@@ -2,26 +2,26 @@
 
 > Templates for `~/.claude/CLAUDE.md` sections. All sections use `<!-- onboard:name -->` / `<!-- /onboard:name -->` markers.
 
-## Tier Selection Rules
+## Tier Selection
 
-Evaluate top-to-bottom. First match wins.
+Direct mapping from Q1 (Coding Comfort). No matrix needed — the user's choice IS the tier.
 
-1. Any role + Expert experience → **Expert**
-2. Senior Developer + Advanced → **Standard**
-3. Junior Developer + Advanced → **Standard**
-4. Designer/PM + Beginner or Intermediate → **Guided**
-5. Student + Beginner → **Guided**
-6. All other combinations → **Supported**
+| Q1 Selection | Tier |
+|---|---|
+| Guide me step by step | **Guided** |
+| Help me grow | **Supported** |
+| Work alongside me | **Standard** |
+| Stay out of my way | **Expert** |
 
 ## About Me Templates
 
-**Guided:** `I am a {role} and not a professional developer · I am {experience_label} with coding and command-line tools · I mainly use Claude Code for {purpose} · Please treat me as a collaborator who needs clear, jargon-free explanations`
+**Guided:** `I am {comfort_label} · I mainly use Claude Code for {purpose} · Please treat me as a collaborator who needs clear, jargon-free explanations`
 
-**Supported:** `I am a {role} with some coding experience · My technical comfort level: {experience_label} · I mainly use Claude Code for {purpose} · I can follow technical explanations but appreciate context for unfamiliar concepts`
+**Supported:** `I am {comfort_label} · I mainly use Claude Code for {purpose} · I can follow technical explanations but appreciate context for unfamiliar concepts`
 
-**Standard:** `I am a {role} · I mainly use Claude Code for {purpose} · I'm comfortable with code and technical concepts`
+**Standard:** `I mainly use Claude Code for {purpose} · I'm comfortable with code and technical concepts`
 
-**Expert:** `I am a {role} · I mainly use Claude Code for {purpose}`
+**Expert:** `I mainly use Claude Code for {purpose}`
 
 Each bullet point above (separated by `·`) becomes a `- ` list item in the output.
 
@@ -111,10 +111,20 @@ User's explicit choice always overrides tier default:
 
 ## Variable Mappings
 
-| Q1 Selection | `{role}` | Q2 Selection | `{experience_label}` | Q3 Selection | `{purpose}` |
-|---|---|---|---|---|---|
-| Designer / PM | designer | Beginner | a beginner | Prototyping | prototyping and experiments |
-| Student / Learner | student | Intermediate | at an intermediate level | Learning | learning and building skills |
-| Junior Developer | junior developer | Advanced | advanced | Production | production projects |
-| Senior Developer | senior developer | Expert | an expert | Mix of both | a mix of prototyping and production |
-| Other (freeform) | user's text, lowercased | | | | |
+**Q1 (Coding Comfort) → `{comfort_label}`**
+
+| Q1 Selection | `{comfort_label}` |
+|---|---|
+| Guide me step by step | new to coding or this tool |
+| Help me grow | building my skills |
+| Work alongside me | comfortable with code |
+| Stay out of my way | deeply experienced |
+
+**Q2 (Purpose) → `{purpose}`**
+
+| Q2 Selection | `{purpose}` |
+|---|---|
+| Prototyping | prototyping and experiments |
+| Learning | learning and building skills |
+| Production | production projects |
+| Mix of both | a mix of prototyping and production |
