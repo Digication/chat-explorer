@@ -15,13 +15,15 @@ Direct mapping from Q1 (Coding Comfort). No matrix needed — the user's choice 
 
 ## About Me Templates
 
-**Guided:** `I am {comfort_label} · I mainly use Claude Code for {purpose} · Please treat me as a collaborator who needs clear, jargon-free explanations`
+> **Note:** Purpose is stored separately in `.claude/user-context.md` (project-scoped, gitignored). The About Me section covers the user's identity and communication needs — not project context.
 
-**Supported:** `I am {comfort_label} · I mainly use Claude Code for {purpose} · I can follow technical explanations but appreciate context for unfamiliar concepts`
+**Guided:** `I am {comfort_label} · Please treat me as a collaborator who needs clear, jargon-free explanations`
 
-**Standard:** `I mainly use Claude Code for {purpose} · I'm comfortable with code and technical concepts`
+**Supported:** `I am {comfort_label} · I can follow technical explanations but appreciate context for unfamiliar concepts`
 
-**Expert:** `I mainly use Claude Code for {purpose}`
+**Standard:** `I'm comfortable with code and technical concepts`
+
+**Expert:** (no About Me content needed — the output style handles everything)
 
 Each bullet point above (separated by `·`) becomes a `- ` list item in the output.
 
@@ -117,7 +119,6 @@ Add this line to every generated `~/.claude/CLAUDE.md`, after the safety section
 
 **Production:** Prioritize correctness · Always run tests · Suggest branching before significant changes · Flag security issues
 
-**Mix:** Adjust based on context — "just try it" = fast, "production"/"deploy" = careful. When unclear, ask.
 
 ## Variable Mappings
 
@@ -130,11 +131,12 @@ Add this line to every generated `~/.claude/CLAUDE.md`, after the safety section
 | Work alongside me | comfortable with code |
 | Stay out of my way | deeply experienced |
 
-**Q2 (Purpose) → `{purpose}`**
+**Q2 (Purpose) → `.claude/user-context.md`**
 
-| Q2 Selection | `{purpose}` |
+Purpose is written to the project-level file, not embedded in `~/.claude/CLAUDE.md`. Use the Purpose Additions (above) for the content.
+
+| Q2 Selection | Purpose description |
 |---|---|
 | Prototyping | prototyping and experiments |
 | Learning | learning and building skills |
 | Production | production projects |
-| Mix of both | a mix of prototyping and production |

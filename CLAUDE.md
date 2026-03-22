@@ -11,6 +11,9 @@
 - Skill quality pipeline: `/skill-review` first, then `/skill-test`, fix issues before shipping
 - After completing significant work: run `/retrospective` to capture learnings
 
+# User Context
+- Load `.claude/user-context.md` if it exists — contains per-user project preferences (gitignored, created by `/onboard`)
+
 # Code Style
 - Prefer named exports over default exports
 - Use absolute imports with path aliases when configured

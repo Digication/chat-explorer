@@ -7,7 +7,7 @@ metadata:
 
 # Onboard — Personalized Claude Code Setup
 
-Interactive wizard that configures Claude Code based on who you are and how you work. Generates `~/.claude/CLAUDE.md` with personalized instructions and sets the appropriate output style so every future conversation is tailored to you.
+Interactive wizard that configures Claude Code based on who you are and how you work. Generates `~/.claude/CLAUDE.md` with personalized instructions, `.claude/user-context.md` with per-project preferences (gitignored), and sets the appropriate output style so every future conversation is tailored to you.
 
 ## Arguments
 
@@ -47,7 +47,8 @@ Interactive wizard that configures Claude Code based on who you are and how you 
 
 Remove all onboard-generated sections from `~/.claude/CLAUDE.md` (everything between `<!-- onboard:* -->` markers). Preserve any user-added sections. If no user-added sections remain, delete the file.
 
-Also clean up output style:
+Also clean up:
+- Delete `.claude/user-context.md` (project-level purpose file)
 - Delete the installed output style file from `~/.claude/output-styles/` (whichever one was installed: `beginner.md`, `supported.md`, `standard.md`, or `expert.md`)
 - Remove `"outputStyle"` from `~/.claude/settings.json` (or set to `""`)
 - Tell the user: "Profile removed. Claude Code is back to default. Run `/onboard` anytime to set up again."
@@ -67,9 +68,9 @@ Header: "Coding Comfort"
 | Stay out of my way | **Expert** | Be fast and concise |
 
 After the user picks:
-1. Re-derive safety posture using the new tier + existing purpose + existing style (from current `~/.claude/CLAUDE.md`)
+1. Re-derive safety posture using the new tier + existing purpose (from `.claude/user-context.md`) + existing style (from current `~/.claude/CLAUDE.md`)
 2. Re-derive output style from the new tier
-3. Regenerate all onboard sections using new tier but **preserve existing Step 2/3 values** (parse them from current CLAUDE.md content)
+3. Regenerate all onboard sections using new tier but **preserve existing Step 2/3 values** (purpose from project file, style from global CLAUDE.md)
 4. Jump to Step 5 (Preview and confirm)
 
 ### Step 1 — Coding Comfort
@@ -86,9 +87,9 @@ Header: "Coding Comfort"
 
 This is the **primary question** — it directly determines the profile tier, safety posture, and output style. Any user at any skill level can pick any option. A senior dev exploring a new tool might choose "Guide me." A designer who's been vibe-coding for months might choose "Stay out of my way." Respect their choice.
 
-### Step 2 — Purpose
+### Step 2 — Purpose (project-scoped)
 
-**AskUserQuestion: "What will you mainly use Claude Code for?"**
+**AskUserQuestion: "What will you mainly use Claude Code for in this project?"**
 Header: "Purpose"
 
 | Option | Description |
@@ -96,7 +97,8 @@ Header: "Purpose"
 | Prototyping | Quick experiments and exploring ideas — speed over polish |
 | Learning | Understanding code, following tutorials, building skills |
 | Production | Real projects that need quality, testing, and reliability |
-| Mix of both | Sometimes prototyping, sometimes production work |
+
+> **Storage:** Purpose is saved to `.claude/user-context.md` (project-level, gitignored) — not to the global `~/.claude/CLAUDE.md`. Different projects can have different purposes. The same user might prototype in one repo and do production work in another.
 
 ### Step 3 — Communication Style
 
@@ -187,13 +189,20 @@ Header: "Your Profile"
    - Replace only the onboard-generated sections
 2. If it doesn't exist, create it
 3. All onboard-generated sections must start with `<!-- onboard:section-name -->` HTML comment so future runs can identify and replace them
-4. **Install output style**: Copy the template from the matching `OUTPUT_STYLE_*.md` reference to `~/.claude/output-styles/` (create directory if needed)
-5. **Set the output style** in `~/.claude/settings.json`:
+4. **Write project-level purpose**: Save the user's purpose choice to `.claude/user-context.md` (project root, gitignored):
+   ```markdown
+   <!-- onboard:purpose -->
+   # Purpose
+   - {purpose description from PROFILES.md Purpose Additions}
+   <!-- /onboard:purpose -->
+   ```
+5. **Install output style**: Copy the template from the matching `OUTPUT_STYLE_*.md` reference to `~/.claude/output-styles/` (create directory if needed)
+6. **Set the output style** in `~/.claude/settings.json`:
    - Read existing settings (if any) and merge — don't overwrite other settings
    - Set `"outputStyle"` to the value from Step 4b
    - Tell the user: "Output style set to [name]. This takes effect in your next session."
-5. Display a summary of what was written and configured
-6. If safety posture recommends sandbox, show the user how to enable it:
+7. Display a summary of what was written and configured
+8. If safety posture recommends sandbox, show the user how to enable it:
    - "To enable sandbox mode, run `/sandbox` in Claude Code"
    - Show recommended `settings.json` additions if applicable
 
