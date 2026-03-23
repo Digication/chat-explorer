@@ -24,8 +24,8 @@ Write the file at the END after all scenarios complete — not incrementally.
 
 1. Clone the repo to a temp directory:
    ```bash
-   TEMP_DIR=$(mktemp -d)/boilerplate-test
-   git clone /Volumes/Data/digication/project-boilerplate "$TEMP_DIR"
+   TEMP_DIR=$(mktemp -d)/blueprint-test
+   git clone /Volumes/Data/digication/claude-blueprint "$TEMP_DIR"
    cd "$TEMP_DIR"
    ```
 

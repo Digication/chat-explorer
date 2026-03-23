@@ -9,6 +9,21 @@
 - After completing significant work: capture learnings (see Contextual Skill Routing for how to surface this based on tier)
 - If `git status` shows uncommitted changes at conversation start: handle based on tier (see Contextual Skill Routing) — never assume the user knows what "uncommitted changes" means
 
+# Memory Routing
+
+When saving learnings, route to the right destination. First match wins:
+
+| What you learned | Where to save | Why there |
+|---|---|---|
+| A skill behaved wrong | Edit the skill file | Team-shared, version-controlled |
+| A team standard everyone should follow | Project `CLAUDE.md` | Team-shared, version-controlled |
+| Something personal about this user | Auto memory (user type) | Private, follows the user across projects |
+| A correction or confirmed approach | Auto memory (feedback type) | Private, prevents repeating mistakes |
+| Temporary project context (deadlines, incidents) | Auto memory (project type) | Private, has a shelf life |
+| A pointer to an external system | Auto memory (reference type) | Private, lookup aid |
+
+**Never save to memory:** Secrets/credentials, code patterns derivable from the codebase, git history, or anything already in CLAUDE.md or skill files.
+
 # User Context
 - Load `.claude/user-context.md` if it exists — contains per-user project preferences (gitignored, created by `/onboard`)
 - Detect the user's tier from `.claude/user-context.md` (`<!-- onboard:tier -->` section): `guided`, `supported`, `standard`, or `expert`

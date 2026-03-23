@@ -2,7 +2,7 @@
 name: task
 description: Manages task context switching safely — prevents losing uncommitted work when starting new tasks. Use when starting a new task, resuming previous work, or checking what's in progress.
 metadata:
-  allowed-tools: Bash, Read, Glob, Grep, AskUserQuestion
+  allowed-tools: Bash, Read, Write, Edit, Glob, Grep, AskUserQuestion
 ---
 
 # Task — Safe Context Switching
@@ -98,8 +98,26 @@ Header: "Pause Task"
 3. Execute the chosen action:
    - **Stash**: `git stash push -u -m "task: {branch} - paused"`
    - **WIP commit**: Stage all, commit `wip: {brief_context_from_recent_changes}`
-4. Optionally ask if they want to switch to main: "Switch back to main branch?"
-5. Confirm: "Work saved. Use `/task resume` to pick up where you left off."
+4. **Save task context to auto memory** so the next conversation knows what was in progress:
+   - Determine the memory directory: `~/.claude/projects/<project-slug>/memory/` where `<project-slug>` is the git repo's absolute path with `/` replaced by `-` (e.g., `/Volumes/Data/myapp` → `-Volumes-Data-myapp`)
+   - Create the directory if it doesn't exist
+   - Write the memory file to `<memory-dir>/task_{branch_name}.md`:
+     ```markdown
+     ---
+     name: task_{branch_name}
+     description: Paused task on {branch} — {brief description of what was being worked on}
+     type: project
+     ---
+
+     Task paused on `{branch}` ({date}).
+     **What was in progress:** {summary of changes from git diff/status}
+     **Next steps:** {what remains to be done, if known}
+     **Why paused:** {reason, if given}
+     ```
+   - Add a pointer to `<memory-dir>/MEMORY.md` (create if it doesn't exist)
+   - If the task is later resumed and completed, remove this memory file and its MEMORY.md entry (no longer needed)
+5. Optionally ask if they want to switch to main: "Switch back to main branch?"
+6. Confirm: "Work saved. Use `/task resume` to pick up where you left off."
 
 ### `resume`
 
@@ -121,7 +139,8 @@ Options built from:
    - **If user picked a branch**: `git checkout task/{name}`. If a stash exists with a matching `task: task/{name}` prefix, ask if they want to pop it too.
    - **If user picked a stash**: Parse the originating branch from the stash message (the `task: {branch}` prefix). Checkout that branch first (`git checkout {branch}`), THEN pop the stash (`git stash pop`). Both steps are required — never pop a stash without first being on the correct branch.
 6. Run `git status` and show current state
-7. Confirm: "Resumed `task/{name}`. Here's where you left off: [brief state summary]"
+7. **Check auto memory** at `~/.claude/projects/<project-slug>/memory/task_{branch_name}.md` — if found, include the saved context (what was in progress, next steps) in the summary. Then remove the memory file and its MEMORY.md entry since the task is active again.
+8. Confirm: "Resumed `task/{name}`. Here's where you left off: [brief state summary including memory context if available]"
 
 ### `list`
 

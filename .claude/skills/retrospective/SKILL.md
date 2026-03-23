@@ -10,6 +10,7 @@ metadata:
 - `references/SKILL_IMPROVEMENT.md` - Protocol for updating existing skills
 - `references/GENERAL_IMPROVEMENT.md` - Protocol for saving cross-cutting preferences
 - `references/SKILL_CREATION.md` - Protocol for creating new skills
+- `references/MEMORY_CAPTURE.md` - Protocol for saving personal/temporary learnings to auto memory
 
 Resolve paths relative to this skill's base path.
 
@@ -22,10 +23,13 @@ Review the current conversation for potential workflow improvements.
 1. **Skill corrections** - A skill was used but needed adjustment
    -> Follow [SKILL_IMPROVEMENT](references/SKILL_IMPROVEMENT.md)
 
-2. **General preferences** - User expressed cross-cutting preferences
+2. **General preferences** - User expressed cross-cutting team standards
    -> Follow [GENERAL_IMPROVEMENT](references/GENERAL_IMPROVEMENT.md)
 
-3. **New skill opportunity** - No skill existed but approach worked well
+3. **Personal learnings** - User preferences, project context, or external references that don't belong in project files
+   -> Follow [MEMORY_CAPTURE](references/MEMORY_CAPTURE.md)
+
+4. **New skill opportunity** - No skill existed but approach worked well
    -> Follow [SKILL_CREATION](references/SKILL_CREATION.md)
 
 ## Examples
@@ -43,7 +47,7 @@ Agent: I noticed a potential improvement to the `/commit` skill:
        Should I update the skill?
 ```
 
-### After Expressing a Preference (General Improvement)
+### After Expressing a Team Standard (General Improvement)
 
 ```
 User: Install the new lodash-es package
@@ -53,6 +57,24 @@ User: /retrospective
 Agent: I noticed a general preference:
        **Package manager**: This project uses pnpm, not npm.
        I'll save this to CLAUDE.md.
+```
+
+### After a Personal Preference or Project Context (Memory Capture)
+
+```
+User: I'm a designer, not a developer — keep the explanations simple
+User: /retrospective
+Agent: I noticed something worth remembering for next time:
+       **User background**: You're a designer who prefers simple explanations.
+       This is personal to you, so I'll save it to memory (not project files). OK?
+```
+
+```
+User: We're freezing all merges after Thursday for the mobile release
+User: /retrospective
+Agent: I noticed temporary project context worth remembering:
+       **Merge freeze**: Begins 2026-03-27 for mobile release.
+       This is temporary, so I'll save it to memory rather than CLAUDE.md. OK?
 ```
 
 ### After a Successful New Workflow (Skill Creation)
