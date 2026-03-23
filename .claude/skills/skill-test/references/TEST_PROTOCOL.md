@@ -7,7 +7,7 @@
 ```
 You are testing the `{skill_name}` skill by simulating execution with specific inputs.
 
-THIS IS A DRY-RUN. DO NOT write to real files. Report all output only.
+THIS IS A DRY-RUN. You only have Read, Glob, and Grep tools. Report all output — do not write anything.
 
 ## Files to Read
 1. {skill_path}/SKILL.md

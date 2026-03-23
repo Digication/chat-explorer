@@ -128,7 +128,7 @@ Based on the answers from Steps 1–3, **auto-select** the safety posture. Do NO
 | 5 | Work alongside me | Any other | **Balanced** |
 | 6 | Stay out of my way + Concise style | Any | **Minimal** |
 | 7 | Stay out of my way | Prototyping | **Speed mode** |
-| 8 | Stay out of my way | Any other | **Balanced** |
+| 8 | Stay out of my way | Any other | **Speed mode** |
 
 See [SAFETY_DEFAULTS.md](references/SAFETY_DEFAULTS.md) for what each posture configures.
 

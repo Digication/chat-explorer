@@ -2,7 +2,7 @@
 name: implement
 description: Plan and execute implementation projects — from new apps to single features. Use when the user wants to create an implementation plan, execute an existing plan, build a new app, or add a feature. Evaluates complexity to decide between direct implementation vs. phased planning.
 metadata:
-  allowed-tools: Read, Write, Edit, Bash(pnpm:*), Bash(npx:*), Bash(git:*), Bash(node:*), Bash(mkdir:*), Bash(ls:*), Bash(cat:*), Bash(rm:*), Bash(cp:*), Bash(mv:*), Glob, Grep, Agent, TodoWrite
+  allowed-tools: Read, Write, Edit, Bash(pnpm:*), Bash(npx:*), Bash(git:*), Bash(node:*), Bash(mkdir:*), Bash(ls:*), Bash(cp:*), Bash(mv:*), Glob, Grep, Agent, TodoWrite
 ---
 
 # Implementation Plan & Execute

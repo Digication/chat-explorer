@@ -48,7 +48,7 @@ Present the scenario list to the user and ask for approval before running. Inclu
 For each scenario, spawn an Agent with:
 
 1. **Fresh context** — no conversation history, simulates a real invocation
-2. **Read-only** — agents must NOT write to `~/.claude/`, `settings.json`, or any real files
+2. **Read-only by tool restriction** — test agents MUST only have access to `Read, Glob, Grep` tools. Never grant `Write, Edit, Bash, or Agent` to test agents. This enforces read-only at the tool level, not just by instruction.
 3. **Complete instructions** — tell the agent exactly which files to read and what inputs to simulate
 4. **Structured output** — require a specific report format (see [REPORT_FORMAT.md](references/REPORT_FORMAT.md))
 
@@ -121,7 +121,7 @@ After generating the test report, turn the lens on yourself. Follow the [SELF_CR
 ## Rules
 
 - **Fresh context per agent** — each test agent starts with zero conversation history
-- **Read-only testing** — agents must never write real files. All output is reported, not executed
+- **Read-only testing** — agents must never write real files. Enforce via tool restrictions (Read, Glob, Grep only), not just instructions
 - **Deterministic inputs** — each scenario specifies exact answers, never "let the agent choose"
 - **Report all assumptions** — if the agent had to interpret ambiguous instructions, that's an issue
 - **Cover decision tables exhaustively** — every row in every decision matrix should be hit by at least one scenario
