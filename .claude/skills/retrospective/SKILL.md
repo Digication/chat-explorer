@@ -1,6 +1,6 @@
 ---
 name: retrospective
-description: Reviews the current conversation to identify workflow improvements, skill updates, or new skill opportunities. Use when the user asks to reflect on what worked, save a preference, improve a skill, remember something for next time, or explicitly invokes /retrospective.
+description: Captures learnings from the current conversation — skill corrections, user preferences, or new skill opportunities. Use when the user corrects your approach, says "remember this", asks to save a preference, reflects on what worked, or after completing significant work. Also auto-triggered by Contextual Skill Routing when corrections or successful non-obvious workflows are detected.
 metadata:
   allowed-tools: Read, Glob, Grep, Edit, Write
 ---

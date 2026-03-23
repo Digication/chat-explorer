@@ -190,8 +190,12 @@ Header: "Your Profile"
    - Replace only the onboard-generated sections
 2. If it doesn't exist, create it
 3. All onboard-generated sections must start with `<!-- onboard:section-name -->` HTML comment so future runs can identify and replace them
-4. **Write project-level purpose**: Save the user's purpose choice to `.claude/user-context.md` (project root, gitignored):
+4. **Write project-level context**: Save the user's tier and purpose to `.claude/user-context.md` (project root, gitignored):
    ```markdown
+   <!-- onboard:tier -->
+   # Tier: {tier}
+   <!-- /onboard:tier -->
+
    <!-- onboard:purpose -->
    # Purpose: {label}
    - {behavior bullet 1 from PROFILES.md Purpose Additions}
@@ -199,6 +203,7 @@ Header: "Your Profile"
    - ...
    <!-- /onboard:purpose -->
    ```
+   Where `{tier}` is one of: `guided`, `supported`, `standard`, `expert` (lowercase). This enables CLAUDE.md's Contextual Skill Routing rules to detect the tier from a single file without cross-referencing `~/.claude/CLAUDE.md`.
    Where `{label}` is the purpose label from PROFILES.md Variable Mappings (e.g., "prototyping and experiments") and the bullets are from Purpose Additions (e.g., "Prioritize speed", "Suggest throwaway branches"). The label enables reverse-lookup for `show` and `level-up`; the bullets are the actionable instructions Claude follows.
 5. **Install output style**: Copy the template from the matching `OUTPUT_STYLE_*.md` reference to `~/.claude/output-styles/` (create directory if needed)
 6. **Set the output style** in `~/.claude/settings.json`:
