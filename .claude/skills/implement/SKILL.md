@@ -149,7 +149,20 @@ Generate implementation plan documents following the structure in [PLAN_STRUCTUR
    └── EXECUTION_GUIDE.md    # Execution order, parallelism, troubleshooting
    ```
 
-6. **Present the plan.** Show the user the phase summary table, dependency graph, and file change inventory. Ask for approval before proceeding to execution.
+6. **Present the plan and hand off.** Show the user the phase summary table and links to the key plan documents for review. Then **immediately** provide the execution prompt — don't wait for a separate confirmation step. Planning and execution should happen in separate chat sessions to keep context clean.
+
+   Format:
+   ```
+   [show plan summary table and key doc links]
+
+   Once it looks good, start a new chat session and run:
+
+   ```
+   /implement execute docs/implementation-plan/<feature-name>
+   ```
+   ```
+
+   Do NOT say "Want me to start building?" or ask for approval before showing the prompt. The user can review the docs and start execution when ready — no extra round-trip needed.
 
 ### Testing Phases
 
@@ -209,7 +222,11 @@ Run an existing implementation plan phase-by-phase using sub-agents.
 
 4. **Handle parallel phases.** When the dependency graph shows independent phases, spawn them concurrently using `isolation: "worktree"`. After both complete, merge worktree changes before proceeding.
 
-5. **Final verification.** After all phases complete, run the full verification suite (typecheck, tests, build).
+5. **Final verification.** After all phases complete, run the full verification suite:
+   a. Run typecheck, tests, and build
+   b. **Start the app** — actually run it and confirm it starts without runtime errors (typecheck alone misses ESM issues, missing decorator metadata, missing runtime config, etc.)
+   c. **Smoke test key flows** — if the app has a UI, open it and verify the main user journey works (e.g., register → login → create item → verify it appears). If it's an API, make a few curl/GraphQL requests. Only report completion after proving the app works end-to-end.
+   d. Stop the app and clean up
 
 ### Sub-Agent Spawning Patterns
 
@@ -257,5 +274,6 @@ Use the EXECUTION_GUIDE.md's model recommendations if they exist. Default to `op
 - **Verification gates.** Never proceed to a dependent phase if verification failed.
 - **No skipping phases.** Even if a phase seems trivial, run it to ensure correct file structure.
 - **Plan docs are the source of truth.** Sub-agents execute what the plan says. Do not improvise beyond the plan scope.
+- **Reference docs override plan content.** When executing Docker or infrastructure phases, cross-reference the skill's own reference docs (`references/DOCKER.md`, `references/INFRASTRUCTURE*.md`). If the plan conflicts with the reference guide, follow the reference guide and note the deviation.
 - **Self-contained phases.** Each phase file must be executable by an agent that has never seen any other phase file. Include enough context (the "Context:" paragraph) for cold starts.
 - **Code completeness.** Phase files must contain complete, copy-pasteable code. Never use `// ...` or `/* rest of implementation */` placeholders.
