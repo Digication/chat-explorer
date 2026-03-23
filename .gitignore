@@ -7,3 +7,4 @@ build/
 *.log
 .DS_Store
 .claude/user-context.md
+.claude/tests/TEST_RESULTS.md

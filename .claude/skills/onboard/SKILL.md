@@ -22,8 +22,8 @@ Interactive wizard that configures Claude Code based on who you are and how you 
 ### Step 0 — Check Existing Profile
 
 1. Check if `~/.claude/CLAUDE.md` exists
-2. If it exists and has an `## About Me` section:
-   - Parse the current profile: detect the tier from the `<!-- onboard:about-me -->` section content (match against the About Me templates in PROFILES.md)
+2. If it exists and has a `<!-- onboard:about-me -->` marker (check for the HTML comment, NOT the `## About Me` heading — Expert profiles have empty About Me content):
+   - Parse the current profile: detect the tier by matching the `<!-- onboard:about-me -->` section content against the About Me templates in PROFILES.md. For tier detection: "new to coding" → Guided, "building my skills" → Supported, "comfortable with code" → Standard, empty/minimal content → Expert.
    - Show the current profile summary including the detected tier
    - If `show` argument was passed, display and stop
    - Use **AskUserQuestion** to ask: "You're currently set to: [detected tier]. What would you like to do?"
@@ -70,8 +70,9 @@ Header: "Coding Comfort"
 After the user picks:
 1. Re-derive safety posture using the new tier + existing purpose (from `.claude/user-context.md`) + existing style (from current `~/.claude/CLAUDE.md`)
 2. Re-derive output style from the new tier
-3. Regenerate all onboard sections using new tier but **preserve existing Step 2/3 values** (purpose from project file, style from global CLAUDE.md)
-4. Jump to Step 5 (Preview and confirm)
+3. Delete the old output style file from `~/.claude/output-styles/` (identify from current `settings.json` `outputStyle` value → map to filename)
+4. Regenerate all onboard sections using new tier but **preserve existing Step 2/3 values** (purpose from project file, style from global CLAUDE.md)
+5. Jump to Step 5 (Preview and confirm)
 
 ### Step 1 — Coding Comfort
 
@@ -192,10 +193,13 @@ Header: "Your Profile"
 4. **Write project-level purpose**: Save the user's purpose choice to `.claude/user-context.md` (project root, gitignored):
    ```markdown
    <!-- onboard:purpose -->
-   # Purpose
-   - {purpose description from PROFILES.md Purpose Additions}
+   # Purpose: {label}
+   - {behavior bullet 1 from PROFILES.md Purpose Additions}
+   - {behavior bullet 2}
+   - ...
    <!-- /onboard:purpose -->
    ```
+   Where `{label}` is the purpose label from PROFILES.md Variable Mappings (e.g., "prototyping and experiments") and the bullets are from Purpose Additions (e.g., "Prioritize speed", "Suggest throwaway branches"). The label enables reverse-lookup for `show` and `level-up`; the bullets are the actionable instructions Claude follows.
 5. **Install output style**: Copy the template from the matching `OUTPUT_STYLE_*.md` reference to `~/.claude/output-styles/` (create directory if needed)
 6. **Set the output style** in `~/.claude/settings.json`:
    - Read existing settings (if any) and merge — don't overwrite other settings

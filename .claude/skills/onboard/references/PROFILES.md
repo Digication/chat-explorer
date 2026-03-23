@@ -23,7 +23,7 @@ Direct mapping from Q1 (Coding Comfort). No matrix needed — the user's choice 
 
 **Standard:** `I'm comfortable with code and technical concepts`
 
-**Expert:** (no About Me content needed — the output style handles everything)
+**Expert:** (no bullet points — write the markers and `## About Me` heading with an empty body. The output style handles communication behavior.)
 
 Each bullet point above (separated by `·`) becomes a `- ` list item in the output.
 

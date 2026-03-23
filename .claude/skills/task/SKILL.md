@@ -34,10 +34,12 @@ This is the core workflow — safe context switching.
 
 **Step 1 — Check dirty state**
 
-Run `git status --porcelain` and `git stash list`.
+Run `git status --porcelain`.
 
-- If clean (no changes, no stashes): skip to Step 3
-- If dirty: proceed to Step 2
+- If working tree is clean (no modified/staged/untracked files): skip to Step 3
+- If dirty (any changes): proceed to Step 2
+
+> Note: Stash presence alone does NOT trigger Step 2 — only uncommitted working tree changes do.
 
 **Step 2 — Handle uncommitted changes**
 
@@ -74,7 +76,9 @@ Header: "New Task"
 | Stay on current branch | No branch — just start working here |
 
 3. Create the branch if requested: `git checkout -b task/{name}` (or `git checkout -b task/{name} main`)
-4. Confirm: "Ready to go. You're on `task/{name}`. What are we building?"
+4. Confirm based on the choice:
+   - If branch created: "Ready to go. You're on `task/{name}`. What are we building?"
+   - If staying on current branch: "Ready to go. You're on `{current_branch}`. What are we building?"
 
 ### `pause`
 
@@ -113,7 +117,9 @@ Options built from:
 - Task branches (with last commit message as description)
 - Stash entries (with stash message as description)
 
-5. Switch to the selected branch or pop the selected stash
+5. Resume the selected task:
+   - **If user picked a branch**: `git checkout task/{name}`. If a stash exists with a matching `task: task/{name}` prefix, ask if they want to pop it too.
+   - **If user picked a stash**: Parse the originating branch from the stash message (the `task: {branch}` prefix). Checkout that branch first (`git checkout {branch}`), THEN pop the stash (`git stash pop`). Both steps are required — never pop a stash without first being on the correct branch.
 6. Run `git status` and show current state
 7. Confirm: "Resumed `task/{name}`. Here's where you left off: [brief state summary]"
 

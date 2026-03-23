@@ -8,7 +8,7 @@
 
 # Workflow
 - Commit messages: Conventional Commits format (`feat(scope): description`)
-- Skill quality pipeline: `/skill-review` first, then `/skill-test`, fix issues before shipping
+- Skill quality pipeline: `/skill-review` → `/skill-test` (dry-run) → `/skill-test-integration plan` (real ops) → fix → ship
 - After completing significant work: run `/retrospective` to capture learnings
 - If `git status` shows uncommitted changes at conversation start, briefly note them and ask if they're related to the current task — suggest `/task` if not
 
