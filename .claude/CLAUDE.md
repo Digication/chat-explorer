@@ -3,6 +3,8 @@
 - Run `/onboard` if `~/.claude/CLAUDE.md` has no `## About Me` section OR `.claude/user-context.md` is missing
 - After completing significant work: capture learnings (see Contextual Skill Routing for how to surface this based on tier)
 - If `git status` shows uncommitted changes at conversation start: handle based on tier (see Contextual Skill Routing) — never assume the user knows what "uncommitted changes" means
+- Commit messages: Conventional Commits format (`feat(scope): description`)
+- Skill quality pipeline (for skill authors): `/skill-dev review` → `/skill-dev test` → `/skill-dev integration plan` → fix → ship
 
 # Memory Routing
 
