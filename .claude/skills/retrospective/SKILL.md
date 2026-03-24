@@ -73,7 +73,7 @@ Agent: I noticed something worth remembering for next time:
 User: We're freezing all merges after Thursday for the mobile release
 User: /retrospective
 Agent: I noticed temporary project context worth remembering:
-       **Merge freeze**: Begins 2026-03-27 for mobile release.
+       **Merge freeze**: Begins 2026-03-26 for mobile release.
        This is temporary, so I'll save it to memory rather than CLAUDE.md. OK?
 ```
 

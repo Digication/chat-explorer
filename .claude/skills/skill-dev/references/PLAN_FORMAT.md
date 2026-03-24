@@ -21,7 +21,7 @@ The results file must contain:
 4. Overall verdict: PASS / FAIL / PARTIAL
 5. Raw agent outputs (unedited) for traceability
 
-Use the report format from `.claude/skills/skill-test/references/REPORT_FORMAT.md`.
+Use the report format from `.claude/skills/skill-dev/references/REPORT_FORMAT.md`.
 
 Write the file at the END after all scenarios complete — not incrementally.
 

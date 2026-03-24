@@ -73,6 +73,16 @@ At conversation start and during the conversation, watch for these situations an
 - **Guided/Supported**: Silently note it. At conversation end or next natural pause, ask: "I learned something from how we worked today. Want me to remember that for next time?" (internally use `/retrospective`)
 - **Standard/Expert**: Suggest `/retrospective`
 
+### Questionable or hedged claims
+- **Detect**: Claude's response contains hedged language ("I think", "usually", "if I recall"), specific factual assertions about external libraries/APIs, OR user questions accuracy ("are you sure?", "is that right?", "really?")
+- **Guided/Supported**: Silently invoke fact-checking on the flagged claims, then surface findings naturally: "I double-checked that — here's what I found." (internally use `/fact-check`)
+- **Standard/Expert**: Mention that fact-checking found something: "I verified that claim — [result]. (You can run `/fact-check` anytime.)"
+
+### Long discussion with many back-and-forth decisions
+- **Detect**: Conversation has 5+ feedback exchanges (corrections, suggestions, disagreements) OR user says "review what we discussed", "did we get this right", "sanity check"
+- **Guided/Supported**: "We've been going back and forth on a lot of decisions. Want me to bring in a fresh pair of eyes to double-check everything?" (internally use `/review-thread`)
+- **Standard/Expert**: Suggest `/review-thread`
+
 ## Purpose-Aware Behavior
 
 Combine tier with purpose (from `.claude/user-context.md`) for additional context:
