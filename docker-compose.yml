@@ -1,0 +1,59 @@
+services:
+  app:
+    image: node:24-bookworm
+    container_name: chat-explorer-dev
+    working_dir: /app
+    command:
+      - sh
+      - -c
+      - |
+        corepack enable &&
+        corepack prepare --activate &&
+        pnpm install &&
+        pnpm dev:full
+    env_file:
+      - .env
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    ports:
+      - "4000:4000"   # Exposed for Google OAuth callback (Google requires plain localhost)
+    depends_on:
+      db:
+        condition: service_healthy
+    labels:
+      caddy: chat-explorer.localhost
+      caddy.tls: internal
+      caddy.reverse_proxy: "{{upstreams 5173}}"
+    networks:
+      - web
+      - default
+    stdin_open: true
+    tty: true
+
+  db:
+    image: postgres:17
+    container_name: chat-explorer-db
+    environment:
+      POSTGRES_USER: dev
+      POSTGRES_PASSWORD: dev
+      POSTGRES_DB: chat-explorer
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - default
+
+networks:
+  web:
+    external: true
+
+volumes:
+  pgdata:

@@ -5,6 +5,14 @@ build/
 .env.*
 !.env.example
 *.log
+uploads/*
+!uploads/.gitkeep
+data/uploads/
+coverage/
+playwright-report/
+test-results/
 .DS_Store
+.pnpm-store/
+.claude/.claude-backup/
 .claude/user-context.md
 .claude/tests/TEST_RESULTS.md
