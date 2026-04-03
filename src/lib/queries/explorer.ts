@@ -11,16 +11,6 @@ export const GET_EXPLORER_ME = gql`
   }
 `;
 
-/** Fetch the current user's institution. */
-export const GET_EXPLORER_INSTITUTION = gql`
-  query ExplorerInstitution {
-    myInstitution {
-      id
-      name
-    }
-  }
-`;
-
 /** Fetch courses, optionally filtered by institution. Includes institutionId for scope building. */
 export const GET_EXPLORER_COURSES = gql`
   query ExplorerCourses($institutionId: ID) {

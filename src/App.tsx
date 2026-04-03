@@ -14,6 +14,7 @@ import InsightsPage from "@/pages/InsightsPage";
 import ChatExplorerPage from "@/pages/ChatExplorerPage";
 // AiChatPage is no longer used — AI Chat is embedded in ChatExplorerPage
 import ReportsPage from "@/pages/ReportsPage";
+import { InsightsScopeProvider } from "@/components/insights/ScopeSelector";
 
 function DashboardPage() {
   return (
@@ -104,10 +105,12 @@ export default function App() {
                 path="/"
                 element={
                   <ProtectedRoute>
-                    <AppShell
-                      darkMode={darkMode}
-                      onToggleDarkMode={() => setDarkMode((d) => !d)}
-                    />
+                    <InsightsScopeProvider>
+                      <AppShell
+                        darkMode={darkMode}
+                        onToggleDarkMode={() => setDarkMode((d) => !d)}
+                      />
+                    </InsightsScopeProvider>
                   </ProtectedRoute>
                 }
               >
