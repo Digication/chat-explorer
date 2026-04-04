@@ -1,8 +1,10 @@
 import { AppDataSource } from "../../data-source.js";
+import { Comment } from "../../entities/Comment.js";
 import { CommentToriTag } from "../../entities/CommentToriTag.js";
 import { ToriTag } from "../../entities/ToriTag.js";
 import { Student } from "../../entities/Student.js";
-import { In } from "typeorm";
+import { StudentConsent, ConsentStatus } from "../../entities/StudentConsent.js";
+import { In, IsNull } from "typeorm";
 import type {
   AnalyticsScope,
   AnalyticsResult,
@@ -11,16 +13,25 @@ import type {
 } from "./types.js";
 import { resolveScope } from "./scope.js";
 import { withCache } from "./cache.js";
-import { clusterMatrix } from "./clustering.js";
 
 export interface HeatmapData {
   matrix: number[][];
   rowLabels: string[]; // student identifiers
   colLabels: string[]; // tag names
+  rowIds: string[];    // student UUIDs, same order as rowLabels
+  colIds: string[];    // ToriTag UUIDs, same order as colLabels
   rowOrder: number[]; // ordering indices (identity unless clustered)
   colOrder: number[];
   mode: HeatmapMode;
   scaling: ScalingMode;
+}
+
+export interface CellEvidence {
+  commentId: string;
+  text: string;
+  threadId: string;
+  threadName: string;
+  timestamp: string | null;
 }
 
 export async function getHeatmap(
@@ -43,6 +54,8 @@ export async function getHeatmap(
         matrix: [],
         rowLabels: [],
         colLabels: [],
+        rowIds: [],
+        colIds: [],
         rowOrder: [],
         colOrder: [],
         mode,
@@ -107,13 +120,10 @@ export async function getHeatmap(
     let rowOrder = rowLabels.map((_, i) => i);
     let colOrder = colLabels.map((_, i) => i);
 
-    if (mode === "CLUSTERED") {
-      const clustered = clusterMatrix(scaled);
-      rowOrder = clustered.rowOrder;
-      colOrder = clustered.colOrder;
-    }
+    const rowIds = studentIds;
+    const colIds = allTags.map((t) => t.id);
 
-    return { matrix: scaled, rowLabels, colLabels, rowOrder, colOrder, mode, scaling };
+    return { matrix: scaled, rowLabels, colLabels, rowIds, colIds, rowOrder, colOrder, mode, scaling };
   });
 
   return {
@@ -148,4 +158,86 @@ function applyScaling(matrix: number[][], scaling: ScalingMode): number[][] {
   }
   if (globalMax === 0) return matrix;
   return matrix.map((row) => row.map((v) => v / globalMax));
+}
+
+/**
+ * Returns the actual comment text for a specific (student, TORI tag) pair.
+ * Uses a direct consent check instead of resolveScope() to avoid loading
+ * all comments into memory.
+ */
+export async function getHeatmapCellEvidence(
+  scope: AnalyticsScope,
+  studentId: string,
+  toriTagId: string
+): Promise<CellEvidence[]> {
+  // Direct consent check — lightweight, no resolveScope()
+  const consentRepo = AppDataSource.getRepository(StudentConsent);
+
+  // Check institution-level exclusion
+  const instExclusion = await consentRepo.findOne({
+    where: {
+      studentId,
+      institutionId: scope.institutionId,
+      courseId: IsNull(),
+      status: ConsentStatus.EXCLUDED,
+    },
+  });
+  if (instExclusion) return [];
+
+  // Check course-level exclusion
+  if (scope.courseId) {
+    const courseExclusion = await consentRepo.findOne({
+      where: {
+        studentId,
+        institutionId: scope.institutionId,
+        courseId: scope.courseId,
+        status: ConsentStatus.EXCLUDED,
+      },
+    });
+    if (courseExclusion) return [];
+  }
+
+  // Direct evidence query
+  const qb = AppDataSource.getRepository(Comment)
+    .createQueryBuilder("c")
+    .innerJoin(CommentToriTag, "ctt", "ctt.commentId = c.id")
+    .innerJoin("c.thread", "t")
+    .innerJoin("t.assignment", "a")
+    .select([
+      'c.id AS "commentId"',
+      "c.text AS text",
+      'c.threadId AS "threadId"',
+      't.name AS "threadName"',
+      "c.timestamp AS timestamp",
+    ])
+    .where("c.studentId = :studentId", { studentId })
+    .andWhere("ctt.toriTagId = :toriTagId", { toriTagId })
+    .andWhere("c.role = :role", { role: "USER" })
+    .andWhere(
+      "a.courseId IN (SELECT id FROM course WHERE institutionId = :instId)",
+      { instId: scope.institutionId }
+    );
+
+  if (scope.courseId) {
+    qb.andWhere("a.courseId = :courseId", { courseId: scope.courseId });
+  }
+  if (scope.assignmentId) {
+    qb.andWhere("t.assignmentId = :assignmentId", {
+      assignmentId: scope.assignmentId,
+    });
+  }
+
+  qb.orderBy("c.timestamp", "ASC", "NULLS LAST")
+    .addOrderBy("c.orderIndex", "ASC")
+    .limit(20);
+
+  const rows = await qb.getRawMany();
+
+  return rows.map((r) => ({
+    commentId: r.commentId ?? r.commentid,
+    text: r.text,
+    threadId: r.threadId ?? r.threadid,
+    threadName: r.threadName ?? r.threadname,
+    timestamp: r.timestamp ? new Date(r.timestamp).toISOString() : null,
+  }));
 }

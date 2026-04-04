@@ -19,7 +19,7 @@ export interface AnalyticsResult<T> {
 }
 
 // Heatmap visual modes
-export type HeatmapMode = "CLASSIC" | "CLUSTERED" | "DOT";
+export type HeatmapMode = "CLASSIC";
 
 // How color/size intensity is calculated
 export type ScalingMode = "RAW" | "ROW" | "GLOBAL";

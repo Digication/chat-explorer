@@ -29,8 +29,6 @@ export const typeDefs = /* GraphQL */ `
 
   enum HeatmapMode {
     CLASSIC
-    CLUSTERED
-    DOT
   }
 
   enum ScalingMode {
@@ -292,10 +290,20 @@ export const typeDefs = /* GraphQL */ `
     matrix: [[Float!]!]!
     rowLabels: [String!]!
     colLabels: [String!]!
+    rowIds: [ID!]!
+    colIds: [ID!]!
     rowOrder: [Int!]!
     colOrder: [Int!]!
     mode: HeatmapMode!
     scaling: ScalingMode!
+  }
+
+  type CellEvidence {
+    commentId: ID!
+    text: String!
+    threadId: ID!
+    threadName: String!
+    timestamp: String
   }
 
   type NetworkNode {
@@ -493,6 +501,12 @@ export const typeDefs = /* GraphQL */ `
     scaling: ScalingMode
   }
 
+  input CellEvidenceInput {
+    scope: AnalyticsScopeInput!
+    studentId: ID!
+    toriTagId: ID!
+  }
+
   input ConsentInput {
     studentId: ID!
     institutionId: ID!
@@ -520,9 +534,13 @@ export const typeDefs = /* GraphQL */ `
     textSignals(scope: AnalyticsScopeInput!): TextSignalsResult!
     engagement(scope: AnalyticsScopeInput!): EngagementAnalysisResult!
     heatmap(input: HeatmapInput!): HeatmapResult!
+    heatmapCellEvidence(input: CellEvidenceInput!): [CellEvidence!]!
     network(scope: AnalyticsScopeInput!): NetworkResult!
     instructionalInsights(scope: AnalyticsScopeInput!): InsightsResult!
     recommendations(scope: AnalyticsScopeInput!): RecommendationsResult!
+
+    # Thread
+    thread(id: ID!): Thread
 
     # Chat
     chatSessions(courseId: ID, assignmentId: ID): [ChatSession!]!

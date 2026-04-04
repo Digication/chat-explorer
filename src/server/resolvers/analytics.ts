@@ -9,7 +9,7 @@ import { getOverview } from "../services/analytics/overview.js";
 import { getToriAnalysis } from "../services/analytics/tori.js";
 import { getTextSignals } from "../services/analytics/text-signals.js";
 import { getEngagement } from "../services/analytics/engagement.js";
-import { getHeatmap } from "../services/analytics/heatmap.js";
+import { getHeatmap, getHeatmapCellEvidence } from "../services/analytics/heatmap.js";
 import { getNetwork } from "../services/analytics/network.js";
 import { getInsights } from "../services/analytics/instructional-insights.js";
 import { getRecommendations } from "../services/analytics/recommendations.js";
@@ -76,6 +76,15 @@ export const analyticsResolvers = {
     ) => {
       const validated = await validateScope(ctx, input.scope);
       return getHeatmap(validated, input.mode, input.scaling);
+    },
+
+    heatmapCellEvidence: async (
+      _: unknown,
+      { input }: { input: { scope: ScopeInput; studentId: string; toriTagId: string } },
+      ctx: GraphQLContext
+    ) => {
+      const validated = await validateScope(ctx, input.scope);
+      return getHeatmapCellEvidence(validated, input.studentId, input.toriTagId);
     },
 
     network: async (

@@ -114,6 +114,8 @@ export const GET_HEATMAP = gql`
         matrix
         rowLabels
         colLabels
+        rowIds
+        colIds
         rowOrder
         colOrder
         mode
@@ -122,6 +124,19 @@ export const GET_HEATMAP = gql`
       meta {
         cached
       }
+    }
+  }
+`;
+
+/** Evidence quotes for a specific (student, TORI tag) heatmap cell. */
+export const GET_HEATMAP_CELL_EVIDENCE = gql`
+  query HeatmapCellEvidence($input: CellEvidenceInput!) {
+    heatmapCellEvidence(input: $input) {
+      commentId
+      text
+      threadId
+      threadName
+      timestamp
     }
   }
 `;

@@ -11,6 +11,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import { GET_HEATMAP } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
+import EvidencePopover from "@/components/insights/EvidencePopover";
 
 // ── Color helpers ──────────────────────────────────────────────────────────────
 
@@ -39,10 +40,12 @@ function Sparkline({
   values,
   labels,
   globalMax,
+  onDotClick,
 }: {
   values: number[];
   labels: string[];
   globalMax: number;
+  onDotClick?: (colIndex: number, event: React.MouseEvent<SVGElement>) => void;
 }) {
   // viewBox coordinates — SVG scales to fill whatever width the td gives it
   const VW = 1000;
@@ -96,7 +99,13 @@ function Sparkline({
         // Color dot relative to global max so intensity is comparable across students
         const t = globalMax > 0 ? v / globalMax : 0;
         return (
-          <g key={i} style={{ cursor: "default" }}>
+          <g
+            key={i}
+            style={{ cursor: v > 0 && onDotClick ? "pointer" : "default" }}
+            onClick={(e) => {
+              if (v > 0 && onDotClick) onDotClick(i, e);
+            }}
+          >
             <title>{`${labels[i]}: ${v}`}</title>
             {/* Invisible wider hit area */}
             <circle cx={cx} cy={cy} r={10} fill="transparent" />
@@ -122,13 +131,18 @@ function StudentTagCard({
   name,
   values,
   labels,
+  colIds,
+  onTagClick,
 }: {
   name: string;
   values: number[];
   labels: string[];
+  colIds: string[];
+  onTagClick?: (event: React.MouseEvent<HTMLElement>, toriTagId: string, toriTagName: string, count: number) => void;
 }) {
+  // Build tag array with original colId so we can reference it after sorting
   const tags = labels
-    .map((label, i) => ({ label, count: values[i] }))
+    .map((label, i) => ({ label, count: values[i], colId: colIds[i] }))
     .filter((t) => t.count > 0)
     .sort((a, b) => b.count - a.count);
 
@@ -151,15 +165,21 @@ function StudentTagCard({
         </Typography>
       ) : (
         <Box component="ul" sx={{ m: 0, p: 0, listStyle: "none" }}>
-          {tags.slice(0, 7).map(({ label, count }) => (
+          {tags.slice(0, 7).map(({ label, count, colId }) => (
             <Box
               component="li"
               key={label}
+              onClick={(e: React.MouseEvent<HTMLElement>) => {
+                if (onTagClick) onTagClick(e, colId, label, count);
+              }}
               sx={{
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
                 py: "1px",
+                cursor: onTagClick ? "pointer" : "default",
+                borderRadius: 0.5,
+                "&:hover": onTagClick ? { bgcolor: "action.hover" } : {},
               }}
             >
               <Typography
@@ -201,11 +221,25 @@ function StudentTagCard({
 
 type DisplayMode = "CLASSIC" | "SPARKLINE" | "SMALL_MULTIPLES";
 
-export default function HeatmapView() {
+interface PopoverState {
+  anchorEl: HTMLElement;
+  studentId: string;
+  studentName: string;
+  toriTagId: string;
+  toriTagName: string;
+  count: number;
+}
+
+interface HeatmapViewProps {
+  onViewThread?: (threadId: string, studentName: string) => void;
+}
+
+export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
   const { scope } = useInsightsScope();
 
   const [mode, setMode] = useState<DisplayMode>("CLASSIC");
   const [scaling, setScaling] = useState<"RAW" | "ROW" | "GLOBAL">("RAW");
+  const [popoverState, setPopoverState] = useState<PopoverState | null>(null);
 
   const { data, loading, error, refetch } = useQuery<any>(GET_HEATMAP, {
     variables: {
@@ -259,6 +293,8 @@ export default function HeatmapView() {
   const matrix: number[][] = hm.matrix;
   const rowLabels: string[] = hm.rowLabels;
   const colLabels: string[] = hm.colLabels;
+  const rowIds: string[] = hm.rowIds ?? [];
+  const colIds: string[] = hm.colIds ?? [];
   const rowOrder: number[] = hm.rowOrder ?? rowLabels.map((_: string, i: number) => i);
   const colOrder: number[] = hm.colOrder ?? colLabels.map((_: string, i: number) => i);
 
@@ -332,6 +368,20 @@ export default function HeatmapView() {
                         values={values}
                         labels={colOrder.map((ci) => colLabels[ci])}
                         globalMax={maxVal}
+                        onDotClick={(localColIdx, e) => {
+                          const ci = colOrder[localColIdx];
+                          // Anchor to the <td>, not the SVG circle
+                          const td = (e.target as Element).closest("td") as HTMLElement;
+                          if (!td) return;
+                          setPopoverState({
+                            anchorEl: td,
+                            studentId: rowIds[ri],
+                            studentName: rowLabels[ri],
+                            toriTagId: colIds[ci],
+                            toriTagName: colLabels[ci],
+                            count: matrix[ri]?.[ci] ?? 0,
+                          });
+                        }}
                       />
                     </td>
                   </tr>
@@ -351,6 +401,17 @@ export default function HeatmapView() {
               name={rowLabels[ri]}
               values={colOrder.map((ci) => matrix[ri]?.[ci] ?? 0)}
               labels={colOrder.map((ci) => colLabels[ci])}
+              colIds={colOrder.map((ci) => colIds[ci])}
+              onTagClick={(e, toriTagId, toriTagName, count) => {
+                setPopoverState({
+                  anchorEl: e.currentTarget as HTMLElement,
+                  studentId: rowIds[ri],
+                  studentName: rowLabels[ri],
+                  toriTagId,
+                  toriTagName,
+                  count,
+                });
+              }}
             />
           ))}
         </Box>
@@ -421,6 +482,17 @@ export default function HeatmapView() {
                         arrow
                       >
                         <td
+                          onClick={(e) => {
+                            if (raw === 0) return;
+                            setPopoverState({
+                              anchorEl: e.currentTarget as HTMLElement,
+                              studentId: rowIds[ri],
+                              studentName: rowLabels[ri],
+                              toriTagId: colIds[ci],
+                              toriTagName: colLabels[ci],
+                              count: raw,
+                            });
+                          }}
                           style={{
                             width: 48,
                             height: 32,
@@ -429,6 +501,7 @@ export default function HeatmapView() {
                             border: "1px solid rgba(0,0,0,0.06)",
                             background: cellColor(t),
                             color: textColor(t),
+                            cursor: raw > 0 ? "pointer" : "default",
                           }}
                         >
                           {raw > 0 ? raw : null}
@@ -441,6 +514,24 @@ export default function HeatmapView() {
             </tbody>
           </table>
         </Box>
+      )}
+
+      {/* Evidence popover — shown when a heatmap cell is clicked */}
+      {popoverState && scope && (
+        <EvidencePopover
+          anchorEl={popoverState.anchorEl}
+          studentId={popoverState.studentId}
+          studentName={popoverState.studentName}
+          toriTagId={popoverState.toriTagId}
+          toriTagName={popoverState.toriTagName}
+          count={popoverState.count}
+          scope={scope}
+          onClose={() => setPopoverState(null)}
+          onViewThread={(threadId, studentName) => {
+            setPopoverState(null);
+            onViewThread?.(threadId, studentName);
+          }}
+        />
       )}
     </Box>
   );

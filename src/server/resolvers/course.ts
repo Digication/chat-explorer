@@ -79,6 +79,25 @@ export const courseResolvers = {
       await requireCourseAccess(ctx, assignment.courseId);
       return assignment;
     },
+
+    thread: async (
+      _: unknown,
+      { id }: { id: string },
+      ctx: GraphQLContext
+    ) => {
+      requireAuth(ctx);
+      const repo = AppDataSource.getRepository(Thread);
+      const thread = await repo.findOne({ where: { id } });
+      if (!thread) return null;
+
+      // Verify user has access to the course this thread belongs to
+      const assignmentRepo = AppDataSource.getRepository(Assignment);
+      const assignment = await assignmentRepo.findOne({ where: { id: thread.assignmentId } });
+      if (!assignment) return null; // orphaned thread — treat as not found
+      await requireCourseAccess(ctx, assignment.courseId);
+
+      return thread;
+    },
   },
 
   Course: {

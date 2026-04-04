@@ -52,6 +52,33 @@ export const GET_STUDENT_PROFILES = gql`
   }
 `;
 
+/** Fetch a single thread by ID with full comments and TORI tags. */
+export const GET_THREAD_BY_ID = gql`
+  query ThreadById($id: ID!) {
+    thread(id: $id) {
+      id
+      name
+      comments {
+        id
+        role
+        text
+        timestamp
+        orderIndex
+        studentId
+        student {
+          id
+          displayName
+        }
+        toriTags {
+          id
+          name
+          domain
+        }
+      }
+    }
+  }
+`;
+
 /**
  * Fetch threads with full comments for a course's assignments.
  * Includes student info and TORI tags on each comment.
