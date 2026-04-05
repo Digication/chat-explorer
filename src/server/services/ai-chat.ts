@@ -41,15 +41,64 @@ export async function buildContext(session: ChatSession): Promise<string> {
 
   switch (session.scope) {
     case ChatScope.SELECTION: {
-      // Only the hand-picked comments
       if (session.selectedCommentIds && session.selectedCommentIds.length > 0) {
+        // Hand-picked comments
         comments = await commentRepo.find({
           where: { id: In(session.selectedCommentIds) },
           relations: ["thread", "student"],
           order: { orderIndex: "ASC" },
         });
+        scopeLabel = "selected comments";
+      } else if (session.studentId) {
+        // Student-level scope: fetch all comments by this student,
+        // narrowed to the assignment or course if provided.
+        const threadRepo = AppDataSource.getRepository(Thread);
+
+        if (session.assignmentId) {
+          // Narrow to threads in this assignment
+          const threads = await threadRepo.find({
+            where: { assignmentId: session.assignmentId },
+          });
+          const threadIds = threads.map((t) => t.id);
+          if (threadIds.length > 0) {
+            comments = await commentRepo.find({
+              where: { studentId: session.studentId, threadId: In(threadIds) },
+              relations: ["thread", "student"],
+              order: { orderIndex: "ASC" },
+            });
+          }
+        } else if (session.courseId) {
+          // Narrow to threads in any assignment in this course
+          const assignmentRepo = AppDataSource.getRepository(Assignment);
+          const assignments = await assignmentRepo.find({
+            where: { courseId: session.courseId },
+          });
+          const assignmentIds = assignments.map((a) => a.id);
+          if (assignmentIds.length > 0) {
+            const threads = await threadRepo.find({
+              where: { assignmentId: In(assignmentIds) },
+            });
+            const threadIds = threads.map((t) => t.id);
+            if (threadIds.length > 0) {
+              comments = await commentRepo.find({
+                where: { studentId: session.studentId, threadId: In(threadIds) },
+                relations: ["thread", "student"],
+                order: { orderIndex: "ASC" },
+              });
+            }
+          }
+        } else {
+          // No course/assignment filter — all comments by this student
+          comments = await commentRepo.find({
+            where: { studentId: session.studentId },
+            relations: ["thread", "student"],
+            order: { orderIndex: "ASC" },
+          });
+        }
+        scopeLabel = "student";
+      } else {
+        scopeLabel = "selected comments";
       }
-      scopeLabel = "selected comments";
       break;
     }
 
