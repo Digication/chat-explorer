@@ -19,8 +19,9 @@ export interface RawCsvRow {
   authorEmail: string;
   authorSystemRole: string;
   authorCourseRole: string;
-  // Future column: explicitly signals "student" vs "ai_assistant" per comment.
-  // When present, this takes priority over all other role-detection heuristics.
+  // Explicit role label per comment: "ASSISTANT" or "USER"
+  commentRole: string;
+  // Legacy alias — older CSVs may use "Comment Author Type" instead
   commentAuthorType: string;
   assignmentId: string;
   assignmentCreatedDate: string;
@@ -45,6 +46,26 @@ export interface RawCsvRow {
   aiAssistantReflections: string;
   aiAssistantGenerateAnswers: string;
   aiAssistantIntendedAudience: string;
+  // Course columns (new in 2026-04 CSV format)
+  courseId: string;
+  courseName: string;
+  courseUrl: string;
+  courseStartDate: string;
+  courseEndDate: string;
+  courseNumber: string;
+  courseSyncId: string;
+  courseFaculty: string;
+  // Assignment creator columns (new)
+  assignmentCreatorSyncId: string;
+  assignmentCreatorFirstName: string;
+  assignmentCreatorLastName: string;
+  assignmentCreatorEmail: string;
+  // AI assistant creator columns (new)
+  aiAssistantCreatorSystemId: string;
+  aiAssistantCreatorSyncId: string;
+  aiAssistantCreatorFirstName: string;
+  aiAssistantCreatorLastName: string;
+  aiAssistantCreatorEmail: string;
 }
 
 function normalizeHeader(header: string): string {
@@ -67,7 +88,9 @@ function normalizeHeader(header: string): string {
     "comment author email": "authorEmail",
     "comment author system role": "authorSystemRole",
     "comment author course role": "authorCourseRole",
-    // Future column — will explicitly label each comment's author type
+    // Explicit role column (new CSV format)
+    "comment role": "commentRole",
+    // Legacy alias
     "comment author type": "commentAuthorType",
     "assignment id": "assignmentId",
     "assignment created date": "assignmentCreatedDate",
@@ -92,10 +115,46 @@ function normalizeHeader(header: string): string {
     "ai assistant reflections": "aiAssistantReflections",
     "ai assistant generate answers / content": "aiAssistantGenerateAnswers",
     "ai assistant intended audience": "aiAssistantIntendedAudience",
+    // Course columns
+    "course id": "courseId",
+    "course name": "courseName",
+    "course url": "courseUrl",
+    "course start date": "courseStartDate",
+    "course end date": "courseEndDate",
+    "course number": "courseNumber",
+    "course sync id": "courseSyncId",
+    "course faculty": "courseFaculty",
+    // Assignment creator columns
+    "assignment creator sync id": "assignmentCreatorSyncId",
+    "assignment creator first name": "assignmentCreatorFirstName",
+    "assignment creator last name": "assignmentCreatorLastName",
+    "assignment creator email": "assignmentCreatorEmail",
+    // AI assistant creator columns
+    "ai assistant creator system id": "aiAssistantCreatorSystemId",
+    "ai assistant creator sync id": "aiAssistantCreatorSyncId",
+    "ai assistant creator first name": "aiAssistantCreatorFirstName",
+    "ai assistant creator last name": "aiAssistantCreatorLastName",
+    "ai assistant creator email": "aiAssistantCreatorEmail",
   };
 
   const normalized = header.trim().toLowerCase();
   return headerMap[normalized] ?? normalized;
+}
+
+/**
+ * Converts HTML entities back to their normal characters.
+ * CSV exports from some systems encode special characters as HTML entities
+ * (e.g. apostrophes become &#39; or &apos;). This reverses that encoding
+ * so text displays correctly in the app.
+ */
+export function decodeEntities(text: string): string {
+  return text
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
 }
 
 export function parseCsvBuffer(buffer: Buffer): RawCsvRow[] {

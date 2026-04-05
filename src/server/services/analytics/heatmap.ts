@@ -214,7 +214,7 @@ export async function getHeatmapCellEvidence(
     .andWhere("ctt.toriTagId = :toriTagId", { toriTagId })
     .andWhere("c.role = :role", { role: "USER" })
     .andWhere(
-      "a.courseId IN (SELECT id FROM course WHERE institutionId = :instId)",
+      'a."courseId" IN (SELECT id FROM course WHERE "institutionId" = :instId)',
       { instId: scope.institutionId }
     );
 

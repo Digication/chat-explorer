@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { writeFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { AppDataSource } from "../data-source.js";
-import { parseCsvBuffer, type RawCsvRow } from "./csv-parser.js";
+import { parseCsvBuffer, decodeEntities, type RawCsvRow } from "./csv-parser.js";
 import { checkDuplicates } from "./dedup.js";
 import { extractToriForThread } from "./tori-extractor.js";
 import { Institution } from "../entities/Institution.js";
@@ -99,8 +99,20 @@ async function detectInstitution(
 // ── Helper: determine comment role from CSV author fields ──────────
 
 function resolveCommentRole(row: RawCsvRow): CommentRole {
-  // ── Priority 1: explicit "Comment Author Type" column (future CSV format).
+  // ── Priority 1: explicit "Comment Role" column (2026-04+ CSV format).
   // When present, this is the definitive answer — skip all heuristics.
+  const commentRole = (row.commentRole ?? "").toUpperCase().trim();
+  if (commentRole === "ASSISTANT" || commentRole === "AI") {
+    return CommentRole.ASSISTANT;
+  }
+  if (commentRole === "USER" || commentRole === "STUDENT") {
+    return CommentRole.USER;
+  }
+  if (commentRole === "SYSTEM") {
+    return CommentRole.SYSTEM;
+  }
+
+  // ── Priority 1b: legacy "Comment Author Type" column (older CSV format).
   const authorType = (row.commentAuthorType ?? "").toLowerCase().trim();
   if (authorType === "ai" || authorType === "ai_assistant" || authorType === "assistant") {
     return CommentRole.ASSISTANT;
@@ -317,40 +329,64 @@ export async function commitUpload(
     // ── Process each assignment group ────────────────────────────
     for (const [assignmentExternalId, assignmentRows] of rowsByAssignment) {
       // ── 1. Ensure a Course exists ──────────────────────────────
-      // No Course column in CSV — create one default course per assignment
-      let course = courseCache.get(assignmentExternalId);
-      if (!course) {
-        // Look up by name pattern (the course name is derived from the
-        // assignment name since we have no explicit course data)
-        const firstRow = assignmentRows[0];
-        const courseName = `${firstRow.assignmentName ?? "Untitled"} — Course`;
+      const firstRow = assignmentRows[0];
+      const csvCourseId = firstRow.courseId?.trim() || null;
 
-        // Try to find an existing course that was created for this
-        // assignment in a prior upload (we link via the assignment)
-        if (!dedup.existingAssignmentIds.has(assignmentExternalId)) {
-          // New assignment → new course
-          course = await manager.save(Course, {
-            institutionId,
-            name: courseName,
-          });
-          newCoursesCount++;
-        } else {
-          // Assignment already exists — find its course
-          const existingAssignment = await manager.findOne(Assignment, {
-            where: { externalId: assignmentExternalId },
-            relations: { course: true },
-          });
-          course = existingAssignment?.course as Course | undefined;
+      // Cache key: use the CSV course ID if available, otherwise fall back
+      // to assignment ID (legacy behavior for CSVs without course data)
+      const courseCacheKey = csvCourseId ?? `__assignment__${assignmentExternalId}`;
+      let course = courseCache.get(courseCacheKey);
+
+      if (!course) {
+        if (csvCourseId) {
+          // ── New CSV format: real course data available ──────────
+          // Try to find existing course by externalId within this institution
+          course =
+            (await manager.findOne(Course, {
+              where: { externalId: csvCourseId, institutionId },
+            })) ?? undefined;
+
           if (!course) {
-            // Fallback: create a course anyway
+            // Create course with full metadata from CSV
+            course = await manager.save(Course, {
+              institutionId,
+              externalId: csvCourseId,
+              name: firstRow.courseName || "Untitled Course",
+              url: firstRow.courseUrl || null,
+              startDate: parseDateOrNull(firstRow.courseStartDate),
+              endDate: parseDateOrNull(firstRow.courseEndDate),
+              courseNumber: firstRow.courseNumber || null,
+              syncId: firstRow.courseSyncId || null,
+              faculty: firstRow.courseFaculty || null,
+            });
+            newCoursesCount++;
+          }
+        } else {
+          // ── Legacy CSV format: no course data — one course per assignment
+          const courseName = `${firstRow.assignmentName ?? "Untitled"} — Course`;
+
+          if (!dedup.existingAssignmentIds.has(assignmentExternalId)) {
             course = await manager.save(Course, {
               institutionId,
               name: courseName,
             });
             newCoursesCount++;
+          } else {
+            const existingAssignment = await manager.findOne(Assignment, {
+              where: { externalId: assignmentExternalId },
+              relations: { course: true },
+            });
+            course = existingAssignment?.course as Course | undefined;
+            if (!course) {
+              course = await manager.save(Course, {
+                institutionId,
+                name: courseName,
+              });
+              newCoursesCount++;
+            }
           }
         }
-        courseCache.set(assignmentExternalId, course);
+        courseCache.set(courseCacheKey, course);
       }
       courseIdsForAccess.add(course.id);
 
@@ -502,7 +538,7 @@ export async function commitUpload(
             studentId,
             externalId: row.commentId,
             role,
-            text: row.commentFullText ?? "",
+            text: decodeEntities(row.commentFullText ?? ""),
             timestamp: parseDateOrNull(row.commentTimestamp),
             orderIndex: parseIntOrNull(row.commentOrder) ?? 0,
             totalComments: parseIntOrNull(row.totalComments),

@@ -33,6 +33,24 @@ export class Course {
   @Column({ type: "text", nullable: true })
   description!: string | null;
 
+  @Column({ type: "varchar", nullable: true })
+  url!: string | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  startDate!: Date | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  endDate!: Date | null;
+
+  @Column({ type: "varchar", nullable: true })
+  courseNumber!: string | null;
+
+  @Column({ type: "varchar", nullable: true })
+  syncId!: string | null;
+
+  @Column({ type: "varchar", nullable: true })
+  faculty!: string | null;
+
   @CreateDateColumn({ type: "timestamptz" })
   createdAt!: Date;
 
