@@ -8,7 +8,7 @@
     "dev": "node --import @swc-node/register/esm-register ./src/server/index.ts",
     "dev:client": "vite",
     "dev:full": "concurrently \"pnpm dev\" \"pnpm dev:client\"",
-    "build": "vite build && tsc -p tsconfig.node.json --noEmit",
+    "build": "vite build && tsc -p tsconfig.server.json",
     "start": "node dist/server/index.js",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
     "test": "vitest run",
