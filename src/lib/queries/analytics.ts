@@ -242,6 +242,48 @@ export const GET_ME = gql`
   }
 `;
 
+/** Consent summary for an institution (optionally filtered by course). */
+export const GET_CONSENT_SUMMARY = gql`
+  query ConsentSummary($institutionId: ID!, $courseId: ID) {
+    consentSummary(institutionId: $institutionId, courseId: $courseId) {
+      consented
+      excluded
+      total
+    }
+  }
+`;
+
+/** Set consent status for a single student. */
+export const SET_STUDENT_CONSENT = gql`
+  mutation SetStudentConsent($input: ConsentInput!) {
+    setStudentConsent(input: $input) {
+      studentId
+      institutionId
+      courseId
+      status
+    }
+  }
+`;
+
+/** Set consent status for multiple students at once. */
+export const BULK_SET_CONSENT = gql`
+  mutation BulkSetConsent(
+    $studentIds: [ID!]!
+    $institutionId: ID!
+    $courseId: ID
+    $status: ConsentStatus!
+  ) {
+    bulkSetConsent(
+      studentIds: $studentIds
+      institutionId: $institutionId
+      courseId: $courseId
+      status: $status
+    ) {
+      updated
+    }
+  }
+`;
+
 /** All institutions (digication_admin only). */
 export const GET_INSTITUTIONS = gql`
   query Institutions {
