@@ -14,10 +14,10 @@ interface Student {
 interface BottomBarProps {
   /** List of students for the carousel. */
   students: Student[];
-  /** Currently selected student ID, or null. */
-  selectedStudentId: string | null;
-  /** Called when a student is selected. */
-  onSelectStudent: (id: string) => void;
+  /** Currently selected student IDs. */
+  selectedStudentIds: string[];
+  /** Called when a student is toggled (selected or deselected). */
+  onToggleStudent: (id: string) => void;
   /** Called to open the student list panel. */
   onOpenStudentList: () => void;
   /** Whether the student list panel is open. */
@@ -35,8 +35,8 @@ interface BottomBarProps {
  */
 export default function BottomBar({
   students,
-  selectedStudentId,
-  onSelectStudent,
+  selectedStudentIds,
+  onToggleStudent,
   onOpenStudentList,
   studentListOpen,
   onToggleAnalyze,
@@ -99,8 +99,8 @@ export default function BottomBar({
         {/* Center zone: Student carousel */}
         <StudentCarousel
           students={students}
-          selectedId={selectedStudentId}
-          onSelect={onSelectStudent}
+          selectedIds={selectedStudentIds}
+          onToggle={onToggleStudent}
         />
 
         {/* Right zone: Analyze button */}

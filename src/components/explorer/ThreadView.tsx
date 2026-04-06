@@ -12,8 +12,8 @@ import { GET_ASSIGNMENT_THREADS } from "@/lib/queries/explorer";
 import CommentCard from "@/components/explorer/CommentCard";
 
 interface ThreadViewProps {
-  /** The selected student's ID, or null if none selected. */
-  studentId: string | null;
+  /** The selected student IDs (empty = none selected). */
+  studentIds: string[];
   /** The selected course ID. */
   courseId: string | null;
   /** The selected assignment ID (optional filter). */
@@ -30,7 +30,7 @@ interface ThreadViewProps {
  * comments that match active TORI filters.
  */
 export default function ThreadView({
-  studentId,
+  studentIds,
   courseId,
   assignmentId,
   activeToriFilters,
@@ -42,19 +42,21 @@ export default function ThreadView({
     skip: !courseId,
   });
 
-  // Filter assignments and threads to only those containing the selected student
+  // Filter assignments and threads to only those containing selected students
   const filteredAssignments = useMemo(() => {
-    if (!data?.assignments || !studentId) return [];
+    if (!data?.assignments || studentIds.length === 0) return [];
+
+    const idSet = new Set(studentIds);
 
     return data.assignments
       .map((assignment: any) => {
         // If an assignmentId filter is set, skip non-matching assignments
         if (assignmentId && assignment.id !== assignmentId) return null;
 
-        // Keep only threads that contain at least one comment from this student
+        // Keep only threads that contain at least one comment from a selected student
         const threads = (assignment.threads ?? []).filter((thread: any) =>
           thread.comments?.some(
-            (c: any) => c.studentId === studentId || c.student?.id === studentId
+            (c: any) => idSet.has(c.studentId) || idSet.has(c.student?.id)
           )
         );
 
@@ -62,10 +64,10 @@ export default function ThreadView({
         return { ...assignment, threads };
       })
       .filter(Boolean);
-  }, [data, studentId, assignmentId]);
+  }, [data, studentIds, assignmentId]);
 
   // Empty state: no student selected
-  if (!studentId) {
+  if (studentIds.length === 0) {
     return (
       <Box
         sx={{

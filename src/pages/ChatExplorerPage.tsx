@@ -34,7 +34,7 @@ export default function ChatExplorerPage() {
   const assignmentId = scope?.assignmentId;
 
   // ── Local state (specific to this page) ────────────────────────────
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [toriFilters, setToriFilters] = useState<string[]>([]);
   const [studentListOpen, setStudentListOpen] = useState(false);
   // TORI tags clicked in chat comments — passed as context to AI chat
@@ -47,20 +47,28 @@ export default function ChatExplorerPage() {
   useEffect(() => {
     if (courseId !== prevCourseIdRef.current) {
       prevCourseIdRef.current = courseId;
-      setSelectedStudentId(null);
+      setSelectedStudentIds([]);
       setToriFilters([]);
       setAiContextTags([]);
     }
   }, [courseId]);
 
-  // Clear TORI filters when the selected student changes
-  const prevStudentIdRef = useRef<string | null>(null);
+  // Clear TORI filters when the selected students change
+  const prevStudentIdsRef = useRef<string[]>([]);
   useEffect(() => {
-    if (selectedStudentId !== prevStudentIdRef.current) {
-      prevStudentIdRef.current = selectedStudentId;
+    const key = selectedStudentIds.join(",");
+    if (key !== prevStudentIdsRef.current.join(",")) {
+      prevStudentIdsRef.current = selectedStudentIds;
       setToriFilters([]);
     }
-  }, [selectedStudentId]);
+  }, [selectedStudentIds]);
+
+  /** Toggle a student in the selection (add or remove). */
+  const handleToggleStudent = useCallback((id: string) => {
+    setSelectedStudentIds((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+    );
+  }, []);
 
   // ── Queries ────────────────────────────────────────────────────────
 
@@ -90,12 +98,11 @@ export default function ChatExplorerPage() {
     for (const assignment of threadsData.assignments) {
       for (const thread of assignment.threads ?? []) {
         for (const comment of thread.comments ?? []) {
-          // If a student is selected, only count their comments' tags
-          if (
-            selectedStudentId &&
-            comment.student?.id !== selectedStudentId &&
-            comment.studentId !== selectedStudentId
-          ) continue;
+          // If students are selected, only count their comments' tags
+          if (selectedStudentIds.length > 0) {
+            const cid = comment.student?.id ?? comment.studentId;
+            if (!selectedStudentIds.includes(cid)) continue;
+          }
 
           for (const tag of comment.toriTags ?? []) {
             const existing = tagMap.get(tag.name);
@@ -114,7 +121,7 @@ export default function ChatExplorerPage() {
     }
 
     return Array.from(tagMap.values()).sort((a, b) => b.count - a.count);
-  }, [threadsData, selectedStudentId]);
+  }, [threadsData, selectedStudentIds]);
 
   // ── Handlers ───────────────────────────────────────────────────────
 
@@ -137,14 +144,17 @@ export default function ChatExplorerPage() {
     );
   }, []);
 
-  // Find the selected student's display name for AI context indicator
+  // Find the selected student(s) display name for AI context indicator
   const selectedStudentName = useMemo(() => {
-    if (!selectedStudentId) return undefined;
-    const student = studentProfiles.find(
-      (s: any) => s.studentId === selectedStudentId
-    );
-    return student?.name;
-  }, [selectedStudentId, studentProfiles]);
+    if (selectedStudentIds.length === 0) return undefined;
+    if (selectedStudentIds.length === 1) {
+      const student = studentProfiles.find(
+        (s: any) => s.studentId === selectedStudentIds[0]
+      );
+      return student?.name;
+    }
+    return `${selectedStudentIds.length} students`;
+  }, [selectedStudentIds, studentProfiles]);
 
   // ── Render ─────────────────────────────────────────────────────────
 
@@ -209,7 +219,7 @@ export default function ChatExplorerPage() {
             </Box>
           ) : (
             <ThreadView
-              studentId={selectedStudentId}
+              studentIds={selectedStudentIds}
               courseId={courseId}
               assignmentId={assignmentId ?? null}
               activeToriFilters={toriFilters}
@@ -223,8 +233,8 @@ export default function ChatExplorerPage() {
           open={studentListOpen}
           onClose={() => setStudentListOpen(false)}
           students={studentProfiles}
-          selectedId={selectedStudentId}
-          onSelect={setSelectedStudentId}
+          selectedIds={selectedStudentIds}
+          onToggle={handleToggleStudent}
         />
       </Box>
 
@@ -274,7 +284,7 @@ export default function ChatExplorerPage() {
             onClose={() => setAiPanelOpen(false)}
             courseId={courseId}
             assignmentId={assignmentId}
-            studentId={selectedStudentId ?? undefined}
+            studentId={selectedStudentIds.length === 1 ? selectedStudentIds[0] : undefined}
             studentName={selectedStudentName}
             selectedToriTags={
               aiContextTags.length > 0
@@ -291,8 +301,8 @@ export default function ChatExplorerPage() {
       {/* ── BOTTOM BAR: spans full width ───────────────────────── */}
       <BottomBar
         students={studentProfiles}
-        selectedStudentId={selectedStudentId}
-        onSelectStudent={setSelectedStudentId}
+        selectedStudentIds={selectedStudentIds}
+        onToggleStudent={handleToggleStudent}
         onOpenStudentList={() => setStudentListOpen(true)}
         studentListOpen={studentListOpen}
         onToggleAnalyze={() => setAiPanelOpen((p) => !p)}

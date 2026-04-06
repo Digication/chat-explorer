@@ -31,10 +31,10 @@ interface StudentListPanelProps {
   onClose: () => void;
   /** Full list of students. */
   students: StudentProfile[];
-  /** Currently selected student ID, or null. */
-  selectedId: string | null;
-  /** Called when a student is clicked. */
-  onSelect: (id: string) => void;
+  /** Currently selected student IDs. */
+  selectedIds: string[];
+  /** Called when a student is toggled (selected or deselected). */
+  onToggle: (id: string) => void;
 }
 
 /** Color mapping for depth bands. */
@@ -52,8 +52,8 @@ export default function StudentListPanel({
   open,
   onClose,
   students,
-  selectedId,
-  onSelect,
+  selectedIds,
+  onToggle,
 }: StudentListPanelProps) {
   const [search, setSearch] = useState("");
 
@@ -99,18 +99,15 @@ export default function StudentListPanel({
         {filtered.map((s) => (
           <ListItemButton
             key={s.studentId}
-            selected={s.studentId === selectedId}
-            onClick={() => {
-              onSelect(s.studentId);
-              onClose();
-            }}
+            selected={selectedIds.includes(s.studentId)}
+            onClick={() => onToggle(s.studentId)}
             sx={{ borderRadius: 1, mb: 0.5, py: 1 }}
           >
             <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, width: "100%" }}>
               <UserAvatar
                 name={s.name}
                 size="medium"
-                selected={s.studentId === selectedId}
+                selected={selectedIds.includes(s.studentId)}
               />
 
               <Box sx={{ flex: 1, minWidth: 0 }}>

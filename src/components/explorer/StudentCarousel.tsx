@@ -23,10 +23,10 @@ interface Student {
 interface StudentCarouselProps {
   /** List of students to display. */
   students: Student[];
-  /** Currently selected student ID, or null. */
-  selectedId: string | null;
-  /** Called when a student is clicked. */
-  onSelect: (id: string) => void;
+  /** Currently selected student IDs. */
+  selectedIds: string[];
+  /** Called when a student is toggled (selected or deselected). */
+  onToggle: (id: string) => void;
 }
 
 /**
@@ -36,8 +36,8 @@ interface StudentCarouselProps {
  */
 export default function StudentCarousel({
   students,
-  selectedId,
-  onSelect,
+  selectedIds,
+  onToggle,
 }: StudentCarouselProps) {
   const { getDisplayName } = useUserSettings();
   // The index of the first visible student
@@ -75,11 +75,11 @@ export default function StudentCarousel({
           }}
         >
           {students.map((s) => {
-            const isSelected = s.studentId === selectedId;
+            const isSelected = selectedIds.includes(s.studentId);
             return (
               <Box
                 key={s.studentId}
-                onClick={() => onSelect(s.studentId)}
+                onClick={() => onToggle(s.studentId)}
                 sx={{
                   width: SLOT_WIDTH,
                   minWidth: SLOT_WIDTH,
