@@ -7,7 +7,7 @@ describe('Theme configuration', () => {
   });
 
   it('sidebar theme uses GlobalHeader background', () => {
-    expect(sidebarTheme.palette.background.default).toBe('#26282b');
+    expect(sidebarTheme.palette.background.default).toBe('#191a1b');
   });
 
   it('light theme uses Helvetica Neue font family', () => {

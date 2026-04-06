@@ -9,6 +9,8 @@ import {
   CircularProgress,
   Alert,
   Divider,
+  ToggleButton,
+  ToggleButtonGroup,
 } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
 import CloseIcon from "@mui/icons-material/Close";
@@ -77,6 +79,7 @@ export default function AiChatPanel({
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [scopeOverride, setScopeOverride] = useState<string | null>(null);
 
   // Ref for auto-scrolling the message area to the bottom
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -120,8 +123,9 @@ export default function AiChatPanel({
 
   // ── Handlers ───────────────────────────────────────────────────────
 
-  /** Determine the AI chat scope based on available context. */
-  const chatScope = studentId ? "SELECTION" : courseId ? "COURSE" : "CROSS_COURSE";
+  /** Determine the AI chat scope — user override takes precedence. */
+  const defaultScope = studentId ? "SELECTION" : courseId ? "COURSE" : "CROSS_COURSE";
+  const chatScope = scopeOverride ?? defaultScope;
 
   /** Create a new session and make it active. */
   const handleNewChat = useCallback(async () => {
@@ -260,19 +264,22 @@ export default function AiChatPanel({
           <Typography variant="subtitle1" fontWeight={600} noWrap>
             {sessionData?.chatSession?.title || "AI Chat"}
           </Typography>
-          {/* Context indicator — shows what data the AI is working with */}
-          <Typography variant="caption" color="text.secondary" noWrap>
-            {studentName
-              ? `Analyzing ${getDisplayName(studentName)}'s work`
-              : assignmentId
-                ? "Assignment scope"
-                : courseId
-                  ? "Course scope"
-                  : "All data"}
-            {selectedToriTags?.length
-              ? ` · ${selectedToriTags.join(", ")}`
-              : ""}
-          </Typography>
+          {/* Context scope selector */}
+          <ToggleButtonGroup
+            size="small"
+            value={chatScope}
+            exclusive
+            onChange={(_, v) => v && setScopeOverride(v)}
+            sx={{ "& .MuiToggleButton-root": { py: 0, px: 1, fontSize: "0.65rem", textTransform: "none" } }}
+          >
+            {studentId && (
+              <ToggleButton value="SELECTION">
+                {studentName ? getDisplayName(studentName) : "Student"}
+              </ToggleButton>
+            )}
+            {courseId && <ToggleButton value="COURSE">Course</ToggleButton>}
+            <ToggleButton value="CROSS_COURSE">All data</ToggleButton>
+          </ToggleButtonGroup>
         </Box>
         {anchor === "right" && (
           <IconButton size="small" onClick={onClose} aria-label="Close chat">
