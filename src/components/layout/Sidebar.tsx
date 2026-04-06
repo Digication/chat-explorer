@@ -7,67 +7,44 @@ import {
   ListItemIcon,
   ListItemText,
   Tooltip,
-  Avatar,
-  Typography,
   IconButton,
-  Divider,
   Drawer,
   useMediaQuery,
 } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
-import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
-// SmartToyOutlinedIcon removed — AI Chat is now embedded in Chat Explorer
+import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
-import LogoutIcon from "@mui/icons-material/Logout";
-import DarkModeOutlinedIcon from "@mui/icons-material/DarkModeOutlined";
-import LightModeOutlinedIcon from "@mui/icons-material/LightModeOutlined";
 import MenuIcon from "@mui/icons-material/Menu";
 import { sidebarTheme } from "@/lib/theme";
-import { useAuth } from "@/lib/AuthProvider";
-import { signOut } from "@/lib/auth-client";
+import { HEADER_HEIGHT } from "./GlobalHeader";
 
 const COLLAPSED_WIDTH = 60;
 const EXPANDED_WIDTH = 280;
 
 const NAV_ITEMS = [
-  { label: "Dashboard", icon: <HomeOutlinedIcon />, path: "/" },
   { label: "Insights", icon: <InsightsOutlinedIcon />, path: "/insights" },
   { label: "Chat Explorer", icon: <ChatOutlinedIcon />, path: "/chat" },
+  { label: "Upload", icon: <CloudUploadOutlinedIcon />, path: "/upload" },
   { label: "Reports", icon: <DescriptionOutlinedIcon />, path: "/reports" },
   { label: "Settings", icon: <SettingsOutlinedIcon />, path: "/settings" },
 ];
 
-interface SidebarProps {
-  darkMode: boolean;
-  onToggleDarkMode: () => void;
-}
-
 function SidebarContent({
   expanded,
-  darkMode,
-  onToggleDarkMode,
   onClose,
 }: {
   expanded: boolean;
-  darkMode: boolean;
-  onToggleDarkMode: () => void;
   onClose?: () => void;
 }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user } = useAuth();
 
   const handleNav = (path: string) => {
     navigate(path);
     onClose?.();
-  };
-
-  const handleSignOut = async () => {
-    await signOut();
-    navigate("/login");
   };
 
   return (
@@ -98,7 +75,12 @@ function SidebarContent({
                   px: 2,
                   mx: 1,
                   borderRadius: 1,
-                  bgcolor: active ? "rgba(25, 118, 210, 0.12)" : "transparent",
+                  borderLeft: active
+                    ? "3px solid #1976d2"
+                    : "3px solid transparent",
+                  bgcolor: active
+                    ? "rgba(255, 255, 255, 0.12)"
+                    : "transparent",
                   "&:hover": { bgcolor: "rgba(255, 255, 255, 0.08)" },
                 }}
               >
@@ -107,7 +89,7 @@ function SidebarContent({
                     minWidth: 0,
                     mr: expanded ? 2 : 0,
                     justifyContent: "center",
-                    color: active ? "primary.main" : "text.secondary",
+                    color: active ? "#fff" : "text.secondary",
                   }}
                 >
                   {item.icon}
@@ -118,7 +100,7 @@ function SidebarContent({
                     primaryTypographyProps={{
                       fontSize: 14,
                       fontWeight: active ? 500 : 400,
-                      color: active ? "primary.main" : "text.primary",
+                      color: active ? "#fff" : "text.primary",
                     }}
                   />
                 )}
@@ -127,75 +109,11 @@ function SidebarContent({
           );
         })}
       </List>
-
-      {/* Bottom section: user info + controls */}
-      <Divider sx={{ borderColor: "rgba(255,255,255,0.1)" }} />
-      <Box sx={{ p: 1.5 }}>
-        {/* Dark mode toggle */}
-        <Tooltip title={expanded ? "" : darkMode ? "Light mode" : "Dark mode"} placement="right">
-          <IconButton onClick={onToggleDarkMode} size="small" sx={{ mb: 1, ml: 0.5 }}>
-            {darkMode ? <LightModeOutlinedIcon /> : <DarkModeOutlinedIcon />}
-          </IconButton>
-        </Tooltip>
-
-        {/* User info */}
-        {user && (
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 1.5,
-              px: 0.5,
-              mb: 1,
-            }}
-          >
-            <Avatar
-              src={user.image ?? undefined}
-              sx={{ width: 32, height: 32, fontSize: 14 }}
-            >
-              {user.name?.[0]?.toUpperCase()}
-            </Avatar>
-            {expanded && (
-              <Box sx={{ overflow: "hidden", flex: 1 }}>
-                <Typography variant="body2" noWrap fontWeight={500}>
-                  {user.name}
-                </Typography>
-                <Typography variant="caption" noWrap color="text.secondary">
-                  {user.email}
-                </Typography>
-              </Box>
-            )}
-          </Box>
-        )}
-
-        {/* Sign out */}
-        <Tooltip title={expanded ? "" : "Sign out"} placement="right">
-          <ListItemButton
-            onClick={handleSignOut}
-            sx={{
-              minHeight: 36,
-              px: 1.5,
-              borderRadius: 1,
-              "&:hover": { bgcolor: "rgba(255,255,255,0.08)" },
-            }}
-          >
-            <ListItemIcon sx={{ minWidth: 0, mr: expanded ? 2 : 0, justifyContent: "center" }}>
-              <LogoutIcon fontSize="small" />
-            </ListItemIcon>
-            {expanded && (
-              <ListItemText
-                primary="Sign out"
-                primaryTypographyProps={{ fontSize: 13 }}
-              />
-            )}
-          </ListItemButton>
-        </Tooltip>
-      </Box>
     </Box>
   );
 }
 
-export default function Sidebar({ darkMode, onToggleDarkMode }: SidebarProps) {
+export default function Sidebar() {
   const [hovered, setHovered] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const isMobile = useMediaQuery("(max-width:768px)");
@@ -203,17 +121,17 @@ export default function Sidebar({ darkMode, onToggleDarkMode }: SidebarProps) {
   if (isMobile) {
     return (
       <ThemeProvider theme={sidebarTheme}>
-        {/* Hamburger button */}
+        {/* Hamburger button — sits inside the global header area */}
         <IconButton
           onClick={() => setMobileOpen(true)}
+          aria-label="Open navigation menu"
           sx={{
             position: "fixed",
             top: 10,
             left: 10,
-            zIndex: 1300,
-            bgcolor: "#1a1a1a",
-            color: "#e0e0e0",
-            "&:hover": { bgcolor: "#333" },
+            zIndex: 1400,
+            color: "#fff",
+            "&:hover": { bgcolor: "rgba(255,255,255,0.12)" },
           }}
         >
           <MenuIcon />
@@ -223,21 +141,21 @@ export default function Sidebar({ darkMode, onToggleDarkMode }: SidebarProps) {
           open={mobileOpen}
           onClose={() => setMobileOpen(false)}
           PaperProps={{
-            sx: { width: EXPANDED_WIDTH, bgcolor: "#1a1a1a" },
+            sx: {
+              width: EXPANDED_WIDTH,
+              bgcolor: "background.paper",
+              top: `${HEADER_HEIGHT}px`,
+              height: `calc(100vh - ${HEADER_HEIGHT}px)`,
+            },
           }}
         >
-          <SidebarContent
-            expanded
-            darkMode={darkMode}
-            onToggleDarkMode={onToggleDarkMode}
-            onClose={() => setMobileOpen(false)}
-          />
+          <SidebarContent expanded onClose={() => setMobileOpen(false)} />
         </Drawer>
       </ThemeProvider>
     );
   }
 
-  // Desktop: hover-expand sidebar
+  // Desktop: hover-expand sidebar, positioned below the global header
   const width = hovered ? EXPANDED_WIDTH : COLLAPSED_WIDTH;
 
   return (
@@ -247,20 +165,16 @@ export default function Sidebar({ darkMode, onToggleDarkMode }: SidebarProps) {
         onMouseLeave={() => setHovered(false)}
         sx={{
           position: "fixed",
-          top: 0,
+          top: `${HEADER_HEIGHT}px`,
           left: 0,
-          height: "100vh",
+          height: `calc(100vh - ${HEADER_HEIGHT}px)`,
           width,
           transition: "width 200ms ease",
           zIndex: 1200,
-          bgcolor: "#1a1a1a",
+          bgcolor: "background.paper",
         }}
       >
-        <SidebarContent
-          expanded={hovered}
-          darkMode={darkMode}
-          onToggleDarkMode={onToggleDarkMode}
-        />
+        <SidebarContent expanded={hovered} />
       </Box>
     </ThemeProvider>
   );

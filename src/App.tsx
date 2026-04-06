@@ -1,8 +1,7 @@
-import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router";
 import { ThemeProvider, CssBaseline } from "@mui/material";
 import { ApolloProvider } from "@apollo/client/react";
-import { lightTheme, darkTheme } from "@/lib/theme";
+import { lightTheme } from "@/lib/theme";
 import { apolloClient } from "@/lib/apollo-client";
 import { AuthProvider, useAuth } from "@/lib/AuthProvider";
 import AppShell from "@/components/layout/AppShell";
@@ -20,10 +19,10 @@ function DashboardPage() {
   return (
     <Box>
       <Typography variant="h5" fontWeight={500} gutterBottom>
-        Dashboard
+        Upload
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 3 }}>
-        Upload a CSV to get started. Analytics and visualizations will appear here.
+        Upload a CSV to get started.
       </Typography>
       <CsvUploadCard />
     </Box>
@@ -83,19 +82,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  const [darkMode, setDarkMode] = useState(() => {
-    return localStorage.getItem("theme-mode") === "dark";
-  });
-
-  useEffect(() => {
-    localStorage.setItem("theme-mode", darkMode ? "dark" : "light");
-  }, [darkMode]);
-
-  const theme = darkMode ? darkTheme : lightTheme;
-
   return (
     <ApolloProvider client={apolloClient}>
-      <ThemeProvider theme={theme}>
+      <ThemeProvider theme={lightTheme}>
         <CssBaseline />
         <BrowserRouter>
           <AuthProvider>
@@ -106,15 +95,13 @@ export default function App() {
                 element={
                   <ProtectedRoute>
                     <InsightsScopeProvider>
-                      <AppShell
-                        darkMode={darkMode}
-                        onToggleDarkMode={() => setDarkMode((d) => !d)}
-                      />
+                      <AppShell />
                     </InsightsScopeProvider>
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<DashboardPage />} />
+                <Route index element={<Navigate to="/insights" replace />} />
+                <Route path="upload" element={<DashboardPage />} />
                 <Route path="insights" element={<InsightsPage />} />
                 <Route path="chat" element={<ChatExplorerPage />} />
                 {/* AI Chat is now embedded in Chat Explorer — redirect old URL */}

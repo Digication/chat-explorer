@@ -4,7 +4,7 @@ import { createTheme, type SxProps, type Theme } from "@mui/material/styles";
 const FONT_FAMILY = '"Helvetica Neue", Helvetica, Arial, sans-serif';
 const SPACING = 5; // 5px spacing unit
 const BORDER_RADIUS = 2;
-const PRIMARY = "#1976d2";
+const PRIMARY = "#1976d2"; // Digication primary (from Campus Web)
 const MAX_CONTENT_WIDTH = 1063;
 
 // Shared component overrides
@@ -50,7 +50,7 @@ export const lightTheme = createTheme({
       default: "#f5f7fa",
       paper: "#ffffff",
     },
-    text: { primary: "#191a1b" },
+    text: { primary: "#333333" },
   },
   components: {
     ...sharedComponents,
@@ -63,27 +63,7 @@ export const lightTheme = createTheme({
   },
 });
 
-export const darkTheme = createTheme({
-  spacing: SPACING,
-  shape: { borderRadius: BORDER_RADIUS },
-  typography: {
-    fontFamily: FONT_FAMILY,
-    fontWeightBold: 500,
-    button: { textTransform: "none" },
-  },
-  palette: {
-    mode: "dark",
-    primary: { main: PRIMARY },
-    background: {
-      default: "#1a1a1a",
-      paper: "#222222",
-    },
-    text: { primary: "#e0e0e0" },
-  },
-  components: sharedComponents,
-});
-
-// Sidebar always uses dark theme
+// Sidebar always uses dark theme (matches Campus Web sidebar bg #191a1b)
 export const sidebarTheme = createTheme({
   spacing: SPACING,
   shape: { borderRadius: BORDER_RADIUS },
@@ -96,8 +76,8 @@ export const sidebarTheme = createTheme({
     mode: "dark",
     primary: { main: PRIMARY },
     background: {
-      default: "#1a1a1a",
-      paper: "#1a1a1a",
+      default: "#191a1b", // Campus Web sidebar bg
+      paper: "#191a1b",
     },
     text: { primary: "#e0e0e0" },
   },
