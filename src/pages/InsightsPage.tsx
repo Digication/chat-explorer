@@ -44,7 +44,7 @@ export default function InsightsPage() {
   }, []);
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", p: 4 }}>
+    <Box sx={{ display: "flex", p: 4 }}>
       {/* Main insights content — shrinks when fixed panel is open */}
       <Box
         sx={{

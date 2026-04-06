@@ -1,17 +1,17 @@
 import { Box } from "@mui/material";
 import { Outlet } from "react-router";
 import Sidebar, { COLLAPSED_WIDTH } from "./Sidebar";
-import GlobalHeader from "./GlobalHeader";
+import GlobalHeader, { HEADER_HEIGHT } from "./GlobalHeader";
 
 export default function AppShell() {
   return (
     <>
       <GlobalHeader />
 
-      <Box sx={{ display: "flex", minHeight: "100vh" }}>
+      <Box sx={{ display: "flex", height: `calc(100vh - ${HEADER_HEIGHT}px)` }}>
         <Sidebar />
 
-        {/* Main content area — no padding so pages can go full-width */}
+        {/* Main content area — scrolls independently within the viewport */}
         <Box
           component="main"
           sx={{
