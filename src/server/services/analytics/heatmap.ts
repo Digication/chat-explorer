@@ -161,46 +161,47 @@ function applyScaling(matrix: number[][], scaling: ScalingMode): number[][] {
 }
 
 /**
- * Returns the actual comment text for a specific (student, TORI tag) pair.
- * Uses a direct consent check instead of resolveScope() to avoid loading
- * all comments into memory.
+ * Returns the actual comment text for evidence drill-down.
+ * Supports three modes:
+ *   - Both studentId + toriTagId: intersection (heatmap cell)
+ *   - Only toriTagId: all evidence for that tag across students
+ *   - Only studentId: all evidence for that student across tags
  */
 export async function getHeatmapCellEvidence(
   scope: AnalyticsScope,
-  studentId: string,
-  toriTagId: string
+  studentId?: string,
+  toriTagId?: string
 ): Promise<CellEvidence[]> {
-  // Direct consent check — lightweight, no resolveScope()
-  const consentRepo = AppDataSource.getRepository(StudentConsent);
+  // If filtering by a specific student, do consent check
+  if (studentId) {
+    const consentRepo = AppDataSource.getRepository(StudentConsent);
 
-  // Check institution-level exclusion
-  const instExclusion = await consentRepo.findOne({
-    where: {
-      studentId,
-      institutionId: scope.institutionId,
-      courseId: IsNull(),
-      status: ConsentStatus.EXCLUDED,
-    },
-  });
-  if (instExclusion) return [];
-
-  // Check course-level exclusion
-  if (scope.courseId) {
-    const courseExclusion = await consentRepo.findOne({
+    const instExclusion = await consentRepo.findOne({
       where: {
         studentId,
         institutionId: scope.institutionId,
-        courseId: scope.courseId,
+        courseId: IsNull(),
         status: ConsentStatus.EXCLUDED,
       },
     });
-    if (courseExclusion) return [];
+    if (instExclusion) return [];
+
+    if (scope.courseId) {
+      const courseExclusion = await consentRepo.findOne({
+        where: {
+          studentId,
+          institutionId: scope.institutionId,
+          courseId: scope.courseId,
+          status: ConsentStatus.EXCLUDED,
+        },
+      });
+      if (courseExclusion) return [];
+    }
   }
 
-  // Direct evidence query
+  // Build the evidence query — conditionally join tori tags
   const qb = AppDataSource.getRepository(Comment)
     .createQueryBuilder("c")
-    .innerJoin(CommentToriTag, "ctt", "ctt.commentId = c.id")
     .innerJoin("c.thread", "t")
     .innerJoin("t.assignment", "a")
     .select([
@@ -210,13 +211,21 @@ export async function getHeatmapCellEvidence(
       't.name AS "threadName"',
       "c.timestamp AS timestamp",
     ])
-    .where("c.studentId = :studentId", { studentId })
-    .andWhere("ctt.toriTagId = :toriTagId", { toriTagId })
-    .andWhere("c.role = :role", { role: "USER" })
+    .where("c.role = :role", { role: "USER" })
     .andWhere(
       'a."courseId" IN (SELECT id FROM course WHERE "institutionId" = :instId)',
       { instId: scope.institutionId }
     );
+
+  // Join TORI tags table only when filtering by tag
+  if (toriTagId) {
+    qb.innerJoin(CommentToriTag, "ctt", "ctt.commentId = c.id")
+      .andWhere("ctt.toriTagId = :toriTagId", { toriTagId });
+  }
+
+  if (studentId) {
+    qb.andWhere("c.studentId = :studentId", { studentId });
+  }
 
   if (scope.courseId) {
     qb.andWhere("a.courseId = :courseId", { courseId: scope.courseId });

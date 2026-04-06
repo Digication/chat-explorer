@@ -45,18 +45,18 @@ export default function InsightsPage() {
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh", p: 4 }}>
-      {/* Main insights content — shifts left when panel is open */}
+      {/* Main insights content — shrinks when fixed panel is open */}
       <Box
         sx={{
           flex: 1,
           minWidth: 0,
-          maxWidth: openThread
-            ? { xs: "100%", md: "calc(100% - 420px)" }
-            : 1200,
-          mx: openThread ? 0 : "auto",
+          maxWidth: 1200,
+          mx: "auto",
           py: 4,
           px: 2,
-          transition: "max-width 0.3s ease, margin 0.3s ease",
+          // Add right padding when the fixed ThreadPanel is open
+          pr: openThread ? { xs: 2, md: "440px" } : 2,
+          transition: "padding-right 0.3s ease",
         }}
       >
         {/* Smart recommendations (top of page) */}
@@ -77,7 +77,7 @@ export default function InsightsPage() {
 
         {/* TORI tag frequency bars */}
         <Section id="tori-frequencies" title="TORI Tag Frequencies">
-          <ToriTagFrequencies />
+          <ToriTagFrequencies onViewThread={handleViewThread} />
         </Section>
 
         {/* Network graph */}
@@ -87,7 +87,7 @@ export default function InsightsPage() {
 
         {/* Student engagement table */}
         <Section id="engagement-table" title="Student Engagement">
-          <StudentEngagementTable />
+          <StudentEngagementTable onViewThread={handleViewThread} />
         </Section>
 
         {/* Depth bands */}

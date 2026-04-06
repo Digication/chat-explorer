@@ -65,12 +65,17 @@ export const GET_TORI_ANALYSIS = gql`
     toriAnalysis(scope: $scope) {
       data {
         tagFrequencies {
+          tagId
           tagName
           domain
           count
           percent
         }
         coOccurrencePairs {
+          tags
+          count
+        }
+        coOccurrenceTriples {
           tags
           count
         }

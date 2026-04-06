@@ -80,7 +80,7 @@ export const analyticsResolvers = {
 
     heatmapCellEvidence: async (
       _: unknown,
-      { input }: { input: { scope: ScopeInput; studentId: string; toriTagId: string } },
+      { input }: { input: { scope: ScopeInput; studentId?: string; toriTagId?: string } },
       ctx: GraphQLContext
     ) => {
       const validated = await validateScope(ctx, input.scope);

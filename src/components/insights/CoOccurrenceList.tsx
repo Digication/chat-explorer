@@ -8,6 +8,8 @@ import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 import ListItemText from "@mui/material/ListItemText";
 import Skeleton from "@mui/material/Skeleton";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import { GET_TORI_ANALYSIS } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
@@ -17,6 +19,7 @@ const DEFAULT_LIMIT = 15;
 export default function CoOccurrenceList() {
   const { scope } = useInsightsScope();
   const [showAll, setShowAll] = useState(false);
+  const [mode, setMode] = useState<"pairs" | "triples">("pairs");
 
   const { data, loading, error, refetch } = useQuery<any>(GET_TORI_ANALYSIS, {
     variables: { scope },
@@ -52,53 +55,90 @@ export default function CoOccurrenceList() {
     );
   }
 
-  // Sort pairs by count descending.
-  const pairs = [...(data.toriAnalysis.data.coOccurrencePairs ?? [])].sort(
+  // Select data source based on mode.
+  const rawItems =
+    mode === "triples"
+      ? data.toriAnalysis.data.coOccurrenceTriples ?? []
+      : data.toriAnalysis.data.coOccurrencePairs ?? [];
+
+  // Sort by count descending.
+  const items = [...rawItems].sort(
     (a: { count: number }, b: { count: number }) => b.count - a.count,
   );
 
-  if (pairs.length === 0) {
+  if (items.length === 0) {
     return (
-      <Typography color="text.secondary" sx={{ py: 2 }}>
-        No co-occurrence data available for this scope.
-      </Typography>
+      <Box>
+        <Box sx={{ mb: 2 }}>
+          <ToggleButtonGroup
+            size="small"
+            value={mode}
+            exclusive
+            onChange={(_, v) => { if (v) { setMode(v); setShowAll(false); } }}
+          >
+            <ToggleButton value="pairs">Pairs</ToggleButton>
+            <ToggleButton value="triples">Triples</ToggleButton>
+          </ToggleButtonGroup>
+        </Box>
+        <Typography color="text.secondary" sx={{ py: 2 }}>
+          No co-occurrence data available for this scope.
+        </Typography>
+      </Box>
     );
   }
 
-  const visible = showAll ? pairs : pairs.slice(0, DEFAULT_LIMIT);
+  const visible = showAll ? items : items.slice(0, DEFAULT_LIMIT);
 
   return (
     <Box>
+      {/* Mode toggle */}
+      <Box sx={{ mb: 2 }}>
+        <ToggleButtonGroup
+          size="small"
+          value={mode}
+          exclusive
+          onChange={(_, v) => { if (v) { setMode(v); setShowAll(false); } }}
+        >
+          <ToggleButton value="pairs">Pairs</ToggleButton>
+          <ToggleButton value="triples">Triples</ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
+
       <List dense disablePadding>
-        {visible.map((pair: { tags: string[]; count: number }, i: number) => (
+        {visible.map((item: { tags: string[]; count: number }, i: number) => (
           <ListItem key={i} divider sx={{ py: 1 }}>
             <ListItemText
               primary={
                 <Box
                   sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}
                 >
-                  <Chip label={pair.tags[0]} size="small" color="primary" variant="outlined" />
-                  <Typography variant="body2" color="text.secondary">
-                    &amp;
-                  </Typography>
-                  <Chip label={pair.tags[1]} size="small" color="primary" variant="outlined" />
+                  {item.tags.map((tag: string, j: number) => (
+                    <React.Fragment key={j}>
+                      {j > 0 && (
+                        <Typography variant="body2" color="text.secondary">
+                          &amp;
+                        </Typography>
+                      )}
+                      <Chip label={tag} size="small" color="primary" variant="outlined" />
+                    </React.Fragment>
+                  ))}
                 </Box>
               }
             />
             <Typography variant="body2" fontWeight={600} sx={{ ml: 2, whiteSpace: "nowrap" }}>
-              {pair.count}
+              {item.count}
             </Typography>
           </ListItem>
         ))}
       </List>
 
-      {pairs.length > DEFAULT_LIMIT && (
+      {items.length > DEFAULT_LIMIT && (
         <Button
           size="small"
           onClick={() => setShowAll((prev) => !prev)}
           sx={{ mt: 1 }}
         >
-          {showAll ? "Show less" : `Show more (${pairs.length - DEFAULT_LIMIT} remaining)`}
+          {showAll ? "Show less" : `Show more (${items.length - DEFAULT_LIMIT} remaining)`}
         </Button>
       )}
     </Box>

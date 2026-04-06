@@ -14,6 +14,7 @@ import TableSortLabel from "@mui/material/TableSortLabel";
 import Typography from "@mui/material/Typography";
 import { GET_STUDENT_ENGAGEMENT } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
+import EvidencePopover from "@/components/insights/EvidencePopover";
 
 /** Colors for each depth band. */
 const BAND_COLORS: Record<string, string> = {
@@ -48,11 +49,19 @@ interface Props {
   onViewThread?: (threadId: string, studentName: string) => void;
 }
 
+interface StudentPopoverState {
+  anchorEl: HTMLElement;
+  studentId: string;
+  studentName: string;
+  commentCount: number;
+}
+
 export default function StudentEngagementTable({ onViewThread }: Props) {
   const { scope } = useInsightsScope();
 
   const [sortKey, setSortKey] = useState<SortKey>("engagementScore");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [popover, setPopover] = useState<StudentPopoverState | null>(null);
 
   const { data, loading, error, refetch } = useQuery<any>(
     GET_STUDENT_ENGAGEMENT,
@@ -176,8 +185,20 @@ export default function StudentEngagementTable({ onViewThread }: Props) {
 
           return (
             <TableRow key={student.studentId} hover>
-              {/* Student name */}
-              <TableCell>{student.name}</TableCell>
+              {/* Student name — clickable for evidence */}
+              <TableCell
+                onClick={(e) =>
+                  setPopover({
+                    anchorEl: e.currentTarget as HTMLElement,
+                    studentId: student.studentId,
+                    studentName: student.name,
+                    commentCount: student.commentCount,
+                  })
+                }
+                sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+              >
+                {student.name}
+              </TableCell>
 
               {/* Score with visual bar */}
               <TableCell sx={{ minWidth: 160 }}>
@@ -235,6 +256,22 @@ export default function StudentEngagementTable({ onViewThread }: Props) {
           );
         })}
       </TableBody>
+
+      {/* Evidence popover — shown when a student name is clicked */}
+      {popover && scope && (
+        <EvidencePopover
+          anchorEl={popover.anchorEl}
+          studentId={popover.studentId}
+          studentName={popover.studentName}
+          count={popover.commentCount}
+          scope={scope}
+          onClose={() => setPopover(null)}
+          onViewThread={(threadId, studentName) => {
+            setPopover(null);
+            onViewThread?.(threadId, studentName);
+          }}
+        />
+      )}
     </Table>
   );
 }

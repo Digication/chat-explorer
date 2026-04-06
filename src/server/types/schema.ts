@@ -506,8 +506,8 @@ export const typeDefs = /* GraphQL */ `
 
   input CellEvidenceInput {
     scope: AnalyticsScopeInput!
-    studentId: ID!
-    toriTagId: ID!
+    studentId: ID
+    toriTagId: ID
   }
 
   input ConsentInput {

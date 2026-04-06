@@ -10,11 +10,11 @@ import { decodeEntities } from "@/lib/decode-entities";
 
 interface EvidencePopoverProps {
   anchorEl: HTMLElement | null;
-  studentId: string;
-  studentName: string;
-  toriTagId: string;
-  toriTagName: string;
-  count: number;
+  studentId?: string;
+  studentName?: string;
+  toriTagId?: string;
+  toriTagName?: string;
+  count?: number;
   scope: { institutionId: string; courseId?: string; assignmentId?: string };
   onClose: () => void;
   onViewThread: (threadId: string, studentName: string) => void;
@@ -72,10 +72,15 @@ export default function EvidencePopover({
     >
       {/* Header */}
       <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-        {toriTagName}
+        {toriTagName || studentName || "Evidence"}
       </Typography>
       <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
-        {studentName} — {count} mention{count !== 1 ? "s" : ""}
+        {[
+          studentName && toriTagName ? studentName : null,
+          count != null ? `${count} mention${count !== 1 ? "s" : ""}` : null,
+        ]
+          .filter(Boolean)
+          .join(" — ") || "Matching comments"}
       </Typography>
 
       {/* Loading state */}
@@ -137,7 +142,7 @@ export default function EvidencePopover({
                 variant="caption"
                 sx={{ mt: 0.5, display: "inline-block" }}
                 onClick={() => {
-                  onViewThread(item.threadId, studentName);
+                  onViewThread(item.threadId, studentName || "Student");
                   onClose();
                 }}
               >

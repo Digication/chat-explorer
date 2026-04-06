@@ -42,7 +42,7 @@ export default function ToriNetworkGraph() {
     skip: !scope,
   });
 
-  // Lay out nodes in a circle, computing x/y for each.
+  // Force-directed layout: positions nodes based on repulsion + edge attraction.
   const layout = useMemo(() => {
     if (!data?.network?.data) return null;
 
@@ -51,19 +51,76 @@ export default function ToriNetworkGraph() {
 
     if (nodes.length === 0) return { nodes: [], edges: [], positions: {} as Record<string, { x: number; y: number }> };
 
-    const cx = 200; // center x
-    const cy = 200; // center y
-    const radius = 160;
+    const W = 500;
+    const H = 400;
     const maxFreq = Math.max(...nodes.map((n) => n.frequency), 1);
     const maxWeight = Math.max(...edges.map((e) => e.weight), 1);
 
+    // Build a node-index lookup for edge references
+    const nodeIndex: Record<string, number> = {};
+    nodes.forEach((n, i) => { nodeIndex[n.id] = i; });
+
+    // Initialize positions randomly (seeded by index for stability)
+    const pos = nodes.map((_, i) => ({
+      x: W * 0.2 + (W * 0.6) * ((i * 7 + 13) % nodes.length) / Math.max(nodes.length - 1, 1),
+      y: H * 0.2 + (H * 0.6) * ((i * 11 + 7) % nodes.length) / Math.max(nodes.length - 1, 1),
+    }));
+
+    // Run force simulation iterations
+    const ITERATIONS = 200;
+    for (let iter = 0; iter < ITERATIONS; iter++) {
+      const temp = 1 - iter / ITERATIONS; // cooling factor
+
+      // Repulsion between all node pairs (Coulomb-like)
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const dx = pos[i].x - pos[j].x;
+          const dy = pos[i].y - pos[j].y;
+          const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
+          const force = (2000 * temp) / (dist * dist);
+          const fx = (dx / dist) * force;
+          const fy = (dy / dist) * force;
+          pos[i].x += fx;
+          pos[i].y += fy;
+          pos[j].x -= fx;
+          pos[j].y -= fy;
+        }
+      }
+
+      // Attraction along edges (Hooke-like)
+      for (const edge of edges) {
+        const si = nodeIndex[edge.source];
+        const ti = nodeIndex[edge.target];
+        if (si === undefined || ti === undefined) continue;
+        const dx = pos[ti].x - pos[si].x;
+        const dy = pos[ti].y - pos[si].y;
+        const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
+        const force = (dist - 80) * 0.01 * (edge.weight / maxWeight) * temp;
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+        pos[si].x += fx;
+        pos[si].y += fy;
+        pos[ti].x -= fx;
+        pos[ti].y -= fy;
+      }
+
+      // Centering force
+      for (let i = 0; i < nodes.length; i++) {
+        pos[i].x += (W / 2 - pos[i].x) * 0.01;
+        pos[i].y += (H / 2 - pos[i].y) * 0.01;
+      }
+    }
+
+    // Clamp positions to stay within bounds (with padding)
+    const pad = 30;
+    for (const p of pos) {
+      p.x = Math.max(pad, Math.min(W - pad, p.x));
+      p.y = Math.max(pad, Math.min(H - pad, p.y));
+    }
+
     const positions: Record<string, { x: number; y: number }> = {};
     nodes.forEach((node, i) => {
-      const angle = (2 * Math.PI * i) / nodes.length - Math.PI / 2;
-      positions[node.id] = {
-        x: cx + radius * Math.cos(angle),
-        y: cy + radius * Math.sin(angle),
-      };
+      positions[node.id] = pos[i];
     });
 
     return { nodes, edges, positions, maxFreq, maxWeight };
@@ -115,9 +172,9 @@ export default function ToriNetworkGraph() {
   return (
     <Box sx={{ display: "flex", justifyContent: "center" }}>
       <svg
-        width={400}
+        width={500}
         height={400}
-        viewBox="0 0 400 400"
+        viewBox="0 0 500 400"
         style={{ maxWidth: "100%", height: "auto" }}
       >
         {/* Edges */}

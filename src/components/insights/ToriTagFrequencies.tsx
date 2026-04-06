@@ -1,12 +1,15 @@
-import React from "react";
+import React, { useState } from "react";
 import { useQuery } from "@apollo/client/react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Skeleton from "@mui/material/Skeleton";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import { GET_TORI_ANALYSIS } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
+import EvidencePopover from "@/components/insights/EvidencePopover";
 
 /** Colors for each TORI domain — matches ToriChip. */
 const DOMAIN_COLORS: Record<string, string> = {
@@ -19,10 +22,18 @@ const DOMAIN_COLORS: Record<string, string> = {
 };
 
 interface TagFrequency {
+  tagId: string;
   tagName: string;
   domain: string;
   count: number;
   percent: number;
+}
+
+interface PopoverState {
+  anchorEl: HTMLElement;
+  toriTagId: string;
+  toriTagName: string;
+  count: number;
 }
 
 /** Groups tags by domain. Each group is sorted by count descending. */
@@ -45,8 +56,14 @@ function groupByDomain(tags: TagFrequency[]): Map<string, TagFrequency[]> {
   );
 }
 
-export default function ToriTagFrequencies() {
+interface ToriTagFrequenciesProps {
+  onViewThread?: (threadId: string, studentName: string) => void;
+}
+
+export default function ToriTagFrequencies({ onViewThread }: ToriTagFrequenciesProps) {
   const { scope } = useInsightsScope();
+  const [viewMode, setViewMode] = useState<"grouped" | "flat">("grouped");
+  const [popover, setPopover] = useState<PopoverState | null>(null);
 
   const { data, loading, error, refetch } = useQuery<any>(GET_TORI_ANALYSIS, {
     variables: { scope },
@@ -97,86 +114,123 @@ export default function ToriTagFrequencies() {
   // Find the maximum count to scale bars proportionally.
   const maxCount = Math.max(...tags.map((t) => t.count));
   const grouped = groupByDomain(tags);
+  const flatSorted = [...tags].sort((a, b) => b.count - a.count);
+
+  /** Renders a single tag bar row — clickable for evidence drill-down. */
+  const renderTagRow = (tag: TagFrequency, barColor: string) => {
+    const barPct = maxCount > 0 ? (tag.count / maxCount) * 100 : 0;
+    return (
+      <Box
+        key={tag.tagName}
+        onClick={(e: React.MouseEvent<HTMLElement>) => {
+          setPopover({
+            anchorEl: e.currentTarget,
+            toriTagId: tag.tagId,
+            toriTagName: tag.tagName,
+            count: tag.count,
+          });
+        }}
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          mb: 0.75,
+          cursor: "pointer",
+          borderRadius: 0.5,
+          "&:hover": { bgcolor: "action.hover" },
+        }}
+      >
+        <Typography
+          variant="body2"
+          sx={{
+            width: 200,
+            flexShrink: 0,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            pr: 1,
+          }}
+        >
+          {tag.tagName}
+        </Typography>
+        <Box sx={{ flex: 1, mr: 1 }}>
+          <Box
+            sx={{
+              height: 20,
+              width: `${barPct}%`,
+              minWidth: barPct > 0 ? 4 : 0,
+              bgcolor: barColor,
+              borderRadius: 0.5,
+              opacity: 0.8,
+              transition: "width 0.3s ease",
+            }}
+          />
+        </Box>
+        <Typography
+          variant="body2"
+          sx={{ flexShrink: 0, width: 90, textAlign: "right", fontWeight: 500 }}
+        >
+          {tag.count} ({tag.percent.toFixed(1)}%)
+        </Typography>
+      </Box>
+    );
+  };
 
   return (
     <Box>
-      {[...grouped.entries()].map(([domain, domainTags]) => (
-        <Box key={domain} sx={{ mb: 3 }}>
-          {/* Domain header */}
-          <Typography
-            variant="overline"
-            sx={{
-              color: DOMAIN_COLORS[domain] ?? "#757575",
-              fontWeight: 700,
-              letterSpacing: 1,
-              mb: 1,
-              display: "block",
-            }}
-          >
-            {domain}
-          </Typography>
+      {/* View mode toggle */}
+      <Box sx={{ mb: 2 }}>
+        <ToggleButtonGroup
+          size="small"
+          value={viewMode}
+          exclusive
+          onChange={(_, v) => v && setViewMode(v)}
+        >
+          <ToggleButton value="grouped">By Domain</ToggleButton>
+          <ToggleButton value="flat">All Tags</ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
 
-          {/* Tag rows */}
-          {domainTags.map((tag) => {
-            const barPct = maxCount > 0 ? (tag.count / maxCount) * 100 : 0;
-            const barColor = DOMAIN_COLORS[domain] ?? "#757575";
-
-            return (
-              <Box
-                key={tag.tagName}
+      {viewMode === "grouped"
+        ? /* Grouped by domain */
+          [...grouped.entries()].map(([domain, domainTags]) => (
+            <Box key={domain} sx={{ mb: 3 }}>
+              <Typography
+                variant="overline"
                 sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  mb: 0.75,
+                  color: DOMAIN_COLORS[domain] ?? "#757575",
+                  fontWeight: 700,
+                  letterSpacing: 1,
+                  mb: 1,
+                  display: "block",
                 }}
               >
-                {/* Tag name — fixed width */}
-                <Typography
-                  variant="body2"
-                  sx={{
-                    width: 200,
-                    flexShrink: 0,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    pr: 1,
-                  }}
-                >
-                  {tag.tagName}
-                </Typography>
+                {domain}
+              </Typography>
+              {domainTags.map((tag) =>
+                renderTagRow(tag, DOMAIN_COLORS[domain] ?? "#757575"),
+              )}
+            </Box>
+          ))
+        : /* Flat list sorted by count */
+          flatSorted.map((tag) =>
+            renderTagRow(tag, DOMAIN_COLORS[tag.domain] ?? "#757575"),
+          )}
 
-                {/* Horizontal bar */}
-                <Box sx={{ flex: 1, mr: 1 }}>
-                  <Box
-                    sx={{
-                      height: 20,
-                      width: `${barPct}%`,
-                      minWidth: barPct > 0 ? 4 : 0,
-                      bgcolor: barColor,
-                      borderRadius: 0.5,
-                      opacity: 0.8,
-                      transition: "width 0.3s ease",
-                    }}
-                  />
-                </Box>
-
-                {/* Count and percent */}
-                <Typography
-                  variant="body2"
-                  sx={{
-                    flexShrink: 0,
-                    width: 90,
-                    textAlign: "right",
-                    fontWeight: 500,
-                  }}
-                >
-                  {tag.count} ({tag.percent.toFixed(1)}%)
-                </Typography>
-              </Box>
-            );
-          })}
-        </Box>
-      ))}
+      {/* Evidence popover — shown when a tag row is clicked */}
+      {popover && scope && (
+        <EvidencePopover
+          anchorEl={popover.anchorEl}
+          toriTagId={popover.toriTagId}
+          toriTagName={popover.toriTagName}
+          count={popover.count}
+          scope={scope}
+          onClose={() => setPopover(null)}
+          onViewThread={(threadId, studentName) => {
+            setPopover(null);
+            onViewThread?.(threadId, studentName);
+          }}
+        />
+      )}
     </Box>
   );
 }

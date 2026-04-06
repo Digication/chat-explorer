@@ -26,25 +26,18 @@ export default function ThreadPanel({ threadId, studentName, onClose }: ThreadPa
   return (
     <Box
       sx={{
+        position: "fixed",
+        top: 52, // below GlobalHeader (HEADER_HEIGHT)
+        right: 0,
+        bottom: 0,
         width: 420,
-        flexShrink: 0,
-        borderLeft: "1px solid",
+        zIndex: 1100,
+        bgcolor: "background.paper",
+        borderLeft: 1,
         borderColor: "divider",
         display: "flex",
         flexDirection: "column",
-        height: "100vh",
-        position: "sticky",
-        top: 0,
-        bgcolor: "background.paper",
-        // On small screens, overlay the content
-        "@media (max-width: 900px)": {
-          position: "fixed",
-          right: 0,
-          top: 0,
-          bottom: 0,
-          zIndex: 1200,
-          boxShadow: "-4px 0 20px rgba(0,0,0,0.15)",
-        },
+        boxShadow: 6,
       }}
     >
       {/* Sticky header */}
