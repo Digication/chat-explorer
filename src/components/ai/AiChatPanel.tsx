@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@apollo/client/react";
 import {
   Box,
+  Collapse,
   Drawer,
   Typography,
   TextField,
@@ -14,6 +15,8 @@ import {
 } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
 import CloseIcon from "@mui/icons-material/Close";
+import AddIcon from "@mui/icons-material/Add";
+import HistoryIcon from "@mui/icons-material/History";
 import {
   GET_CHAT_SESSIONS,
   GET_CHAT_SESSION,
@@ -80,6 +83,7 @@ export default function AiChatPanel({
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [scopeOverride, setScopeOverride] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Ref for auto-scrolling the message area to the bottom
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -281,12 +285,46 @@ export default function AiChatPanel({
             <ToggleButton value="CROSS_COURSE">All data</ToggleButton>
           </ToggleButtonGroup>
         </Box>
-        {anchor === "right" && (
-          <IconButton size="small" onClick={onClose} aria-label="Close chat">
-            <CloseIcon fontSize="small" />
-          </IconButton>
-        )}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+          {/* History toggle (embedded & drawer modes) */}
+          {anchor !== "full" && sessions.length > 0 && (
+            <IconButton
+              size="small"
+              onClick={() => setShowHistory((p) => !p)}
+              aria-label="Toggle chat history"
+              sx={{ color: showHistory ? "primary.main" : "text.secondary" }}
+            >
+              <HistoryIcon fontSize="small" />
+            </IconButton>
+          )}
+          {/* New chat button */}
+          {anchor !== "full" && (
+            <IconButton size="small" onClick={handleNewChat} aria-label="New chat">
+              <AddIcon fontSize="small" />
+            </IconButton>
+          )}
+          {anchor === "right" && (
+            <IconButton size="small" onClick={onClose} aria-label="Close chat">
+              <CloseIcon fontSize="small" />
+            </IconButton>
+          )}
+        </Box>
       </Box>
+
+      {/* Collapsible session history (embedded & drawer modes) */}
+      {anchor !== "full" && (
+        <Collapse in={showHistory}>
+          <Box sx={{ maxHeight: 200, overflowY: "auto", borderBottom: 1, borderColor: "divider" }}>
+            <ChatHistory
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              onSelect={(id) => { setActiveSessionId(id); setShowHistory(false); }}
+              onDelete={handleDelete}
+              onNew={handleNewChat}
+            />
+          </Box>
+        </Collapse>
+      )}
 
       {/* Error displays */}
       {(sessionsError || sessionError) && (
