@@ -7,11 +7,11 @@ import UserAvatar from "@/components/shared/UserAvatar";
 /** How many students are visible at once in the carousel. */
 const VISIBLE_COUNT = 5;
 /** Width of each student slot in px. */
-const SLOT_WIDTH = 64;
+const SLOT_WIDTH = 80;
 /** Avatar size for the selected student (px). */
-const SELECTED_SIZE = 40;
+const SELECTED_SIZE = 44;
 /** Avatar size for unselected students (px). */
-const UNSELECTED_SIZE = 24;
+const UNSELECTED_SIZE = 32;
 
 interface Student {
   studentId: string;

@@ -133,6 +133,13 @@ export default function DepthBands({ onViewThread }: DepthBandsProps) {
 
   return (
     <Box>
+      {/* Explanation of how depth bands are computed */}
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Students are classified by a weighted score: TORI tag density (30%),
+        lexical diversity (20%), evidence citations (20%), logical connectors (15%),
+        and question frequency (15%). Surface &le; 0.33, Developing &le; 0.66, Deep &gt; 0.66.
+      </Typography>
+
       {/* Stacked horizontal bar — each segment is clickable */}
       <Box
         sx={{

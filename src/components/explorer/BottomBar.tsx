@@ -1,6 +1,7 @@
 import { AppBar, Toolbar, Box, IconButton, Badge, Typography } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
 import PeopleIcon from "@mui/icons-material/People";
+import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import StudentCarousel from "@/components/explorer/StudentCarousel";
 import { sidebarTheme } from "@/lib/theme";
 
@@ -21,6 +22,10 @@ interface BottomBarProps {
   onOpenStudentList: () => void;
   /** Whether the student list panel is open. */
   studentListOpen: boolean;
+  /** Called to toggle the AI analyze panel. */
+  onToggleAnalyze?: () => void;
+  /** Whether the AI analyze panel is open. */
+  analyzeOpen?: boolean;
 }
 
 /**
@@ -34,6 +39,8 @@ export default function BottomBar({
   onSelectStudent,
   onOpenStudentList,
   studentListOpen,
+  onToggleAnalyze,
+  analyzeOpen = false,
 }: BottomBarProps) {
   return (
     <ThemeProvider theme={sidebarTheme}>
@@ -95,6 +102,31 @@ export default function BottomBar({
           selectedId={selectedStudentId}
           onSelect={onSelectStudent}
         />
+
+        {/* Right zone: Analyze button */}
+        {onToggleAnalyze && (
+          <Box
+            sx={{
+              position: "absolute",
+              right: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+            }}
+          >
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+              Analyze
+            </Typography>
+            <IconButton
+              onClick={onToggleAnalyze}
+              sx={{
+                color: analyzeOpen ? "primary.main" : "text.secondary",
+              }}
+            >
+              <SmartToyOutlinedIcon />
+            </IconButton>
+          </Box>
+        )}
       </Toolbar>
     </AppBar>
     </ThemeProvider>

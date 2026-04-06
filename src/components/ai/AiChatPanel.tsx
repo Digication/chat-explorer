@@ -22,7 +22,6 @@ import {
 import ChatMessageBubble from "./ChatMessageBubble";
 import SuggestionChips from "./SuggestionChips";
 import ChatHistory from "./ChatHistory";
-import ModelPicker from "./ModelPicker";
 
 interface AiChatPanelProps {
   /** Whether the panel is visible. */
@@ -256,12 +255,9 @@ export default function AiChatPanel({
         }}
       >
         <Box sx={{ minWidth: 0 }}>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Typography variant="subtitle1" fontWeight={600} noWrap>
-              {sessionData?.chatSession?.title || "AI Chat"}
-            </Typography>
-            <ModelPicker />
-          </Box>
+          <Typography variant="subtitle1" fontWeight={600} noWrap>
+            {sessionData?.chatSession?.title || "AI Chat"}
+          </Typography>
           {/* Context indicator — shows what data the AI is working with */}
           <Typography variant="caption" color="text.secondary" noWrap>
             {studentName
@@ -352,7 +348,7 @@ export default function AiChatPanel({
 
       {/* Suggestion chips (visible only when no messages yet) */}
       <SuggestionChips
-        onSend={(text) => handleSend(text)}
+        onSend={(text) => setInputValue(text)}
         visible={messages.length === 0 && !isSending}
       />
 

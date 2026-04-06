@@ -1,7 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQuery } from "@apollo/client/react";
 import { Box, Typography, Skeleton, Fab, Slide } from "@mui/material";
-import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import {
   GET_STUDENT_PROFILES,
@@ -54,6 +53,15 @@ export default function ChatExplorerPage() {
     }
   }, [courseId]);
 
+  // Clear TORI filters when the selected student changes
+  const prevStudentIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (selectedStudentId !== prevStudentIdRef.current) {
+      prevStudentIdRef.current = selectedStudentId;
+      setToriFilters([]);
+    }
+  }, [selectedStudentId]);
+
   // ── Queries ────────────────────────────────────────────────────────
 
   // Student profiles for the selected scope
@@ -73,7 +81,7 @@ export default function ChatExplorerPage() {
     skip: !courseId,
   });
 
-  // ── Derived: available TORI tags ───────────────────────────────────
+  // ── Derived: available TORI tags (filtered to selected student) ─────
   const availableTags = useMemo(() => {
     if (!threadsData?.assignments) return [];
 
@@ -82,6 +90,13 @@ export default function ChatExplorerPage() {
     for (const assignment of threadsData.assignments) {
       for (const thread of assignment.threads ?? []) {
         for (const comment of thread.comments ?? []) {
+          // If a student is selected, only count their comments' tags
+          if (
+            selectedStudentId &&
+            comment.student?.id !== selectedStudentId &&
+            comment.studentId !== selectedStudentId
+          ) continue;
+
           for (const tag of comment.toriTags ?? []) {
             const existing = tagMap.get(tag.name);
             if (existing) {
@@ -99,7 +114,7 @@ export default function ChatExplorerPage() {
     }
 
     return Array.from(tagMap.values()).sort((a, b) => b.count - a.count);
-  }, [threadsData]);
+  }, [threadsData, selectedStudentId]);
 
   // ── Handlers ───────────────────────────────────────────────────────
 
@@ -273,24 +288,6 @@ export default function ChatExplorerPage() {
         </Box>
       </Slide>
 
-      {/* ── FAB: toggle AI panel ───────────────────────────────── */}
-      {!aiPanelOpen && (
-        <Fab
-          color="primary"
-          size="medium"
-          onClick={() => setAiPanelOpen(true)}
-          aria-label="Open AI chat"
-          sx={{
-            position: "fixed",
-            bottom: 76, // above the 60px bottom bar + some spacing
-            right: 16,
-            zIndex: 1201,
-          }}
-        >
-          <SmartToyOutlinedIcon />
-        </Fab>
-      )}
-
       {/* ── BOTTOM BAR: spans full width ───────────────────────── */}
       <BottomBar
         students={studentProfiles}
@@ -298,6 +295,8 @@ export default function ChatExplorerPage() {
         onSelectStudent={setSelectedStudentId}
         onOpenStudentList={() => setStudentListOpen(true)}
         studentListOpen={studentListOpen}
+        onToggleAnalyze={() => setAiPanelOpen((p) => !p)}
+        analyzeOpen={aiPanelOpen}
       />
     </Box>
   );
