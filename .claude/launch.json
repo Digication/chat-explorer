@@ -3,9 +3,10 @@
   "configurations": [
     {
       "name": "chat-explorer",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["local-ssl-proxy", "--source", "3100", "--target", "4000"],
-      "port": 3100
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["-e", "setTimeout(() => {}, 999999999)"],
+      "port": 4000,
+      "url": "https://chat-explorer.localhost"
     }
   ]
 }
