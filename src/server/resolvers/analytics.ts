@@ -13,6 +13,7 @@ import { getHeatmap, getHeatmapCellEvidence } from "../services/analytics/heatma
 import { getNetwork } from "../services/analytics/network.js";
 import { getInsights } from "../services/analytics/instructional-insights.js";
 import { getRecommendations } from "../services/analytics/recommendations.js";
+import { getGrowth } from "../services/analytics/growth.js";
 
 interface ScopeInput {
   institutionId: string;
@@ -112,6 +113,15 @@ export const analyticsResolvers = {
     ) => {
       const validated = await validateScope(ctx, scope);
       return getRecommendations(validated);
+    },
+
+    growth: async (
+      _: unknown,
+      { scope }: { scope: ScopeInput },
+      ctx: GraphQLContext
+    ) => {
+      const validated = await validateScope(ctx, scope);
+      return getGrowth(validated);
     },
   },
 };

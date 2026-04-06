@@ -385,6 +385,25 @@ export const typeDefs = /* GraphQL */ `
     priority: Priority!
   }
 
+  type GrowthDataPoint {
+    assignmentId: ID!
+    assignmentName: String!
+    date: String!
+    score: Float!
+    depthBand: DepthBand!
+  }
+
+  type StudentGrowth {
+    studentId: ID!
+    name: String!
+    dataPoints: [GrowthDataPoint!]!
+  }
+
+  type GrowthResult {
+    data: [StudentGrowth!]!
+    meta: AnalyticsMeta!
+  }
+
   type AnalyticsMeta {
     consentedStudentCount: Int!
     excludedStudentCount: Int!
@@ -541,6 +560,7 @@ export const typeDefs = /* GraphQL */ `
     network(scope: AnalyticsScopeInput!): NetworkResult!
     instructionalInsights(scope: AnalyticsScopeInput!): InsightsResult!
     recommendations(scope: AnalyticsScopeInput!): RecommendationsResult!
+    growth(scope: AnalyticsScopeInput!): GrowthResult!
 
     # Thread
     thread(id: ID!): Thread

@@ -284,6 +284,28 @@ export const BULK_SET_CONSENT = gql`
   }
 `;
 
+/** Student growth over time (engagement per assignment). */
+export const GET_GROWTH = gql`
+  query Growth($scope: AnalyticsScopeInput!) {
+    growth(scope: $scope) {
+      data {
+        studentId
+        name
+        dataPoints {
+          assignmentId
+          assignmentName
+          date
+          score
+          depthBand
+        }
+      }
+      meta {
+        cached
+      }
+    }
+  }
+`;
+
 /** All institutions (digication_admin only). */
 export const GET_INSTITUTIONS = gql`
   query Institutions {

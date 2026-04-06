@@ -12,6 +12,7 @@ import TextSignals from "@/components/insights/TextSignals";
 import ToriTagFrequencies from "@/components/insights/ToriTagFrequencies";
 import StudentEngagementTable from "@/components/insights/StudentEngagementTable";
 import ThreadPanel from "@/components/insights/ThreadPanel";
+import GrowthVisualization from "@/components/insights/GrowthVisualization";
 
 /** Consistent wrapper for each analytics section. */
 function Section({
@@ -93,6 +94,11 @@ export default function InsightsPage() {
         {/* Depth bands */}
         <Section id="depth" title="Reflection Depth">
           <DepthBands onViewThread={handleViewThread} />
+        </Section>
+
+        {/* Student growth over time */}
+        <Section id="growth" title="Student Growth Over Time">
+          <GrowthVisualization onViewThread={handleViewThread} />
         </Section>
 
         {/* Co-occurrence patterns */}
