@@ -187,6 +187,45 @@ export const GET_RECOMMENDATIONS = gql`
   }
 `;
 
+/** Text signal aggregates (question count, sentence length, etc.). */
+export const GET_TEXT_SIGNALS = gql`
+  query TextSignals($scope: AnalyticsScopeInput!) {
+    textSignals(scope: $scope) {
+      data {
+        aggregates {
+          questionCount { mean median stddev }
+          avgSentenceLength { mean median stddev }
+          lexicalDiversity { mean median stddev }
+          hedgingCount { mean median stddev }
+          specificityCount { mean median stddev }
+          evidenceCount { mean median stddev }
+          logicalConnectorCount { mean median stddev }
+        }
+      }
+      meta { cached }
+    }
+  }
+`;
+
+/** Student engagement profiles from instructional insights. */
+export const GET_STUDENT_ENGAGEMENT = gql`
+  query StudentEngagement($scope: AnalyticsScopeInput!) {
+    instructionalInsights(scope: $scope) {
+      data {
+        studentProfiles {
+          studentId
+          name
+          engagementScore
+          depthBand
+          commentCount
+          topToriTags
+        }
+      }
+      meta { cached }
+    }
+  }
+`;
+
 /** Current authenticated user. */
 export const GET_ME = gql`
   query Me {

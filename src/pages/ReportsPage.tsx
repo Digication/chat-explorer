@@ -99,7 +99,7 @@ export default function ReportsPage() {
   }
 
   return (
-    <Box>
+    <Box sx={{ maxWidth: 900, mx: "auto", py: 4, px: 3 }}>
       <Typography variant="h5" fontWeight={500} gutterBottom>
         Reports
       </Typography>

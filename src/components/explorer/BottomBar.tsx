@@ -1,6 +1,8 @@
 import { AppBar, Toolbar, Box, IconButton, Badge, Typography } from "@mui/material";
+import { ThemeProvider } from "@mui/material/styles";
 import PeopleIcon from "@mui/icons-material/People";
 import StudentCarousel from "@/components/explorer/StudentCarousel";
+import { sidebarTheme } from "@/lib/theme";
 
 interface Student {
   studentId: string;
@@ -22,12 +24,9 @@ interface BottomBarProps {
 }
 
 /**
- * Fixed 60px bar at the bottom of the left (explorer) panel.
- * Two zones: left (Students button), center/right (carousel).
+ * Fixed 60px bar at the bottom of the screen.
+ * Students button is pinned to the left, carousel is centered.
  * Dark background matching the sidebar theme.
- *
- * Note: The AI Chat button was removed because the chat panel is now
- * always visible on the right side of the split-screen layout.
  */
 export default function BottomBar({
   students,
@@ -37,13 +36,14 @@ export default function BottomBar({
   studentListOpen,
 }: BottomBarProps) {
   return (
+    <ThemeProvider theme={sidebarTheme}>
     <AppBar
       position="fixed"
       sx={{
         top: "auto",
         bottom: 0,
-        backgroundColor: "#1a1a1a",
-        // Spans the full width, only offset by the 60px sidebar on the left
+        backgroundColor: "grey.900",
+        // Spans the full width, offset by the 60px sidebar on the left
         left: 60,
         width: "calc(100% - 60px)",
         height: 60,
@@ -54,16 +54,26 @@ export default function BottomBar({
           minHeight: 60,
           height: 60,
           display: "flex",
-          justifyContent: "space-between",
+          // Use relative positioning so children can be absolutely placed
+          position: "relative",
+          justifyContent: "center",
           px: 2,
         }}
       >
-        {/* Left zone: Students button with count badge */}
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+        {/* Left zone: Students button pinned to left edge */}
+        <Box
+          sx={{
+            position: "absolute",
+            left: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 1,
+          }}
+        >
           <IconButton
             onClick={onOpenStudentList}
             sx={{
-              color: studentListOpen ? "#1976d2" : "#e0e0e0",
+              color: studentListOpen ? "primary.main" : "text.secondary",
             }}
           >
             <Badge
@@ -74,12 +84,12 @@ export default function BottomBar({
               <PeopleIcon />
             </Badge>
           </IconButton>
-          <Typography variant="caption" sx={{ color: "#e0e0e0" }}>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
             Students
           </Typography>
         </Box>
 
-        {/* Center/right zone: Student carousel */}
+        {/* Center zone: Student carousel */}
         <StudentCarousel
           students={students}
           selectedId={selectedStudentId}
@@ -87,5 +97,6 @@ export default function BottomBar({
         />
       </Toolbar>
     </AppBar>
+    </ThemeProvider>
   );
 }

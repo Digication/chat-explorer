@@ -2,7 +2,7 @@ import { Chip } from "@mui/material";
 
 /** Maps a TORI domain name to a color. */
 const DOMAIN_COLORS: Record<string, string> = {
-  "Cognitive-Analytical": "#1976d2",
+  "Cognitive-Analytical": "#0288D1",
   "Emotional-Affective": "#c62828",
   "Social-Interpersonal": "#2e7d32",
   "Personal Growth": "#7b1fa2",

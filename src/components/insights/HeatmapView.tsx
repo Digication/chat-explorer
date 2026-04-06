@@ -419,7 +419,7 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
 
       {/* ── Classic table ── */}
       {mode === "CLASSIC" && (
-        <Box sx={{ overflowX: "auto" }}>
+        <Box sx={{ overflowX: "auto", overflowY: "auto", maxHeight: "70vh" }}>
           <table
             style={{
               borderCollapse: "collapse",
@@ -429,13 +429,14 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
           >
             <thead>
               <tr>
-                {/* Empty corner cell */}
+                {/* Empty corner cell — sticky both left and top */}
                 <th
                   style={{
                     position: "sticky",
                     left: 0,
-                    background: "var(--mui-palette-background-paper, #fff)",
-                    zIndex: 2,
+                    top: 0,
+                    background: "#fff",
+                    zIndex: 4,
                     minWidth: 120,
                   }}
                 />
@@ -443,6 +444,10 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
                   <th
                     key={ci}
                     style={{
+                      position: "sticky",
+                      top: 0,
+                      zIndex: 3,
+                      background: "#fff",
                       padding: "4px 6px",
                       fontWeight: 500,
                       whiteSpace: "nowrap",
@@ -462,7 +467,7 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
                     style={{
                       position: "sticky",
                       left: 0,
-                      background: "var(--mui-palette-background-paper, #fff)",
+                      background: "#fff",
                       zIndex: 1,
                       padding: "4px 8px",
                       fontWeight: 500,

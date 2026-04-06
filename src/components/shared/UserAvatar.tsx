@@ -38,8 +38,8 @@ const SIZE_MAP = { small: 28, medium: 36, large: 48 } as const;
 interface UserAvatarProps {
   /** Full name of the user. */
   name: string;
-  /** Avatar size preset. */
-  size?: "small" | "medium" | "large";
+  /** Avatar size preset, or a custom pixel value. */
+  size?: "small" | "medium" | "large" | number;
   /** Whether this avatar is selected (shows a primary-colored ring). */
   selected?: boolean;
 }
@@ -53,7 +53,7 @@ export default function UserAvatar({
   size = "medium",
   selected = false,
 }: UserAvatarProps) {
-  const px = SIZE_MAP[size];
+  const px = typeof size === "number" ? size : SIZE_MAP[size];
   const bgColor = PALETTE[hashName(name) % PALETTE.length];
   const initials = getInitials(name);
 

@@ -6,6 +6,7 @@ import Popover from "@mui/material/Popover";
 import Skeleton from "@mui/material/Skeleton";
 import Typography from "@mui/material/Typography";
 import { GET_HEATMAP_CELL_EVIDENCE } from "@/lib/queries/analytics";
+import { decodeEntities } from "@/lib/decode-entities";
 
 interface EvidencePopoverProps {
   anchorEl: HTMLElement | null;
@@ -38,19 +39,21 @@ export default function EvidencePopover({
   onClose,
   onViewThread,
 }: EvidencePopoverProps) {
-  const [fetchEvidence, { data, loading, called }] =
-    useLazyQuery<{ heatmapCellEvidence: EvidenceItem[] }>(GET_HEATMAP_CELL_EVIDENCE);
+  const [fetchEvidence, { data, loading }] =
+    useLazyQuery<{ heatmapCellEvidence: EvidenceItem[] }>(GET_HEATMAP_CELL_EVIDENCE, {
+      fetchPolicy: "network-only", // Always fetch fresh data for each cell
+    });
 
-  // Fetch evidence on mount
+  // Fetch evidence whenever the target cell changes
   React.useEffect(() => {
-    if (anchorEl && !called) {
+    if (anchorEl) {
       fetchEvidence({
         variables: {
           input: { scope, studentId, toriTagId },
         },
       });
     }
-  }, [anchorEl, called, fetchEvidence, scope, studentId, toriTagId]);
+  }, [anchorEl, fetchEvidence, scope, studentId, toriTagId]);
 
   const evidence = data?.heatmapCellEvidence ?? [];
 
@@ -106,16 +109,14 @@ export default function EvidencePopover({
               sx={{
                 p: 1.5,
                 borderRadius: 1,
-                bgcolor: "grey.50",
+                bgcolor: "action.hover",
                 borderLeft: "3px solid",
                 borderColor: "primary.main",
               }}
             >
               {/* Truncated quote */}
               <Typography variant="body2" sx={{ mb: 0.5, lineHeight: 1.5 }}>
-                "{item.text.length > 200
-                  ? item.text.slice(0, 200) + "…"
-                  : item.text}"
+                "{(() => { const t = decodeEntities(item.text); return t.length > 200 ? t.slice(0, 200) + "…" : t; })()}"
               </Typography>
 
               {/* Thread name + timestamp */}

@@ -29,10 +29,26 @@ export const GET_CHAT_SESSION = gql`
   }
 `;
 
-/** Create a new chat session. */
+/** Create a new chat session with optional context for the AI. */
 export const CREATE_CHAT_SESSION = gql`
-  mutation CreateChatSession($courseId: ID, $assignmentId: ID, $title: String) {
-    createChatSession(courseId: $courseId, assignmentId: $assignmentId, title: $title) {
+  mutation CreateChatSession(
+    $courseId: ID
+    $assignmentId: ID
+    $studentId: ID
+    $scope: String
+    $selectedToriTags: [String!]
+    $selectedCommentIds: [ID!]
+    $title: String
+  ) {
+    createChatSession(
+      courseId: $courseId
+      assignmentId: $assignmentId
+      studentId: $studentId
+      scope: $scope
+      selectedToriTags: $selectedToriTags
+      selectedCommentIds: $selectedCommentIds
+      title: $title
+    ) {
       id
       title
       courseId

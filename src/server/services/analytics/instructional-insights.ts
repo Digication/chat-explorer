@@ -115,6 +115,8 @@ export async function getInsights(
 
     const studentProfiles: StudentProfile[] = studentIds.map((sId) => {
       const sComments = userComments.filter((c) => c.studentId === sId);
+      // Skip students with no comments in this scope
+      if (sComments.length === 0) return null as unknown as StudentProfile;
       const tagCounts = tagsByStudent.get(sId) ?? new Map<string, number>();
       const topTags = [...tagCounts.entries()]
         .sort((a, b) => b[1] - a[1])
@@ -137,7 +139,7 @@ export async function getInsights(
         commentCount: sComments.length,
         avgWordCount,
       };
-    });
+    }).filter((p): p is StudentProfile => p !== null);
 
     // ── Tag exemplars ────────────────────────────────────────────
     // Group associations by tag, then pick top 3 by engagement score

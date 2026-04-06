@@ -1,11 +1,12 @@
 import { Card, CardContent, Typography, Box, Chip } from "@mui/material";
 import ToriChip from "@/components/shared/ToriChip";
+import { decodeEntities } from "@/lib/decode-entities";
 
-/** Background colors per comment role. */
+/** Background colors per comment role — aligned with Digication palette. */
 const ROLE_BG: Record<string, string> = {
-  USER: "#e3f2fd",
-  ASSISTANT: "#f3e5f5",
-  SYSTEM: "#e8f5e9",
+  USER: "#e3f2fd",      // light blue tint (near Digication primary)
+  ASSISTANT: "#f5f5f5",  // neutral light gray
+  SYSTEM: "#fafafa",     // very light gray
 };
 
 /** Friendly labels per role. */
@@ -37,6 +38,8 @@ interface CommentCardProps {
   highlighted?: boolean;
   /** Whether this comment should appear faded. */
   dimmed?: boolean;
+  /** Called when a TORI tag chip is clicked (passes tag name to AI chat context). */
+  onToriTagClick?: (tagName: string) => void;
 }
 
 /**
@@ -47,6 +50,7 @@ export default function CommentCard({
   comment,
   highlighted = false,
   dimmed = false,
+  onToriTagClick,
 }: CommentCardProps) {
   const bg = ROLE_BG[comment.role] ?? "#fafafa";
   const roleLabel = ROLE_LABEL[comment.role] ?? comment.role;
@@ -62,7 +66,8 @@ export default function CommentCard({
       sx={{
         mb: 1.5,
         opacity: dimmed ? 0.4 : 1,
-        borderLeft: highlighted ? "3px solid #1976d2" : "3px solid transparent",
+        borderLeft: highlighted ? "3px solid" : "3px solid transparent",
+        borderLeftColor: highlighted ? "primary.main" : "transparent",
         backgroundColor: bg,
         transition: "opacity 0.2s",
       }}
@@ -103,14 +108,19 @@ export default function CommentCard({
           variant="body2"
           sx={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}
         >
-          {comment.text}
+          {decodeEntities(comment.text)}
         </Typography>
 
         {/* TORI tags (only shown on USER role comments) */}
         {comment.role === "USER" && comment.toriTags.length > 0 && (
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 1 }}>
             {comment.toriTags.map((tag) => (
-              <ToriChip key={tag.id} tag={tag.name} domain={tag.domain} />
+              <ToriChip
+                key={tag.id}
+                tag={tag.name}
+                domain={tag.domain}
+                onClick={onToriTagClick ? () => onToriTagClick(tag.name) : undefined}
+              />
             ))}
           </Box>
         )}

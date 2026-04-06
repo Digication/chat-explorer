@@ -1,17 +1,21 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQuery } from "@apollo/client/react";
-import { Box, Typography, Skeleton } from "@mui/material";
+import { Box, Typography, Skeleton, Fab, Slide } from "@mui/material";
+import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
+import CloseIcon from "@mui/icons-material/Close";
 import {
   GET_STUDENT_PROFILES,
   GET_ASSIGNMENT_THREADS,
 } from "@/lib/queries/explorer";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
-import ScopeSelector from "@/components/insights/ScopeSelector";
 import ThreadView from "@/components/explorer/ThreadView";
 import BottomBar from "@/components/explorer/BottomBar";
 import ToriFilters from "@/components/explorer/ToriFilters";
 import StudentListPanel from "@/components/explorer/StudentListPanel";
 import AiChatPanel from "@/components/ai/AiChatPanel";
+
+/** Width of the collapsible AI panel. Capped at 50vw via CSS min(). */
+const AI_PANEL_WIDTH = "min(600px, 50vw)";
 
 /**
  * Chat Explorer page — split-screen layout.
@@ -34,6 +38,10 @@ export default function ChatExplorerPage() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [toriFilters, setToriFilters] = useState<string[]>([]);
   const [studentListOpen, setStudentListOpen] = useState(false);
+  // TORI tags clicked in chat comments — passed as context to AI chat
+  const [aiContextTags, setAiContextTags] = useState<string[]>([]);
+  // AI panel is hidden by default, slides in from the right when toggled
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
   // Reset student selection and TORI filters whenever the course changes
   const prevCourseIdRef = useRef<string | undefined>(undefined);
@@ -42,6 +50,7 @@ export default function ChatExplorerPage() {
       prevCourseIdRef.current = courseId;
       setSelectedStudentId(null);
       setToriFilters([]);
+      setAiContextTags([]);
     }
   }, [courseId]);
 
@@ -106,119 +115,183 @@ export default function ChatExplorerPage() {
     setToriFilters([]);
   }, []);
 
+  /** When a TORI tag is clicked in a chat comment, add it as AI context. */
+  const handleToriTagClick = useCallback((tagName: string) => {
+    setAiContextTags((prev) =>
+      prev.includes(tagName) ? prev : [...prev, tagName]
+    );
+  }, []);
+
+  // Find the selected student's display name for AI context indicator
+  const selectedStudentName = useMemo(() => {
+    if (!selectedStudentId) return undefined;
+    const student = studentProfiles.find(
+      (s: any) => s.studentId === selectedStudentId
+    );
+    return student?.name;
+  }, [selectedStudentId, studentProfiles]);
+
   // ── Render ─────────────────────────────────────────────────────────
 
   return (
-    // Outer wrapper: break out of AppShell's maxWidth/padding to use full viewport.
     <Box
       sx={{
         display: "flex",
         flexDirection: "column",
         height: "100vh",
-        mx: -4,
-        mt: -4,
-        width: "calc(100% + 64px)",
+        // Smooth transition when AI panel opens/closes
+        transition: "padding-right 0.3s ease",
+        pr: aiPanelOpen ? AI_PANEL_WIDTH : 0,
       }}
     >
-      {/* ── TOP AREA: split-screen (left threads + right AI chat) ── */}
+      {/* ── MAIN CONTENT: full-width thread viewer ──────────────── */}
       <Box
         sx={{
           flex: 1,
           minHeight: 0,
           display: "flex",
-          pb: "60px",
+          flexDirection: "column",
+          pb: "60px", // space for the fixed bottom bar
         }}
       >
-        {/* ── LEFT PANEL: Student conversation viewer ────────────── */}
-        <Box
-          sx={{
-            flex: 1,
-            minWidth: 0,
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          {/* Header + scope breadcrumb */}
-          <Box sx={{ px: 3, pt: 3, pb: 1 }}>
-            <Typography variant="h5" fontWeight={500} sx={{ mb: 2 }}>
-              Chat Explorer
-            </Typography>
+        {/* Header + TORI filters */}
+        <Box sx={{ px: 3, pt: 3, pb: 1 }}>
+          <Typography variant="h5" fontWeight={500} sx={{ mb: 2 }}>
+            Chat Explorer
+          </Typography>
 
-            {/* Shared breadcrumb: Institution > Course > Assignment */}
-            <ScopeSelector />
-
-            {/* TORI tag filter bar (appears once a course is selected) */}
-            {availableTags.length > 0 && (
-              <ToriFilters
-                availableTags={availableTags}
-                activeFilters={toriFilters}
-                onToggle={handleToggleToriFilter}
-                onClear={handleClearToriFilters}
-              />
-            )}
-          </Box>
-
-          {/* Main content: thread view */}
-          <Box sx={{ flex: 1, overflowY: "auto", pb: "80px", px: 3 }}>
-            {!courseId ? (
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  height: "100%",
-                  minHeight: 300,
-                  color: "text.secondary",
-                }}
-              >
-                <Typography>Select a course to get started.</Typography>
-              </Box>
-            ) : studentsLoading ? (
-              <Box>
-                <Skeleton variant="rounded" height={60} sx={{ mb: 1 }} />
-                <Skeleton variant="rounded" height={60} sx={{ mb: 1 }} />
-                <Skeleton variant="rounded" height={60} />
-              </Box>
-            ) : (
-              <ThreadView
-                studentId={selectedStudentId}
-                courseId={courseId}
-                assignmentId={assignmentId ?? null}
-                activeToriFilters={toriFilters}
-              />
-            )}
-          </Box>
-
-          {/* Student list slide-out panel */}
-          <StudentListPanel
-            open={studentListOpen}
-            onClose={() => setStudentListOpen(false)}
-            students={studentProfiles}
-            selectedId={selectedStudentId}
-            onSelect={setSelectedStudentId}
-          />
+          {/* TORI tag filter bar (appears once a course is selected) */}
+          {availableTags.length > 0 && (
+            <ToriFilters
+              availableTags={availableTags}
+              activeFilters={toriFilters}
+              onToggle={handleToggleToriFilter}
+              onClear={handleClearToriFilters}
+            />
+          )}
         </Box>
 
-        {/* ── RIGHT PANEL: AI Chat ─────────────────────────────────── */}
+        {/* Thread view — takes full available width */}
+        <Box sx={{ flex: 1, overflowY: "auto", pb: "80px", px: 3 }}>
+          {!courseId ? (
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100%",
+                minHeight: 300,
+                color: "text.secondary",
+              }}
+            >
+              <Typography>Select a course to get started.</Typography>
+            </Box>
+          ) : studentsLoading ? (
+            <Box>
+              <Skeleton variant="rounded" height={60} sx={{ mb: 1 }} />
+              <Skeleton variant="rounded" height={60} sx={{ mb: 1 }} />
+              <Skeleton variant="rounded" height={60} />
+            </Box>
+          ) : (
+            <ThreadView
+              studentId={selectedStudentId}
+              courseId={courseId}
+              assignmentId={assignmentId ?? null}
+              activeToriFilters={toriFilters}
+              onToriTagClick={handleToriTagClick}
+            />
+          )}
+        </Box>
+
+        {/* Student list slide-out panel */}
+        <StudentListPanel
+          open={studentListOpen}
+          onClose={() => setStudentListOpen(false)}
+          students={studentProfiles}
+          selectedId={selectedStudentId}
+          onSelect={setSelectedStudentId}
+        />
+      </Box>
+
+      {/* ── AI PANEL: slides in from the right, overlays content ── */}
+      <Slide direction="left" in={aiPanelOpen} mountOnEnter unmountOnExit>
         <Box
           sx={{
-            width: 420,
-            flexShrink: 0,
+            position: "fixed",
+            top: 52, // below GlobalHeader (HEADER_HEIGHT)
+            right: 0,
+            bottom: 60, // above the bottom bar
+            width: AI_PANEL_WIDTH,
+            zIndex: 1200,
+            bgcolor: "background.paper",
+            borderLeft: 1,
+            borderColor: "divider",
             display: "flex",
             flexDirection: "column",
+            boxShadow: 6,
           }}
         >
+          {/* Close button in the top-right corner of the panel */}
+          <Box
+            sx={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              zIndex: 1,
+            }}
+          >
+            <Fab
+              size="small"
+              onClick={() => setAiPanelOpen(false)}
+              aria-label="Close AI chat"
+              sx={{
+                width: 32,
+                height: 32,
+                minHeight: 32,
+                boxShadow: 1,
+              }}
+            >
+              <CloseIcon fontSize="small" />
+            </Fab>
+          </Box>
           <AiChatPanel
-            open={true}
-            onClose={() => {}}
+            open={aiPanelOpen}
+            onClose={() => setAiPanelOpen(false)}
             courseId={courseId}
             assignmentId={assignmentId}
+            studentId={selectedStudentId ?? undefined}
+            studentName={selectedStudentName}
+            selectedToriTags={
+              aiContextTags.length > 0
+                ? aiContextTags
+                : toriFilters.length > 0
+                  ? toriFilters
+                  : undefined
+            }
             anchor="embedded"
           />
         </Box>
-      </Box>
+      </Slide>
 
-      {/* ── BOTTOM BAR: spans full width ───────────────────────────── */}
+      {/* ── FAB: toggle AI panel ───────────────────────────────── */}
+      {!aiPanelOpen && (
+        <Fab
+          color="primary"
+          size="medium"
+          onClick={() => setAiPanelOpen(true)}
+          aria-label="Open AI chat"
+          sx={{
+            position: "fixed",
+            bottom: 76, // above the 60px bottom bar + some spacing
+            right: 16,
+            zIndex: 1201,
+          }}
+        >
+          <SmartToyOutlinedIcon />
+        </Fab>
+      )}
+
+      {/* ── BOTTOM BAR: spans full width ───────────────────────── */}
       <BottomBar
         students={studentProfiles}
         selectedStudentId={selectedStudentId}

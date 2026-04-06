@@ -7,7 +7,11 @@ import UserAvatar from "@/components/shared/UserAvatar";
 /** How many students are visible at once in the carousel. */
 const VISIBLE_COUNT = 5;
 /** Width of each student slot in px. */
-const SLOT_WIDTH = 72;
+const SLOT_WIDTH = 64;
+/** Avatar size for the selected student (px). */
+const SELECTED_SIZE = 40;
+/** Avatar size for unselected students (px). */
+const UNSELECTED_SIZE = 24;
 
 interface Student {
   studentId: string;
@@ -27,6 +31,7 @@ interface StudentCarouselProps {
 /**
  * Horizontal sliding carousel of student avatars for the bottom bar.
  * Shows ~5 students at a time with left/right arrows to scroll by 1.
+ * Selected avatar is 40px, unselected is 24px.
  */
 export default function StudentCarousel({
   students,
@@ -79,13 +84,14 @@ export default function StudentCarousel({
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
+                  justifyContent: "center",
                   cursor: "pointer",
                   py: 0.5,
                 }}
               >
                 <UserAvatar
                   name={s.name}
-                  size="small"
+                  size={isSelected ? SELECTED_SIZE : UNSELECTED_SIZE}
                   selected={isSelected}
                 />
                 {/* Show name only when selected */}
@@ -95,7 +101,8 @@ export default function StudentCarousel({
                     sx={{
                       color: "#fff",
                       mt: 0.25,
-                      fontSize: "0.65rem",
+                      fontSize: "0.6rem",
+                      lineHeight: 1.2,
                       maxWidth: SLOT_WIDTH - 8,
                       textAlign: "center",
                       overflow: "hidden",

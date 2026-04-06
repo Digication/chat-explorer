@@ -20,6 +20,8 @@ interface ThreadViewProps {
   assignmentId: string | null;
   /** Currently active TORI tag filter names. */
   activeToriFilters: string[];
+  /** Called when a TORI tag chip is clicked in a comment. */
+  onToriTagClick?: (tagName: string) => void;
 }
 
 /**
@@ -32,6 +34,7 @@ export default function ThreadView({
   courseId,
   assignmentId,
   activeToriFilters,
+  onToriTagClick,
 }: ThreadViewProps) {
   // Fetch threads when we have a courseId
   const { data, loading, error } = useQuery<any>(GET_ASSIGNMENT_THREADS, {
@@ -167,6 +170,7 @@ export default function ThreadView({
                       comment={comment}
                       highlighted={matches}
                       dimmed={hasActiveFilters && !matches}
+                      onToriTagClick={onToriTagClick}
                     />
                   );
                 })}

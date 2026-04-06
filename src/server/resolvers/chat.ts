@@ -1,6 +1,6 @@
 import { GraphQLError } from "graphql";
 import { AppDataSource } from "../data-source.js";
-import { ChatSession } from "../entities/ChatSession.js";
+import { ChatSession, ChatScope } from "../entities/ChatSession.js";
 import { ChatMessage, ChatMessageRole } from "../entities/ChatMessage.js";
 import type { GraphQLContext } from "../types/context.js";
 import { requireAuth } from "./middleware/auth.js";
@@ -41,7 +41,15 @@ export const chatResolvers = {
   Mutation: {
     createChatSession: async (
       _: unknown,
-      args: { courseId?: string; assignmentId?: string; title?: string },
+      args: {
+        courseId?: string;
+        assignmentId?: string;
+        studentId?: string;
+        scope?: string;
+        selectedToriTags?: string[];
+        selectedCommentIds?: string[];
+        title?: string;
+      },
       ctx: GraphQLContext
     ) => {
       const user = requireAuth(ctx);
@@ -50,6 +58,10 @@ export const chatResolvers = {
         userId: user.id,
         courseId: args.courseId ?? null,
         assignmentId: args.assignmentId ?? null,
+        studentId: args.studentId ?? null,
+        scope: (args.scope as ChatScope) ?? ChatScope.SELECTION,
+        selectedToriTags: args.selectedToriTags ?? null,
+        selectedCommentIds: args.selectedCommentIds ?? null,
         title: args.title ?? "New Chat",
       });
       return repo.save(session);

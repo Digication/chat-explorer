@@ -93,8 +93,13 @@ export function InsightsScopeProvider({ children }: { children: ReactNode }) {
 
 // ── ScopeSelector component ────────────────────────────────────────────────────
 
+interface ScopeSelectorProps {
+  /** When true, removes bottom margin and uses smaller controls. */
+  compact?: boolean;
+}
+
 /** Breadcrumb-style picker for Institution > Course > Assignment. */
-export default function ScopeSelector() {
+export default function ScopeSelector({ compact = false }: ScopeSelectorProps) {
   const { scope, setScope } = useInsightsScope();
 
   // Current user role
@@ -202,7 +207,7 @@ export default function ScopeSelector() {
   }
 
   return (
-    <Box sx={{ mb: 3 }}>
+    <Box sx={{ mb: compact ? 0 : 3 }}>
       <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />}>
         {/* Institution — clickable dropdown for digication_admin, static for others */}
         {isDigicationAdmin ? (

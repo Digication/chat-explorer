@@ -2,13 +2,15 @@ import React, { useState, useCallback } from "react";
 import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
-import ScopeSelector from "@/components/insights/ScopeSelector";
 import SmartRecommendations from "@/components/insights/SmartRecommendations";
 import MetricsCards from "@/components/insights/MetricsCards";
 import HeatmapView from "@/components/insights/HeatmapView";
 import ToriNetworkGraph from "@/components/insights/ToriNetworkGraph";
 import DepthBands from "@/components/insights/DepthBands";
 import CoOccurrenceList from "@/components/insights/CoOccurrenceList";
+import TextSignals from "@/components/insights/TextSignals";
+import ToriTagFrequencies from "@/components/insights/ToriTagFrequencies";
+import StudentEngagementTable from "@/components/insights/StudentEngagementTable";
 import ThreadPanel from "@/components/insights/ThreadPanel";
 
 /** Consistent wrapper for each analytics section. */
@@ -42,7 +44,7 @@ export default function InsightsPage() {
   }, []);
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh" }}>
+    <Box sx={{ display: "flex", minHeight: "100vh", p: 4 }}>
       {/* Main insights content — shifts left when panel is open */}
       <Box
         sx={{
@@ -57,18 +59,25 @@ export default function InsightsPage() {
           transition: "max-width 0.3s ease, margin 0.3s ease",
         }}
       >
-        {/* Scope breadcrumb selector */}
-        <ScopeSelector />
-
         {/* Smart recommendations (top of page) */}
         <SmartRecommendations />
 
         {/* Overview metric cards */}
-        <MetricsCards />
+        <MetricsCards onViewThread={handleViewThread} />
+
+        {/* Text signal aggregates */}
+        <Section id="text-signals" title="Text Signals">
+          <TextSignals />
+        </Section>
 
         {/* Heatmap — with drill-down */}
         <Section id="heatmap" title="Reflection Heatmap">
           <HeatmapView onViewThread={handleViewThread} />
+        </Section>
+
+        {/* TORI tag frequency bars */}
+        <Section id="tori-frequencies" title="TORI Tag Frequencies">
+          <ToriTagFrequencies />
         </Section>
 
         {/* Network graph */}
@@ -76,9 +85,14 @@ export default function InsightsPage() {
           <ToriNetworkGraph />
         </Section>
 
+        {/* Student engagement table */}
+        <Section id="engagement-table" title="Student Engagement">
+          <StudentEngagementTable />
+        </Section>
+
         {/* Depth bands */}
         <Section id="depth" title="Reflection Depth">
-          <DepthBands />
+          <DepthBands onViewThread={handleViewThread} />
         </Section>
 
         {/* Co-occurrence patterns */}

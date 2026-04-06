@@ -33,6 +33,12 @@ interface AiChatPanelProps {
   courseId?: string;
   /** Optional assignment context for scoping sessions. */
   assignmentId?: string;
+  /** Optional student context — narrows AI focus to this student's data. */
+  studentId?: string;
+  /** Display name for the selected student (shown in the context indicator). */
+  studentName?: string;
+  /** TORI tags to focus the AI conversation on. */
+  selectedToriTags?: string[];
   /**
    * Display mode:
    * - "right": renders inside a right-anchored MUI Drawer (400px wide)
@@ -61,6 +67,9 @@ export default function AiChatPanel({
   onClose,
   courseId,
   assignmentId,
+  studentId,
+  studentName,
+  selectedToriTags,
   anchor = "right",
 }: AiChatPanelProps) {
   // ── State ──────────────────────────────────────────────────────────
@@ -110,11 +119,21 @@ export default function AiChatPanel({
 
   // ── Handlers ───────────────────────────────────────────────────────
 
+  /** Determine the AI chat scope based on available context. */
+  const chatScope = studentId ? "SELECTION" : courseId ? "COURSE" : "CROSS_COURSE";
+
   /** Create a new session and make it active. */
   const handleNewChat = useCallback(async () => {
     try {
       const { data } = await createSession({
-        variables: { courseId, assignmentId, title: "New chat" },
+        variables: {
+          courseId,
+          assignmentId,
+          studentId,
+          scope: chatScope,
+          selectedToriTags: selectedToriTags?.length ? selectedToriTags : undefined,
+          title: "New chat",
+        },
       });
       if (data?.createChatSession?.id) {
         setActiveSessionId(data.createChatSession.id);
@@ -124,7 +143,7 @@ export default function AiChatPanel({
       // Error will show via sessionsError on next render
       console.error("Failed to create session:", err);
     }
-  }, [courseId, assignmentId, createSession, refetchSessions]);
+  }, [courseId, assignmentId, studentId, chatScope, selectedToriTags, createSession, refetchSessions]);
 
   /** Send a message (either typed or from a suggestion chip). */
   const handleSend = useCallback(
@@ -137,7 +156,14 @@ export default function AiChatPanel({
       if (!sessionId) {
         try {
           const { data } = await createSession({
-            variables: { courseId, assignmentId, title: content.slice(0, 60) },
+            variables: {
+              courseId,
+              assignmentId,
+              studentId,
+              scope: chatScope,
+              selectedToriTags: selectedToriTags?.length ? selectedToriTags : undefined,
+              title: content.slice(0, 60),
+            },
           });
           sessionId = data?.createChatSession?.id ?? null;
           if (sessionId) {
@@ -172,6 +198,9 @@ export default function AiChatPanel({
       activeSessionId,
       courseId,
       assignmentId,
+      studentId,
+      chatScope,
+      selectedToriTags,
       createSession,
       sendMessage,
       refetchSession,
@@ -226,11 +255,26 @@ export default function AiChatPanel({
           borderColor: "divider",
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0 }}>
-          <Typography variant="subtitle1" fontWeight={600} noWrap>
-            {sessionData?.chatSession?.title || "AI Chat"}
+        <Box sx={{ minWidth: 0 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Typography variant="subtitle1" fontWeight={600} noWrap>
+              {sessionData?.chatSession?.title || "AI Chat"}
+            </Typography>
+            <ModelPicker />
+          </Box>
+          {/* Context indicator — shows what data the AI is working with */}
+          <Typography variant="caption" color="text.secondary" noWrap>
+            {studentName
+              ? `Analyzing ${studentName}'s work`
+              : assignmentId
+                ? "Assignment scope"
+                : courseId
+                  ? "Course scope"
+                  : "All data"}
+            {selectedToriTags?.length
+              ? ` · ${selectedToriTags.join(", ")}`
+              : ""}
           </Typography>
-          <ModelPicker />
         </Box>
         {anchor === "right" && (
           <IconButton size="small" onClick={onClose} aria-label="Close chat">

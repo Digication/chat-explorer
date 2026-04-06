@@ -1,19 +1,32 @@
 # Heatmap Evidence & Thread Panel — Implementation Plan
 
+## Status: ✅ IMPLEMENTED (2026-04-03)
+
+Committed as `a49abcf feat(insights): add evidence popover and thread panel for heatmap drill-down` and pushed to `main`.
+
 ## Overview
 
-Add interactive drill-down to the Insights heatmap. Clicking any data point (classic cell, sparkline dot, or small-multiples tag) opens a popover showing direct quotes from that student's reflections tagged with that TORI category. Each quote has a "View full conversation" link that opens a slide-in panel on the right showing the complete chat thread, while the main insights content shifts left to make room.
+Interactive drill-down on the Insights heatmap. Clicking any data point (classic cell, sparkline dot, or small-multiples tag) opens a popover showing direct quotes from that student's reflections tagged with that TORI category. Each quote has a "View full conversation" link that opens a slide-in panel on the right showing the complete chat thread, while the main insights content shifts left to make room.
 
-## Current State
+## What was built
 
-### What exists today
+### Backend
+- **`heatmap.ts`** — Extended `getHeatmap()` to return `rowIds` (student UUIDs) and `colIds` (ToriTag UUIDs) alongside display labels. Added `getHeatmapCellEvidence()` function that fetches actual comment text for a (student, TORI tag) pair with direct consent checking (avoids expensive `resolveScope()` call). Limited to 20 results, ordered by timestamp.
+- **`schema.ts`** — Added `rowIds`/`colIds` to `HeatmapData` type. Added `CellEvidence` type, `CellEvidenceInput` input, and `heatmapCellEvidence` query. Added `thread(id: ID!): Thread` query. Cleaned up `HeatmapMode` enum (removed unused `CLUSTERED` and `DOT`).
+- **`analytics.ts` resolver** — Added `heatmapCellEvidence` resolver with scope validation.
+- **`course.ts` resolver** — Added `thread(id)` resolver with auth check (verifies user has access to the course via assignment chain; returns null for orphaned threads).
+- **`types.ts`** — Simplified `HeatmapMode` to just `"CLASSIC"`.
 
-- **HeatmapView.tsx** (`src/components/insights/HeatmapView.tsx`) — 3 display modes: Classic (colored table), Sparkline (SVG polyline rows), Small Multiples (tag-list cards). Hover shows tag name + count but NO evidence/quotes.
-- **Heatmap backend** (`src/server/services/analytics/heatmap.ts`) — returns `matrix`, `rowLabels`, `colLabels`, `rowOrder`, `colOrder`. Does NOT return database IDs for students or tags, only display names. Does NOT return comment text.
-- **Schema** (`src/server/types/schema.ts`) — `HeatmapData` type has no `rowIds`/`colIds` fields. No query exists for fetching evidence for a specific (student, tag) pair. No `thread(id)` query exists (threads are only reachable via `Assignment.threads`). The `HeatmapMode` enum still includes `CLUSTERED` and `DOT` which are no longer used by the frontend.
-- **Explorer components** — `CommentCard.tsx` renders a single comment with role styling, student name, timestamp, and TORI chips. `ThreadView.tsx` renders threads filtered by student. These can be reused in the thread panel.
-- **Existing GQL queries** — `GET_ASSIGNMENT_THREADS` in `src/lib/queries/explorer.ts` fetches threads with full comments for a course. There is no single-thread-by-ID query.
-- **Test infrastructure** — vitest is installed (`pnpm test` runs `vitest run`) but there are zero test files and no `vitest.config.ts`. Tests run inside the Docker container via `docker compose exec chat-explorer-dev pnpm test`.
+### Frontend
+- **`EvidencePopover.tsx`** (new) — MUI Popover that lazy-loads evidence quotes via `GET_HEATMAP_CELL_EVIDENCE`. Shows truncated quote text, thread name, timestamp, and "View full conversation" link. Loading skeleton while fetching.
+- **`ThreadPanel.tsx`** (new) — 420px slide-in right panel that loads a full chat thread via `GET_THREAD_BY_ID`. Sticky header with student name, thread title, and close button. Renders comments using existing `CommentCard` component. Responsive: overlays on small screens, pushes content on larger screens.
+- **`HeatmapView.tsx`** — Added click handlers to all 3 display modes (Classic cells, Sparkline dots, Small Multiples tags). Zero-value cells are not clickable. `Sparkline` component got `onDotClick` prop. `StudentTagCard` got `colIds` and `onTagClick` props. Manages `popoverState` and renders `EvidencePopover`.
+- **`InsightsPage.tsx`** — Changed to flex layout. Main content shifts left when thread panel is open. Manages `openThread` state. Passes `handleViewThread` callback down to `HeatmapView`.
+- **`analytics.ts` queries** — Updated `GET_HEATMAP` to request `rowIds`/`colIds`. Added `GET_HEATMAP_CELL_EVIDENCE` query.
+- **`explorer.ts` queries** — Added `GET_THREAD_BY_ID` query.
+
+### Not yet implemented
+- **Phase 0: Test infrastructure** — `vitest.config.ts`, test setup file, and unit tests for the evidence query and thread resolver are still pending.
 
 ### Data model relationships
 

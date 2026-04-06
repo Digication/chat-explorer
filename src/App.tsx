@@ -17,7 +17,7 @@ import { InsightsScopeProvider } from "@/components/insights/ScopeSelector";
 
 function DashboardPage() {
   return (
-    <Box>
+    <Box sx={{ maxWidth: 800, mx: "auto", py: 4, px: 3 }}>
       <Typography variant="h5" fontWeight={500} gutterBottom>
         Upload
       </Typography>
