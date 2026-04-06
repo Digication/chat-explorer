@@ -9,6 +9,7 @@ import Typography from "@mui/material/Typography";
 import CloseIcon from "@mui/icons-material/Close";
 import { GET_THREAD_BY_ID } from "@/lib/queries/explorer";
 import CommentCard from "@/components/explorer/CommentCard";
+import { useUserSettings } from "@/lib/UserSettingsContext";
 
 interface ThreadPanelProps {
   threadId: string;
@@ -17,6 +18,7 @@ interface ThreadPanelProps {
 }
 
 export default function ThreadPanel({ threadId, studentName, onClose }: ThreadPanelProps) {
+  const { getDisplayName } = useUserSettings();
   const { data, loading, error, refetch } = useQuery<any>(GET_THREAD_BY_ID, {
     variables: { id: threadId },
   });
@@ -54,7 +56,7 @@ export default function ThreadPanel({ threadId, studentName, onClose }: ThreadPa
       >
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography variant="subtitle1" fontWeight={700} noWrap>
-            {studentName}
+            {getDisplayName(studentName)}
           </Typography>
           {thread && (
             <Typography variant="caption" color="text.secondary" noWrap display="block">

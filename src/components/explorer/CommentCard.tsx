@@ -1,6 +1,7 @@
 import { Card, CardContent, Typography, Box, Chip } from "@mui/material";
 import ToriChip from "@/components/shared/ToriChip";
 import { decodeEntities } from "@/lib/decode-entities";
+import { useUserSettings } from "@/lib/UserSettingsContext";
 
 /** Background colors per comment role — aligned with Digication palette. */
 const ROLE_BG: Record<string, string> = {
@@ -52,6 +53,7 @@ export default function CommentCard({
   dimmed = false,
   onToriTagClick,
 }: CommentCardProps) {
+  const { getDisplayName } = useUserSettings();
   const bg = ROLE_BG[comment.role] ?? "#fafafa";
   const roleLabel = ROLE_LABEL[comment.role] ?? comment.role;
 
@@ -89,7 +91,7 @@ export default function CommentCard({
           />
           {comment.role === "USER" && comment.student?.displayName && (
             <Typography variant="caption" fontWeight={500}>
-              {comment.student.displayName}
+              {getDisplayName(comment.student.displayName)}
             </Typography>
           )}
           {formattedTime && (

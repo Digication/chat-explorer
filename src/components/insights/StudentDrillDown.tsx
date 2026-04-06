@@ -6,6 +6,7 @@ import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemText from "@mui/material/ListItemText";
 import Chip from "@mui/material/Chip";
+import { useUserSettings } from "@/lib/UserSettingsContext";
 
 /** Color mapping for depth band chips. */
 const BAND_COLORS: Record<string, string> = {
@@ -49,6 +50,7 @@ export default function StudentDrillDown({
   onClose,
   onSelectStudent,
 }: StudentDrillDownProps) {
+  const { getDisplayName } = useUserSettings();
   return (
     <Popover
       open={Boolean(anchorEl)}
@@ -98,7 +100,7 @@ export default function StudentDrillDown({
               }}
             >
               <ListItemText
-                primary={s.name}
+                primary={getDisplayName(s.name)}
                 secondary={
                   <Box
                     component="span"

@@ -12,6 +12,7 @@ import Typography from "@mui/material/Typography";
 import { GET_HEATMAP } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
 import EvidencePopover from "@/components/insights/EvidencePopover";
+import { useUserSettings } from "@/lib/UserSettingsContext";
 
 // ── Color helpers ──────────────────────────────────────────────────────────────
 
@@ -236,6 +237,7 @@ interface HeatmapViewProps {
 
 export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
   const { scope } = useInsightsScope();
+  const { getDisplayName } = useUserSettings();
 
   const [mode, setMode] = useState<DisplayMode>("CLASSIC");
   const [scaling, setScaling] = useState<"RAW" | "ROW" | "GLOBAL">("RAW");
@@ -361,7 +363,7 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
                         verticalAlign: "middle",
                       }}
                     >
-                      {rowLabels[ri]}
+                      {getDisplayName(rowLabels[ri])}
                     </td>
                     <td style={{ padding: "2px 0", verticalAlign: "middle", width: "100%" }}>
                       <Sparkline
@@ -398,7 +400,7 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
           {rowOrder.map((ri) => (
             <StudentTagCard
               key={ri}
-              name={rowLabels[ri]}
+              name={getDisplayName(rowLabels[ri])}
               values={colOrder.map((ci) => matrix[ri]?.[ci] ?? 0)}
               labels={colOrder.map((ci) => colLabels[ci])}
               colIds={colOrder.map((ci) => colIds[ci])}
@@ -474,7 +476,7 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {rowLabels[ri]}
+                    {getDisplayName(rowLabels[ri])}
                   </td>
                   {colOrder.map((ci) => {
                     const raw = matrix[ri]?.[ci] ?? 0;
@@ -483,7 +485,7 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
                     return (
                       <Tooltip
                         key={ci}
-                        title={`${rowLabels[ri]} × ${colLabels[ci]}: ${raw}`}
+                        title={`${getDisplayName(rowLabels[ri])} × ${colLabels[ci]}: ${raw}`}
                         arrow
                       >
                         <td

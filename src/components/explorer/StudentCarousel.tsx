@@ -3,6 +3,7 @@ import { Box, IconButton, Typography } from "@mui/material";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import UserAvatar from "@/components/shared/UserAvatar";
+import { useUserSettings } from "@/lib/UserSettingsContext";
 
 /** How many students are visible at once in the carousel. */
 const VISIBLE_COUNT = 5;
@@ -38,6 +39,7 @@ export default function StudentCarousel({
   selectedId,
   onSelect,
 }: StudentCarouselProps) {
+  const { getDisplayName } = useUserSettings();
   // The index of the first visible student
   const [startIndex, setStartIndex] = useState(0);
 
@@ -90,7 +92,7 @@ export default function StudentCarousel({
                 }}
               >
                 <UserAvatar
-                  name={s.name}
+                  name={getDisplayName(s.name)}
                   size={isSelected ? SELECTED_SIZE : UNSELECTED_SIZE}
                   selected={isSelected}
                 />
@@ -110,7 +112,7 @@ export default function StudentCarousel({
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {s.name}
+                    {getDisplayName(s.name)}
                   </Typography>
                 )}
               </Box>

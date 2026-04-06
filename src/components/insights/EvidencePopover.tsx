@@ -7,6 +7,7 @@ import Skeleton from "@mui/material/Skeleton";
 import Typography from "@mui/material/Typography";
 import { GET_HEATMAP_CELL_EVIDENCE } from "@/lib/queries/analytics";
 import { decodeEntities } from "@/lib/decode-entities";
+import { useUserSettings } from "@/lib/UserSettingsContext";
 
 interface EvidencePopoverProps {
   anchorEl: HTMLElement | null;
@@ -39,6 +40,7 @@ export default function EvidencePopover({
   onClose,
   onViewThread,
 }: EvidencePopoverProps) {
+  const { getDisplayName } = useUserSettings();
   const [fetchEvidence, { data, loading }] =
     useLazyQuery<{ heatmapCellEvidence: EvidenceItem[] }>(GET_HEATMAP_CELL_EVIDENCE, {
       fetchPolicy: "network-only", // Always fetch fresh data for each cell
@@ -72,11 +74,11 @@ export default function EvidencePopover({
     >
       {/* Header */}
       <Typography variant="subtitle2" fontWeight={700} gutterBottom>
-        {toriTagName || studentName || "Evidence"}
+        {toriTagName || (studentName ? getDisplayName(studentName) : null) || "Evidence"}
       </Typography>
       <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
         {[
-          studentName && toriTagName ? studentName : null,
+          studentName && toriTagName ? getDisplayName(studentName) : null,
           count != null ? `${count} mention${count !== 1 ? "s" : ""}` : null,
         ]
           .filter(Boolean)

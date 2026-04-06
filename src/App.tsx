@@ -4,6 +4,7 @@ import { ApolloProvider } from "@apollo/client/react";
 import { lightTheme } from "@/lib/theme";
 import { apolloClient } from "@/lib/apollo-client";
 import { AuthProvider, useAuth } from "@/lib/AuthProvider";
+import { UserSettingsProvider } from "@/lib/UserSettingsContext";
 import AppShell from "@/components/layout/AppShell";
 import LoginPage from "@/pages/LoginPage";
 import { Box, Typography, CircularProgress } from "@mui/material";
@@ -13,6 +14,7 @@ import InsightsPage from "@/pages/InsightsPage";
 import ChatExplorerPage from "@/pages/ChatExplorerPage";
 // AiChatPage is no longer used — AI Chat is embedded in ChatExplorerPage
 import ReportsPage from "@/pages/ReportsPage";
+import SettingsPage from "@/pages/SettingsPage";
 import { InsightsScopeProvider } from "@/components/insights/ScopeSelector";
 
 function DashboardPage() {
@@ -29,18 +31,6 @@ function DashboardPage() {
   );
 }
 
-function SettingsPage() {
-  return (
-    <Box>
-      <Typography variant="h5" fontWeight={500} gutterBottom>
-        Settings
-      </Typography>
-      <Typography color="text.secondary">
-        Account and preference settings coming soon.
-      </Typography>
-    </Box>
-  );
-}
 
 function NotFoundPage() {
   return (
@@ -94,9 +84,11 @@ export default function App() {
                 path="/"
                 element={
                   <ProtectedRoute>
-                    <InsightsScopeProvider>
-                      <AppShell />
-                    </InsightsScopeProvider>
+                    <UserSettingsProvider>
+                      <InsightsScopeProvider>
+                        <AppShell />
+                      </InsightsScopeProvider>
+                    </UserSettingsProvider>
                   </ProtectedRoute>
                 }
               >

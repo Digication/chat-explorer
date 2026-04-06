@@ -22,6 +22,7 @@ import {
 import ChatMessageBubble from "./ChatMessageBubble";
 import SuggestionChips from "./SuggestionChips";
 import ChatHistory from "./ChatHistory";
+import { useUserSettings } from "@/lib/UserSettingsContext";
 
 interface AiChatPanelProps {
   /** Whether the panel is visible. */
@@ -71,6 +72,7 @@ export default function AiChatPanel({
   selectedToriTags,
   anchor = "right",
 }: AiChatPanelProps) {
+  const { getDisplayName } = useUserSettings();
   // ── State ──────────────────────────────────────────────────────────
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
@@ -261,7 +263,7 @@ export default function AiChatPanel({
           {/* Context indicator — shows what data the AI is working with */}
           <Typography variant="caption" color="text.secondary" noWrap>
             {studentName
-              ? `Analyzing ${studentName}'s work`
+              ? `Analyzing ${getDisplayName(studentName)}'s work`
               : assignmentId
                 ? "Assignment scope"
                 : courseId

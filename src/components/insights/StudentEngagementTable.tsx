@@ -15,6 +15,7 @@ import Typography from "@mui/material/Typography";
 import { GET_STUDENT_ENGAGEMENT } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
 import EvidencePopover from "@/components/insights/EvidencePopover";
+import { useUserSettings } from "@/lib/UserSettingsContext";
 
 /** Colors for each depth band. */
 const BAND_COLORS: Record<string, string> = {
@@ -58,6 +59,7 @@ interface StudentPopoverState {
 
 export default function StudentEngagementTable({ onViewThread }: Props) {
   const { scope } = useInsightsScope();
+  const { getDisplayName } = useUserSettings();
 
   const [sortKey, setSortKey] = useState<SortKey>("engagementScore");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -197,7 +199,7 @@ export default function StudentEngagementTable({ onViewThread }: Props) {
                 }
                 sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
               >
-                {student.name}
+                {getDisplayName(student.name)}
               </TableCell>
 
               {/* Score with visual bar */}
