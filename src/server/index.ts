@@ -4,6 +4,8 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import multer from "multer";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createSchema, createYoga } from "graphql-yoga";
 import { toNodeHandler } from "better-auth/node";
 import { fromNodeHeaders } from "better-auth/node";
@@ -29,9 +31,18 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 },
 });
 
+// Allow the dev URL, the production Railway URL, and any extra origins
+// supplied via the ALLOWED_ORIGINS env var (comma-separated).
+const allowedOrigins = [
+  "https://chat-explorer.localhost",
+  "http://localhost:4000",
+  ...(process.env.BETTER_AUTH_URL ? [process.env.BETTER_AUTH_URL] : []),
+  ...(process.env.ALLOWED_ORIGINS?.split(",").map((s) => s.trim()) ?? []),
+];
+
 app.use(
   cors({
-    origin: ["https://chat-explorer.localhost", "http://localhost:4000"],
+    origin: allowedOrigins,
     credentials: true,
   })
 );
@@ -188,6 +199,24 @@ app.use("/graphql", async (req, res) => {
 
 // ── Body parsing for non-upload routes ───────────────────────────
 app.use(express.json());
+
+// ── Serve the built React frontend in production ────────────────
+// In dev, Vite runs on its own port (5173) and proxies to the API.
+// In production, Express serves the bundled client from dist/client
+// and falls back to index.html for client-side routes.
+if (process.env.NODE_ENV === "production") {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  // dist/server/index.js -> ../client = dist/client
+  const clientDir = path.resolve(__dirname, "../client");
+
+  app.use(express.static(clientDir));
+
+  // SPA fallback: any non-API GET request returns index.html so
+  // React Router can handle the route on the client.
+  app.get(/^\/(?!api|graphql|auth).*/, (_req, res) => {
+    res.sendFile(path.join(clientDir, "index.html"));
+  });
+}
 
 async function main() {
   try {
