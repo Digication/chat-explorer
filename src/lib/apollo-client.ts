@@ -1,12 +1,12 @@
 import { ApolloClient, InMemoryCache, HttpLink, from } from "@apollo/client";
 import { onError } from "@apollo/client/link/error";
+import { API_BASE } from "./api-base";
 
 const httpLink = new HttpLink({
-  // Point to the Express server directly (same origin as auth cookies).
-  // The session cookie is set on localhost:4000 during Google OAuth,
-  // so GraphQL requests must go there too — not through Caddy on
-  // chat-explorer.localhost, which is a different domain.
-  uri: "http://localhost:4000/graphql",
+  // In dev, point at Express on localhost:4000 (where the auth cookie lives).
+  // In production, API_BASE is "" so this resolves to /graphql on the current
+  // origin (the Railway URL), which serves both the app and the API.
+  uri: `${API_BASE}/graphql`,
   credentials: "include", // send auth cookies with every request
 });
 

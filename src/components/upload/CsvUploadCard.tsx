@@ -13,10 +13,7 @@ import {
 } from "@mui/material";
 import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
-
-// The Express server runs on localhost:4000; we send requests there directly
-// so the auth cookie (which lives on localhost) is included.
-const API_BASE = "http://localhost:4000";
+import { API_BASE } from "@/lib/api-base";
 
 // Shape of the preview response from the server
 interface PreviewResult {

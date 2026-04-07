@@ -53,7 +53,11 @@ app.use(cookieParser());
 // where Google's callback will land. Serves a tiny page that auto-submits
 // the sign-in request as a POST (which Better Auth requires).
 app.get("/auth/login/google", (req, res) => {
-  const callbackURL = req.query.callbackURL || "https://chat-explorer.localhost";
+  // In production, fall back to the deployed app URL. In dev, fall back to
+  // the Caddy-served Vite frontend at chat-explorer.localhost.
+  const fallbackCallback =
+    process.env.BETTER_AUTH_URL || "https://chat-explorer.localhost";
+  const callbackURL = req.query.callbackURL || fallbackCallback;
   res.send(`<!DOCTYPE html>
     <html><body>
       <p>Redirecting to Google...</p>
