@@ -194,6 +194,17 @@ async function main() {
     await AppDataSource.initialize();
     console.log("Database connected successfully.");
 
+    // Run any pending migrations in production. In dev, TypeORM's
+    // synchronize: true (set in data-source.ts) handles schema changes.
+    if (process.env.NODE_ENV === "production") {
+      const pending = await AppDataSource.showMigrations();
+      if (pending) {
+        console.log("Running pending migrations...");
+        await AppDataSource.runMigrations();
+        console.log("Migrations complete.");
+      }
+    }
+
     await seedToriTags();
 
     app.listen(PORT, () => {

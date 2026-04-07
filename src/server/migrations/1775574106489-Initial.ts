@@ -1,0 +1,107 @@
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+export class Initial1775574106489 implements MigrationInterface {
+  name = "Initial1775574106489";
+
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`CREATE TABLE "institution" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying NOT NULL, "domain" character varying, "slug" character varying, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "UQ_d218ad3566afa9e396f184fd7d5" UNIQUE ("name"), CONSTRAINT "UQ_eef02e265f84ceb9d48b88015f9" UNIQUE ("slug"), CONSTRAINT "PK_f60ee4ff0719b7df54830b39087" PRIMARY KEY ("id"))`);
+    await queryRunner.query(`CREATE TYPE "public"."user_role_enum" AS ENUM('instructor', 'institution_admin', 'digication_admin')`);
+    await queryRunner.query(`CREATE TABLE "user" ("id" character varying NOT NULL, "name" character varying NOT NULL, "email" character varying NOT NULL, "image" character varying, "emailVerified" boolean NOT NULL DEFAULT false, "role" "public"."user_role_enum" NOT NULL DEFAULT 'instructor', "institutionId" uuid, "preferredLlmProvider" character varying, "preferredLlmModel" character varying, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "UQ_e12875dfb3b1d92d7d7c5377e22" UNIQUE ("email"), CONSTRAINT "PK_cace4a159ff9f2512dd42373760" PRIMARY KEY ("id"))`);
+    await queryRunner.query(`CREATE TABLE "course" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "institutionId" uuid NOT NULL, "externalId" character varying, "name" character varying NOT NULL, "description" text, "url" character varying, "startDate" TIMESTAMP WITH TIME ZONE, "endDate" TIMESTAMP WITH TIME ZONE, "courseNumber" character varying, "syncId" character varying, "faculty" character varying, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_bf95180dd756fd204fb01ce4916" PRIMARY KEY ("id"))`);
+    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_1774d6f5dbd966ec35fda171ab" ON "course" ("externalId", "institutionId") WHERE "externalId" IS NOT NULL`);
+    await queryRunner.query(`CREATE TABLE "assignment" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "courseId" uuid NOT NULL, "externalId" character varying NOT NULL, "name" character varying NOT NULL, "description" text, "url" character varying, "createdDate" TIMESTAMP WITH TIME ZONE, "dueDate" TIMESTAMP WITH TIME ZONE, "gradeMaxPoints" numeric, "intendedOutcomes" text, "aiAssistantId" character varying, "aiAssistantName" character varying, "aiAssistantDescription" text, "aiAssistantInstruction" text, "aiAssistantRestriction" text, "aiAssistantRole" character varying, "aiAssistantTags" text, "aiAssistantGradeLevel" character varying, "aiAssistantResponseLength" character varying, "aiAssistantVisibility" character varying, "aiAssistantReflections" boolean NOT NULL DEFAULT false, "aiAssistantGenerateAnswers" boolean NOT NULL DEFAULT false, "aiAssistantIntendedAudience" character varying, "importedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_43c2f5a3859f54cedafb270f37e" PRIMARY KEY ("id"))`);
+    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_b24d95c5754ea3cde99ca29279" ON "assignment" ("externalId", "courseId") `);
+    await queryRunner.query(`CREATE TABLE "thread" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "assignmentId" uuid NOT NULL, "externalId" character varying NOT NULL, "name" character varying NOT NULL, "totalInputTokens" integer, "totalOutputTokens" integer, "totalCost" numeric, "submissionUrl" character varying, CONSTRAINT "PK_cabc0f3f27d7b1c70cf64623e02" PRIMARY KEY ("id"))`);
+    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_9c4ecab3cb3cf621685c0b0538" ON "thread" ("externalId", "assignmentId") `);
+    await queryRunner.query(`CREATE TABLE "student" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "institutionId" uuid NOT NULL, "systemId" character varying NOT NULL, "syncId" character varying, "firstName" character varying, "lastName" character varying, "email" character varying, "systemRole" character varying, "courseRole" character varying, CONSTRAINT "PK_3d8016e1cb58429474a3c041904" PRIMARY KEY ("id"))`);
+    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_d9aa046a453d91fb20c6bd58fd" ON "student" ("systemId", "institutionId") `);
+    await queryRunner.query(`CREATE TYPE "public"."comment_role_enum" AS ENUM('USER', 'ASSISTANT', 'SYSTEM')`);
+    await queryRunner.query(`CREATE TABLE "comment" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "threadId" uuid NOT NULL, "studentId" uuid, "externalId" character varying NOT NULL, "role" "public"."comment_role_enum" NOT NULL, "text" text NOT NULL, "timestamp" TIMESTAMP WITH TIME ZONE, "orderIndex" integer NOT NULL, "totalComments" integer, "grade" character varying, "uploadedById" character varying, "importedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_0b0e4bbc8415ec426f87f3a88e2" PRIMARY KEY ("id"))`);
+    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_a8036b653ec6c7e18c2a9378a6" ON "comment" ("externalId", "threadId") `);
+    await queryRunner.query(`CREATE TABLE "tori_tag" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying NOT NULL, "domain" character varying NOT NULL, "domainNumber" integer NOT NULL, "categoryNumber" character varying, "description" text, "parentCategory" character varying, CONSTRAINT "UQ_bac73cf8275270f1207bc685b69" UNIQUE ("name"), CONSTRAINT "PK_d88b3efe7bd9155742c6aff02cc" PRIMARY KEY ("id"))`);
+    await queryRunner.query(`CREATE TABLE "comment_tori_tag" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "commentId" uuid NOT NULL, "toriTagId" uuid NOT NULL, "sourceCommentId" character varying, "extractionMethod" character varying NOT NULL DEFAULT 'extracted', CONSTRAINT "PK_00656a7c59c102ea85c2f02b25d" PRIMARY KEY ("id"))`);
+    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_4556ab1239bbd53a3fa46aaa95" ON "comment_tori_tag" ("commentId", "toriTagId") `);
+    await queryRunner.query(`CREATE TYPE "public"."student_consent_status_enum" AS ENUM('INCLUDED', 'EXCLUDED')`);
+    await queryRunner.query(`CREATE TABLE "student_consent" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "studentId" uuid NOT NULL, "institutionId" uuid NOT NULL, "courseId" uuid, "status" "public"."student_consent_status_enum" NOT NULL, "updatedById" character varying NOT NULL, "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_4f60bb6e3b28f457aaf2b5c2e3e" PRIMARY KEY ("id"))`);
+    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_d014664001e9546c7a52d27675" ON "student_consent" ("studentId", "institutionId", "courseId") `);
+    await queryRunner.query(`CREATE TYPE "public"."course_access_accesslevel_enum" AS ENUM('owner', 'collaborator')`);
+    await queryRunner.query(`CREATE TABLE "course_access" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "userId" character varying NOT NULL, "courseId" uuid NOT NULL, "accessLevel" "public"."course_access_accesslevel_enum" NOT NULL, "grantedById" character varying, "grantedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_92d971e40ef5b4295a7f98d0c24" PRIMARY KEY ("id"))`);
+    await queryRunner.query(`CREATE UNIQUE INDEX "IDX_02a4cae0a5ab7f68e5c63b18f5" ON "course_access" ("userId", "courseId") `);
+    await queryRunner.query(`CREATE TABLE "upload_log" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "uploadedById" character varying NOT NULL, "institutionId" uuid NOT NULL, "originalFilename" character varying NOT NULL, "totalRows" integer NOT NULL, "newComments" integer NOT NULL, "skippedDuplicates" integer NOT NULL, "newThreads" integer NOT NULL, "newStudents" integer NOT NULL, "newCourses" integer NOT NULL DEFAULT '0', "newAssignments" integer NOT NULL DEFAULT '0', "toriTagsExtracted" integer NOT NULL, "filePath" character varying, "uploadedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_a65839b2bab4a5644e118444042" PRIMARY KEY ("id"))`);
+    await queryRunner.query(`CREATE TYPE "public"."chat_session_scope_enum" AS ENUM('SELECTION', 'COURSE', 'CROSS_COURSE')`);
+    await queryRunner.query(`CREATE TABLE "chat_session" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "userId" character varying NOT NULL, "title" character varying, "scope" "public"."chat_session_scope_enum" NOT NULL DEFAULT 'SELECTION', "courseId" character varying, "assignmentId" character varying, "studentId" character varying, "selectedCommentIds" text array, "selectedToriTags" text array, "showPII" boolean NOT NULL DEFAULT false, "llmProvider" character varying, "llmModel" character varying, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_9017c2ee500cd1ba895752a0aa7" PRIMARY KEY ("id"))`);
+    await queryRunner.query(`CREATE TYPE "public"."chat_message_role_enum" AS ENUM('USER', 'ASSISTANT', 'SYSTEM')`);
+    await queryRunner.query(`CREATE TABLE "chat_message" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "sessionId" uuid NOT NULL, "role" "public"."chat_message_role_enum" NOT NULL, "content" text NOT NULL, "contextMeta" jsonb, "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_3cc0d85193aade457d3077dd06b" PRIMARY KEY ("id"))`);
+    await queryRunner.query(`CREATE TABLE "user_state" ("userId" character varying NOT NULL, "state" jsonb NOT NULL DEFAULT '{}', "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_b35c67d61943214aff1e7c94abd" PRIMARY KEY ("userId"))`);
+    await queryRunner.query(`ALTER TABLE "user" ADD CONSTRAINT "FK_ca0de218397aed2409d865d1580" FOREIGN KEY ("institutionId") REFERENCES "institution"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+    await queryRunner.query(`ALTER TABLE "course" ADD CONSTRAINT "FK_8fa9f33441d0e7cb28c5d934bc4" FOREIGN KEY ("institutionId") REFERENCES "institution"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+    await queryRunner.query(`ALTER TABLE "assignment" ADD CONSTRAINT "FK_5218258c0784c8b47c5079b8198" FOREIGN KEY ("courseId") REFERENCES "course"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+    await queryRunner.query(`ALTER TABLE "thread" ADD CONSTRAINT "FK_8b047821857688b503571e15806" FOREIGN KEY ("assignmentId") REFERENCES "assignment"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+    await queryRunner.query(`ALTER TABLE "student" ADD CONSTRAINT "FK_1829558ab114be65a7aa1dc950b" FOREIGN KEY ("institutionId") REFERENCES "institution"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+    await queryRunner.query(`ALTER TABLE "comment" ADD CONSTRAINT "FK_f7f39dec77c39953338d2701aee" FOREIGN KEY ("threadId") REFERENCES "thread"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+    await queryRunner.query(`ALTER TABLE "comment" ADD CONSTRAINT "FK_2242a333d165cfc975b8034db0f" FOREIGN KEY ("studentId") REFERENCES "student"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+    await queryRunner.query(`ALTER TABLE "comment_tori_tag" ADD CONSTRAINT "FK_4e85cea9a16d3af44afbf8c1a2e" FOREIGN KEY ("commentId") REFERENCES "comment"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+    await queryRunner.query(`ALTER TABLE "comment_tori_tag" ADD CONSTRAINT "FK_8aa7bcbedc6479c43d2058af603" FOREIGN KEY ("toriTagId") REFERENCES "tori_tag"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+    await queryRunner.query(`ALTER TABLE "student_consent" ADD CONSTRAINT "FK_daf5934846197e4c891d85ec7d3" FOREIGN KEY ("studentId") REFERENCES "student"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+    await queryRunner.query(`ALTER TABLE "student_consent" ADD CONSTRAINT "FK_c43063cb23d76622d0c20e4b9e8" FOREIGN KEY ("institutionId") REFERENCES "institution"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+    await queryRunner.query(`ALTER TABLE "student_consent" ADD CONSTRAINT "FK_44d88847526f36cd5f028c11c80" FOREIGN KEY ("courseId") REFERENCES "course"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+    await queryRunner.query(`ALTER TABLE "course_access" ADD CONSTRAINT "FK_4aa2114fe1fdfc3490ca153e1d4" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+    await queryRunner.query(`ALTER TABLE "course_access" ADD CONSTRAINT "FK_bffac211c1be67a096c94a7167c" FOREIGN KEY ("courseId") REFERENCES "course"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+    await queryRunner.query(`ALTER TABLE "upload_log" ADD CONSTRAINT "FK_d91d482adf24de678173af9b18a" FOREIGN KEY ("uploadedById") REFERENCES "user"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+    await queryRunner.query(`ALTER TABLE "upload_log" ADD CONSTRAINT "FK_38c53354d43774b4dc4cb5a9e4d" FOREIGN KEY ("institutionId") REFERENCES "institution"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+    await queryRunner.query(`ALTER TABLE "chat_session" ADD CONSTRAINT "FK_b371c02a2bc22cb175ded401292" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+    await queryRunner.query(`ALTER TABLE "chat_message" ADD CONSTRAINT "FK_9920f68af92e018eabdba396282" FOREIGN KEY ("sessionId") REFERENCES "chat_session"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+    await queryRunner.query(`ALTER TABLE "user_state" ADD CONSTRAINT "FK_b35c67d61943214aff1e7c94abd" FOREIGN KEY ("userId") REFERENCES "user"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`DROP TABLE "institution"`);
+    await queryRunner.query(`DROP TYPE "public"."user_role_enum"`);
+    await queryRunner.query(`DROP TABLE "user"`);
+    await queryRunner.query(`DROP TABLE "course"`);
+    await queryRunner.query(`DROP INDEX "public"."IDX_1774d6f5dbd966ec35fda171ab"`);
+    await queryRunner.query(`DROP TABLE "assignment"`);
+    await queryRunner.query(`DROP INDEX "public"."IDX_b24d95c5754ea3cde99ca29279"`);
+    await queryRunner.query(`DROP TABLE "thread"`);
+    await queryRunner.query(`DROP INDEX "public"."IDX_9c4ecab3cb3cf621685c0b0538"`);
+    await queryRunner.query(`DROP TABLE "student"`);
+    await queryRunner.query(`DROP INDEX "public"."IDX_d9aa046a453d91fb20c6bd58fd"`);
+    await queryRunner.query(`DROP TYPE "public"."comment_role_enum"`);
+    await queryRunner.query(`DROP TABLE "comment"`);
+    await queryRunner.query(`DROP INDEX "public"."IDX_a8036b653ec6c7e18c2a9378a6"`);
+    await queryRunner.query(`DROP TABLE "tori_tag"`);
+    await queryRunner.query(`DROP TABLE "comment_tori_tag"`);
+    await queryRunner.query(`DROP INDEX "public"."IDX_4556ab1239bbd53a3fa46aaa95"`);
+    await queryRunner.query(`DROP TYPE "public"."student_consent_status_enum"`);
+    await queryRunner.query(`DROP TABLE "student_consent"`);
+    await queryRunner.query(`DROP INDEX "public"."IDX_d014664001e9546c7a52d27675"`);
+    await queryRunner.query(`DROP TYPE "public"."course_access_accesslevel_enum"`);
+    await queryRunner.query(`DROP TABLE "course_access"`);
+    await queryRunner.query(`DROP INDEX "public"."IDX_02a4cae0a5ab7f68e5c63b18f5"`);
+    await queryRunner.query(`DROP TABLE "upload_log"`);
+    await queryRunner.query(`DROP TYPE "public"."chat_session_scope_enum"`);
+    await queryRunner.query(`DROP TABLE "chat_session"`);
+    await queryRunner.query(`DROP TYPE "public"."chat_message_role_enum"`);
+    await queryRunner.query(`DROP TABLE "chat_message"`);
+    await queryRunner.query(`DROP TABLE "user_state"`);
+    await queryRunner.query(`ALTER TABLE "user" DROP CONSTRAINT "FK_ca0de218397aed2409d865d1580"`);
+    await queryRunner.query(`ALTER TABLE "course" DROP CONSTRAINT "FK_8fa9f33441d0e7cb28c5d934bc4"`);
+    await queryRunner.query(`ALTER TABLE "assignment" DROP CONSTRAINT "FK_5218258c0784c8b47c5079b8198"`);
+    await queryRunner.query(`ALTER TABLE "thread" DROP CONSTRAINT "FK_8b047821857688b503571e15806"`);
+    await queryRunner.query(`ALTER TABLE "student" DROP CONSTRAINT "FK_1829558ab114be65a7aa1dc950b"`);
+    await queryRunner.query(`ALTER TABLE "comment" DROP CONSTRAINT "FK_f7f39dec77c39953338d2701aee"`);
+    await queryRunner.query(`ALTER TABLE "comment" DROP CONSTRAINT "FK_2242a333d165cfc975b8034db0f"`);
+    await queryRunner.query(`ALTER TABLE "comment_tori_tag" DROP CONSTRAINT "FK_4e85cea9a16d3af44afbf8c1a2e"`);
+    await queryRunner.query(`ALTER TABLE "comment_tori_tag" DROP CONSTRAINT "FK_8aa7bcbedc6479c43d2058af603"`);
+    await queryRunner.query(`ALTER TABLE "student_consent" DROP CONSTRAINT "FK_daf5934846197e4c891d85ec7d3"`);
+    await queryRunner.query(`ALTER TABLE "student_consent" DROP CONSTRAINT "FK_c43063cb23d76622d0c20e4b9e8"`);
+    await queryRunner.query(`ALTER TABLE "student_consent" DROP CONSTRAINT "FK_44d88847526f36cd5f028c11c80"`);
+    await queryRunner.query(`ALTER TABLE "course_access" DROP CONSTRAINT "FK_4aa2114fe1fdfc3490ca153e1d4"`);
+    await queryRunner.query(`ALTER TABLE "course_access" DROP CONSTRAINT "FK_bffac211c1be67a096c94a7167c"`);
+    await queryRunner.query(`ALTER TABLE "upload_log" DROP CONSTRAINT "FK_d91d482adf24de678173af9b18a"`);
+    await queryRunner.query(`ALTER TABLE "upload_log" DROP CONSTRAINT "FK_38c53354d43774b4dc4cb5a9e4d"`);
+    await queryRunner.query(`ALTER TABLE "chat_session" DROP CONSTRAINT "FK_b371c02a2bc22cb175ded401292"`);
+    await queryRunner.query(`ALTER TABLE "chat_message" DROP CONSTRAINT "FK_9920f68af92e018eabdba396282"`);
+    await queryRunner.query(`ALTER TABLE "user_state" DROP CONSTRAINT "FK_b35c67d61943214aff1e7c94abd"`);
+  }
+}
