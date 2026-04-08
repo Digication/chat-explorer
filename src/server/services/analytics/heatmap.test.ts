@@ -20,23 +20,25 @@ describe("getHeatmapCellEvidence", () => {
   // These tests depend on seed data from CSV uploads.
   // If the DB is empty, they will pass vacuously (returning []).
 
-  it("returns an array (not null or error) for valid inputs", async () => {
-    // Use a non-existent student/tag pair — should return empty array, not throw
+  it("returns an empty result (not null or error) for valid inputs", async () => {
+    // Use a non-existent student/tag pair — should return empty items, not throw
     const result = await getHeatmapCellEvidence(
       { institutionId: "00000000-0000-0000-0000-000000000000" },
       "00000000-0000-0000-0000-000000000001",
       "00000000-0000-0000-0000-000000000002"
     );
-    expect(result).toEqual([]);
+    expect(result).toEqual({ items: [], totalCount: 0 });
   });
 
-  it("returns empty array for non-existent student", async () => {
+  it("returns empty result for non-existent student UUIDs", async () => {
+    // Use valid-looking but unused UUIDs (must be valid UUIDs because the
+    // consent check passes them straight to a Postgres uuid column).
     const result = await getHeatmapCellEvidence(
       { institutionId: "00000000-0000-0000-0000-000000000000" },
-      "nonexistent-student-id",
-      "nonexistent-tag-id"
+      "00000000-0000-0000-0000-000000000999",
+      "00000000-0000-0000-0000-000000000888"
     );
-    expect(result).toEqual([]);
+    expect(result).toEqual({ items: [], totalCount: 0 });
   });
 
   it("returns evidence with correct shape when data exists", async () => {
@@ -69,10 +71,11 @@ describe("getHeatmapCellEvidence", () => {
       sample.toriTagId
     );
 
-    expect(result.length).toBeGreaterThan(0);
+    expect(result.items.length).toBeGreaterThan(0);
+    expect(result.totalCount).toBeGreaterThanOrEqual(result.items.length);
 
     // Verify shape of each evidence item
-    for (const item of result) {
+    for (const item of result.items) {
       expect(item).toHaveProperty("commentId");
       expect(item).toHaveProperty("text");
       expect(item).toHaveProperty("threadId");
@@ -83,9 +86,9 @@ describe("getHeatmapCellEvidence", () => {
     }
   });
 
-  it("limits results to 20", async () => {
-    // This test verifies the LIMIT 20 clause works.
-    // With real data, results should never exceed 20.
+  it("limits results to the requested page size", async () => {
+    // This test verifies the LIMIT clause works.
+    // With real data, items should never exceed the page size (default 20).
     const sample = await AppDataSource.getRepository(CommentToriTag)
       .createQueryBuilder("ctt")
       .innerJoin("ctt.comment", "c")
@@ -110,6 +113,6 @@ describe("getHeatmapCellEvidence", () => {
       sample.toriTagId
     );
 
-    expect(result.length).toBeLessThanOrEqual(20);
+    expect(result.items.length).toBeLessThanOrEqual(20);
   });
 });

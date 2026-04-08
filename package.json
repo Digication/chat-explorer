@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@10.12.1",
   "scripts": {
-    "dev": "node --import @swc-node/register/esm-register ./src/server/index.ts",
+    "dev": "node --watch --watch-path=./src/server --import @swc-node/register/esm-register ./src/server/index.ts",
     "dev:client": "vite",
     "dev:full": "concurrently \"pnpm dev\" \"pnpm dev:client\"",
     "build": "vite build && tsc -p tsconfig.server.json",

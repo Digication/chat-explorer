@@ -1,6 +1,7 @@
 import React from "react";
 import { useLazyQuery } from "@apollo/client/react";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import Link from "@mui/material/Link";
 import Popover from "@mui/material/Popover";
 import Skeleton from "@mui/material/Skeleton";
@@ -8,6 +9,8 @@ import Typography from "@mui/material/Typography";
 import { GET_HEATMAP_CELL_EVIDENCE } from "@/lib/queries/analytics";
 import { decodeEntities } from "@/lib/decode-entities";
 import { useUserSettings } from "@/lib/UserSettingsContext";
+
+const PAGE_SIZE = 20;
 
 interface EvidencePopoverProps {
   anchorEl: HTMLElement | null;
@@ -29,6 +32,11 @@ interface EvidenceItem {
   timestamp: string | null;
 }
 
+interface EvidenceResult {
+  items: EvidenceItem[];
+  totalCount: number;
+}
+
 export default function EvidencePopover({
   anchorEl,
   studentId,
@@ -41,23 +49,56 @@ export default function EvidencePopover({
   onViewThread,
 }: EvidencePopoverProps) {
   const { getDisplayName } = useUserSettings();
-  const [fetchEvidence, { data, loading }] =
-    useLazyQuery<{ heatmapCellEvidence: EvidenceItem[] }>(GET_HEATMAP_CELL_EVIDENCE, {
-      fetchPolicy: "network-only", // Always fetch fresh data for each cell
-    });
+  const [accumulated, setAccumulated] = React.useState<EvidenceItem[]>([]);
+  const [totalCount, setTotalCount] = React.useState(0);
 
-  // Fetch evidence whenever the target cell changes
-  React.useEffect(() => {
-    if (anchorEl) {
-      fetchEvidence({
+  const [fetchEvidence, { loading }] = useLazyQuery<{
+    heatmapCellEvidence: EvidenceResult;
+  }>(GET_HEATMAP_CELL_EVIDENCE, {
+    fetchPolicy: "network-only", // Always fetch fresh data for each cell
+  });
+
+  /** Fetches a page; if `append` is true, adds to accumulated, otherwise replaces. */
+  const fetchPage = React.useCallback(
+    async (offset: number, append: boolean) => {
+      const resp = await fetchEvidence({
         variables: {
-          input: { scope, studentId, toriTagId },
+          input: { scope, studentId, toriTagId, limit: PAGE_SIZE, offset },
         },
       });
-    }
-  }, [anchorEl, fetchEvidence, scope, studentId, toriTagId]);
+      const result = resp?.data?.heatmapCellEvidence;
+      if (!result) return;
+      setTotalCount(result.totalCount);
+      if (append) {
+        setAccumulated((prev) => {
+          const seen = new Set(prev.map((p) => p.commentId));
+          const fresh = result.items.filter(
+            (item: EvidenceItem) => !seen.has(item.commentId)
+          );
+          return [...prev, ...fresh];
+        });
+      } else {
+        setAccumulated(result.items);
+      }
+    },
+    [fetchEvidence, scope, studentId, toriTagId]
+  );
 
-  const evidence = data?.heatmapCellEvidence ?? [];
+  // Reset and fetch a fresh first page whenever the target cell changes.
+  React.useEffect(() => {
+    if (anchorEl) {
+      setAccumulated([]);
+      setTotalCount(0);
+      void fetchPage(0, false);
+    }
+  }, [anchorEl, fetchPage]);
+
+  const evidence = accumulated;
+  const hasMore = evidence.length < totalCount;
+
+  const loadMore = () => {
+    void fetchPage(evidence.length, true);
+  };
 
   return (
     <Popover
@@ -79,31 +120,38 @@ export default function EvidencePopover({
       <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
         {[
           studentName && toriTagName ? getDisplayName(studentName) : null,
-          count != null ? `${count} mention${count !== 1 ? "s" : ""}` : null,
+          // Prefer the live totalCount from the query over the upstream `count` prop,
+          // since `count` may be stale (e.g. from cached aggregate stats).
+          totalCount > 0
+            ? `${totalCount} mention${totalCount !== 1 ? "s" : ""}`
+            : count != null
+            ? `${count} mention${count !== 1 ? "s" : ""}`
+            : null,
         ]
           .filter(Boolean)
           .join(" — ") || "Matching comments"}
       </Typography>
 
-      {/* Loading state */}
-      {loading && (
+      {/* Initial loading state — only when nothing is loaded yet. */}
+      {loading && evidence.length === 0 && (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
           <Skeleton variant="rounded" height={60} />
           <Skeleton variant="rounded" height={60} />
         </Box>
       )}
 
-      {/* Evidence list */}
+      {/* Empty state */}
       {!loading && evidence.length === 0 && (
         <Typography variant="body2" color="text.disabled">
           No evidence found.
         </Typography>
       )}
 
-      {!loading && evidence.length > 0 && (
+      {/* Evidence list */}
+      {evidence.length > 0 && (
         <Box
           sx={{
-            maxHeight: 280,
+            maxHeight: 320,
             overflowY: "auto",
             display: "flex",
             flexDirection: "column",
@@ -152,6 +200,32 @@ export default function EvidencePopover({
               </Link>
             </Box>
           ))}
+        </Box>
+      )}
+
+      {/* Pagination footer: "Showing N of M" + Load more */}
+      {evidence.length > 0 && totalCount > 0 && (
+        <Box
+          sx={{
+            mt: 1.5,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 1,
+          }}
+        >
+          <Typography variant="caption" color="text.secondary">
+            Showing {evidence.length} of {totalCount}
+          </Typography>
+          {hasMore && (
+            <Button
+              size="small"
+              onClick={loadMore}
+              disabled={loading}
+            >
+              {loading ? "Loading…" : "Load more"}
+            </Button>
+          )}
         </Box>
       )}
     </Popover>

@@ -34,6 +34,11 @@ export interface CellEvidence {
   timestamp: string | null;
 }
 
+export interface CellEvidenceResult {
+  items: CellEvidence[];
+  totalCount: number;
+}
+
 export async function getHeatmap(
   scope: AnalyticsScope,
   mode: HeatmapMode = "CLASSIC",
@@ -166,12 +171,21 @@ function applyScaling(matrix: number[][], scaling: ScalingMode): number[][] {
  *   - Both studentId + toriTagId: intersection (heatmap cell)
  *   - Only toriTagId: all evidence for that tag across students
  *   - Only studentId: all evidence for that student across tags
+ *
+ * Pagination: pass `limit` (default 20, capped at 200) and `offset` (default 0).
+ * `totalCount` is returned alongside `items` so the UI can show "showing N of M".
  */
 export async function getHeatmapCellEvidence(
   scope: AnalyticsScope,
   studentId?: string,
-  toriTagId?: string
-): Promise<CellEvidence[]> {
+  toriTagId?: string,
+  limit: number = 20,
+  offset: number = 0
+): Promise<CellEvidenceResult> {
+  // Clamp limit to a sane range to prevent runaway queries.
+  const safeLimit = Math.min(Math.max(limit, 1), 200);
+  const safeOffset = Math.max(offset, 0);
+
   // If filtering by a specific student, do consent check
   if (studentId) {
     const consentRepo = AppDataSource.getRepository(StudentConsent);
@@ -184,7 +198,7 @@ export async function getHeatmapCellEvidence(
         status: ConsentStatus.EXCLUDED,
       },
     });
-    if (instExclusion) return [];
+    if (instExclusion) return { items: [], totalCount: 0 };
 
     if (scope.courseId) {
       const courseExclusion = await consentRepo.findOne({
@@ -195,58 +209,71 @@ export async function getHeatmapCellEvidence(
           status: ConsentStatus.EXCLUDED,
         },
       });
-      if (courseExclusion) return [];
+      if (courseExclusion) return { items: [], totalCount: 0 };
     }
   }
 
-  // Build the evidence query — conditionally join tori tags
-  const qb = AppDataSource.getRepository(Comment)
-    .createQueryBuilder("c")
-    .innerJoin("c.thread", "t")
-    .innerJoin("t.assignment", "a")
+  // Build the evidence query using property-path joins so TypeORM
+  // handles camelCase column quoting (Postgres lowercases unquoted identifiers).
+  const buildBaseQuery = () => {
+    const qb = AppDataSource.getRepository(Comment)
+      .createQueryBuilder("c")
+      .innerJoin("c.thread", "t")
+      .innerJoin("t.assignment", "a")
+      .innerJoin("a.course", "co")
+      .where("c.role = :role", { role: "USER" })
+      .andWhere("co.institutionId = :instId", {
+        instId: scope.institutionId,
+      });
+
+    // Use the c.toriTags relation (not a raw join condition string), so
+    // TypeORM resolves the join columns through entity metadata.
+    if (toriTagId) {
+      qb.innerJoin("c.toriTags", "ctt").andWhere(
+        "ctt.toriTagId = :toriTagId",
+        { toriTagId }
+      );
+    }
+
+    if (studentId) {
+      qb.andWhere("c.studentId = :studentId", { studentId });
+    }
+    if (scope.courseId) {
+      qb.andWhere("a.courseId = :courseId", { courseId: scope.courseId });
+    }
+    if (scope.assignmentId) {
+      qb.andWhere("t.assignmentId = :assignmentId", {
+        assignmentId: scope.assignmentId,
+      });
+    }
+    return qb;
+  };
+
+  // Total count (independent of limit/offset).
+  const totalCount = await buildBaseQuery().getCount();
+
+  // Page of items.
+  const rows = await buildBaseQuery()
     .select([
       'c.id AS "commentId"',
-      "c.text AS text",
+      'c.text AS "text"',
       'c.threadId AS "threadId"',
       't.name AS "threadName"',
-      "c.timestamp AS timestamp",
+      'c.timestamp AS "timestamp"',
     ])
-    .where("c.role = :role", { role: "USER" })
-    .andWhere(
-      'a."courseId" IN (SELECT id FROM course WHERE "institutionId" = :instId)',
-      { instId: scope.institutionId }
-    );
-
-  // Join TORI tags table only when filtering by tag
-  if (toriTagId) {
-    qb.innerJoin(CommentToriTag, "ctt", "ctt.commentId = c.id")
-      .andWhere("ctt.toriTagId = :toriTagId", { toriTagId });
-  }
-
-  if (studentId) {
-    qb.andWhere("c.studentId = :studentId", { studentId });
-  }
-
-  if (scope.courseId) {
-    qb.andWhere("a.courseId = :courseId", { courseId: scope.courseId });
-  }
-  if (scope.assignmentId) {
-    qb.andWhere("t.assignmentId = :assignmentId", {
-      assignmentId: scope.assignmentId,
-    });
-  }
-
-  qb.orderBy("c.timestamp", "ASC", "NULLS LAST")
+    .orderBy("c.timestamp", "ASC", "NULLS LAST")
     .addOrderBy("c.orderIndex", "ASC")
-    .limit(20);
+    .limit(safeLimit)
+    .offset(safeOffset)
+    .getRawMany();
 
-  const rows = await qb.getRawMany();
-
-  return rows.map((r) => ({
+  const items: CellEvidence[] = rows.map((r) => ({
     commentId: r.commentId ?? r.commentid,
     text: r.text,
     threadId: r.threadId ?? r.threadid,
     threadName: r.threadName ?? r.threadname,
     timestamp: r.timestamp ? new Date(r.timestamp).toISOString() : null,
   }));
+
+  return { items, totalCount };
 }

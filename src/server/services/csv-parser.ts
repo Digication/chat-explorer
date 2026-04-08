@@ -157,8 +157,37 @@ export function decodeEntities(text: string): string {
     .replace(/&gt;/g, '>');
 }
 
+/**
+ * Decodes a CSV buffer to a string, handling both UTF-8 and Windows-1252.
+ *
+ * Why: many CSV exports (especially those that have round-tripped through
+ * Excel) are Windows-1252 encoded, not UTF-8. If we hand a Windows-1252
+ * buffer to csv-parse and let it assume UTF-8, characters like the curly
+ * apostrophe (byte 0x92) become U+FFFD replacement characters — which
+ * render as a diamond-question-mark and can never be recovered.
+ *
+ * Strategy: try strict UTF-8 first; if it throws, fall back to Windows-1252.
+ * Also strips a UTF-8 BOM if present so it doesn't end up in the first header.
+ */
+function decodeCsvBuffer(buffer: Buffer): string {
+  const noBom =
+    buffer.length >= 3 &&
+    buffer[0] === 0xef &&
+    buffer[1] === 0xbb &&
+    buffer[2] === 0xbf
+      ? buffer.subarray(3)
+      : buffer;
+
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(noBom);
+  } catch {
+    return new TextDecoder("windows-1252").decode(noBom);
+  }
+}
+
 export function parseCsvBuffer(buffer: Buffer): RawCsvRow[] {
-  const records = parse(buffer, {
+  const text = decodeCsvBuffer(buffer);
+  const records = parse(text, {
     columns: (headers: string[]) => headers.map(normalizeHeader),
     skip_empty_lines: true,
     trim: true,

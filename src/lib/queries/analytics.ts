@@ -137,11 +137,14 @@ export const GET_HEATMAP = gql`
 export const GET_HEATMAP_CELL_EVIDENCE = gql`
   query HeatmapCellEvidence($input: CellEvidenceInput!) {
     heatmapCellEvidence(input: $input) {
-      commentId
-      text
-      threadId
-      threadName
-      timestamp
+      items {
+        commentId
+        text
+        threadId
+        threadName
+        timestamp
+      }
+      totalCount
     }
   }
 `;
