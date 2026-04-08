@@ -12,6 +12,7 @@ import {
 import SearchIcon from "@mui/icons-material/Search";
 import UserAvatar from "@/components/shared/UserAvatar";
 import ToriChip from "@/components/shared/ToriChip";
+import { useUserSettings } from "@/lib/UserSettingsContext";
 
 /** Width of the student list panel. */
 const PANEL_WIDTH = 360;
@@ -56,8 +57,11 @@ export default function StudentListPanel({
   onToggle,
 }: StudentListPanelProps) {
   const [search, setSearch] = useState("");
+  const { getDisplayName } = useUserSettings();
 
-  // Filter students by the search term (case-insensitive)
+  // Filter students by the search term (case-insensitive).
+  // Search always matches on the real name so faculty can find a student
+  // even when PII (display names) is hidden.
   const filtered = useMemo(() => {
     if (!search.trim()) return students;
     const q = search.toLowerCase();
@@ -119,7 +123,7 @@ export default function StudentListPanel({
                     noWrap
                     sx={{ flex: 1 }}
                   >
-                    {s.name}
+                    {getDisplayName(s.name)}
                   </Typography>
                   <Typography variant="caption" color="text.secondary">
                     {s.commentCount} comments

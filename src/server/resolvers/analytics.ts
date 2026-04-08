@@ -81,11 +81,27 @@ export const analyticsResolvers = {
 
     heatmapCellEvidence: async (
       _: unknown,
-      { input }: { input: { scope: ScopeInput; studentId?: string; toriTagId?: string } },
+      {
+        input,
+      }: {
+        input: {
+          scope: ScopeInput;
+          studentId?: string;
+          toriTagId?: string;
+          limit?: number;
+          offset?: number;
+        };
+      },
       ctx: GraphQLContext
     ) => {
       const validated = await validateScope(ctx, input.scope);
-      return getHeatmapCellEvidence(validated, input.studentId, input.toriTagId);
+      return getHeatmapCellEvidence(
+        validated,
+        input.studentId,
+        input.toriTagId,
+        input.limit,
+        input.offset
+      );
     },
 
     network: async (

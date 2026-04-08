@@ -5,6 +5,9 @@
 - **Unit tests**: `docker compose exec <app-name> pnpm test`
 - **E2e tests**: `docker compose run --rm e2e`
 
+# Reference repos (read-only, for UI/pattern reference)
+- **campus-web** — `/Users/jeffreyyan/code/file-based-reflections/campus-web`. This is the Digication Campus web app. It is the source of truth for the UI look-and-feel this project should match: dark sidebar, bottom bar + student carousel spacing, slide-out panels, AI chat history pattern (auto-load latest chat on open, not a fresh one), and general Digication design language. When asked to match "Campus UI" or "Digication patterns", read this repo directly — do NOT rely on memory.
+
 # Production
 - **Hosted on:** Railway (Pro plan), project `chat-explorer`
 - **URL:** https://chat-explorer.up.railway.app (custom domain `chat-explorer.digication.com` planned)

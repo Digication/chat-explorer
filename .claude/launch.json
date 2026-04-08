@@ -5,7 +5,7 @@
       "name": "chat-explorer",
       "runtimeExecutable": "node",
       "runtimeArgs": ["-e", "setTimeout(() => {}, 999999999)"],
-      "port": 4000,
+      "port": 4099,
       "url": "https://chat-explorer.localhost"
     }
   ]

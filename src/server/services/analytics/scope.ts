@@ -1,8 +1,7 @@
 import { AppDataSource } from "../../data-source.js";
 import { Comment } from "../../entities/Comment.js";
-import { Student } from "../../entities/Student.js";
 import { StudentConsent, ConsentStatus } from "../../entities/StudentConsent.js";
-import { IsNull } from "typeorm";
+import { In, IsNull } from "typeorm";
 import type { AnalyticsScope } from "./types.js";
 
 export interface ResolvedScope {
@@ -25,72 +24,18 @@ export interface ResolvedScope {
 
 /**
  * Resolves a scope into filtered student IDs and comments.
- * All analytics modules call this first instead of querying directly.
+ *
+ * `consentedStudentIds` is the set of students who actually have at least
+ * one comment in this scope AND have not been excluded by consent. It is
+ * NOT the institution-wide student roster — earlier versions returned that
+ * broader set, which caused students from other courses to leak into per-
+ * course analytics (heatmap rows, percentages, etc.).
  */
 export async function resolveScope(
   scope: AnalyticsScope
 ): Promise<ResolvedScope> {
-  // 1. Find all students in this institution
-  const studentRepo = AppDataSource.getRepository(Student);
-  const studentQb = studentRepo
-    .createQueryBuilder("s")
-    .select(["s.id"])
-    .where("s.institutionId = :institutionId", {
-      institutionId: scope.institutionId,
-    });
-
-  if (scope.studentIds?.length) {
-    studentQb.andWhere("s.id IN (:...studentIds)", {
-      studentIds: scope.studentIds,
-    });
-  }
-
-  const allStudents = await studentQb.getMany();
-  const allStudentIds = allStudents.map((s) => s.id);
-
-  // 2. Find excluded students
-  const consentRepo = AppDataSource.getRepository(StudentConsent);
-  const excludedIds = new Set<string>();
-
-  if (allStudentIds.length > 0) {
-    // Institution-wide exclusions
-    const instExclusions = await consentRepo.find({
-      where: {
-        institutionId: scope.institutionId,
-        courseId: IsNull(),
-        status: ConsentStatus.EXCLUDED,
-      },
-      select: ["studentId"],
-    });
-    for (const exc of instExclusions) {
-      if (allStudentIds.includes(exc.studentId)) {
-        excludedIds.add(exc.studentId);
-      }
-    }
-
-    // Course-level exclusions (if scope has a courseId)
-    if (scope.courseId) {
-      const courseExclusions = await consentRepo.find({
-        where: {
-          institutionId: scope.institutionId,
-          courseId: scope.courseId,
-          status: ConsentStatus.EXCLUDED,
-        },
-        select: ["studentId"],
-      });
-      for (const exc of courseExclusions) {
-        if (allStudentIds.includes(exc.studentId)) {
-          excludedIds.add(exc.studentId);
-        }
-      }
-    }
-  }
-
-  const consentedStudentIds = allStudentIds.filter(
-    (id) => !excludedIds.has(id)
-  );
-
-  // 3. Query comments filtered to scope and consented students
+  // 1. Query comments filtered to scope (institution + optional course/assignment).
+  //    We do this FIRST so we know which students actually participated.
   const commentRepo = AppDataSource.getRepository(Comment);
   const commentQb = commentRepo
     .createQueryBuilder("c")
@@ -109,19 +54,14 @@ export async function resolveScope(
       assignmentId: scope.assignmentId,
     });
   }
-
-  // Only include comments from consented students (or non-student comments)
-  if (consentedStudentIds.length > 0) {
+  if (scope.studentIds?.length) {
     commentQb.andWhere(
-      "(c.studentId IS NULL OR c.studentId IN (:...consentedIds))",
-      { consentedIds: consentedStudentIds }
+      "(c.studentId IS NULL OR c.studentId IN (:...studentIds))",
+      { studentIds: scope.studentIds }
     );
-  } else {
-    // No consented students — only include non-student comments
-    commentQb.andWhere("c.studentId IS NULL");
   }
 
-  const comments = await commentQb
+  const allComments = await commentQb
     .select([
       "c.id",
       "c.externalId",
@@ -135,6 +75,60 @@ export async function resolveScope(
       "c.grade",
     ])
     .getMany();
+
+  // 2. Extract the set of students who actually participated in this scope.
+  const participatingStudentIds = Array.from(
+    new Set(
+      allComments
+        .map((c) => c.studentId)
+        .filter((id): id is string => id !== null)
+    )
+  );
+
+  // 3. Apply consent exclusions, but only against students who actually
+  //    participated. A student excluded in an unrelated course shouldn't
+  //    inflate this scope's "excluded count".
+  const excludedIds = new Set<string>();
+
+  if (participatingStudentIds.length > 0) {
+    const consentRepo = AppDataSource.getRepository(StudentConsent);
+
+    // Institution-wide exclusions
+    const instExclusions = await consentRepo.find({
+      where: {
+        studentId: In(participatingStudentIds),
+        institutionId: scope.institutionId,
+        courseId: IsNull(),
+        status: ConsentStatus.EXCLUDED,
+      },
+      select: ["studentId"],
+    });
+    for (const exc of instExclusions) excludedIds.add(exc.studentId);
+
+    // Course-level exclusions (only when scoped to a course)
+    if (scope.courseId) {
+      const courseExclusions = await consentRepo.find({
+        where: {
+          studentId: In(participatingStudentIds),
+          institutionId: scope.institutionId,
+          courseId: scope.courseId,
+          status: ConsentStatus.EXCLUDED,
+        },
+        select: ["studentId"],
+      });
+      for (const exc of courseExclusions) excludedIds.add(exc.studentId);
+    }
+  }
+
+  const consentedStudentIds = participatingStudentIds.filter(
+    (id) => !excludedIds.has(id)
+  );
+
+  // 4. Filter comments to consented-or-non-student rows.
+  const consentedSet = new Set(consentedStudentIds);
+  const comments = allComments.filter(
+    (c) => c.studentId === null || consentedSet.has(c.studentId)
+  );
 
   // 4. Get unique threads from the comments
   const threadIds = [...new Set(comments.map((c) => c.threadId))];

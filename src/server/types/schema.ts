@@ -306,6 +306,11 @@ export const typeDefs = /* GraphQL */ `
     timestamp: String
   }
 
+  type CellEvidenceResult {
+    items: [CellEvidence!]!
+    totalCount: Int!
+  }
+
   type NetworkNode {
     id: ID!
     name: String!
@@ -527,6 +532,8 @@ export const typeDefs = /* GraphQL */ `
     scope: AnalyticsScopeInput!
     studentId: ID
     toriTagId: ID
+    limit: Int
+    offset: Int
   }
 
   input ConsentInput {
@@ -556,7 +563,7 @@ export const typeDefs = /* GraphQL */ `
     textSignals(scope: AnalyticsScopeInput!): TextSignalsResult!
     engagement(scope: AnalyticsScopeInput!): EngagementAnalysisResult!
     heatmap(input: HeatmapInput!): HeatmapResult!
-    heatmapCellEvidence(input: CellEvidenceInput!): [CellEvidence!]!
+    heatmapCellEvidence(input: CellEvidenceInput!): CellEvidenceResult!
     network(scope: AnalyticsScopeInput!): NetworkResult!
     instructionalInsights(scope: AnalyticsScopeInput!): InsightsResult!
     recommendations(scope: AnalyticsScopeInput!): RecommendationsResult!

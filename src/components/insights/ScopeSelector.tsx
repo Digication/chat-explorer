@@ -209,9 +209,17 @@ export default function ScopeSelector({ compact = false }: ScopeSelectorProps) {
   return (
     <Box sx={{ mb: compact ? 0 : 3 }}>
       <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />}>
+        {/*
+          IMPORTANT: each direct child of <Breadcrumbs> gets a separator before it.
+          MUI uses React.Children.toArray() which flattens fragments, so a
+          <Button> + <Menu> pair inside a <> fragment counts as TWO children and
+          produces a phantom separator next to the (invisible) Menu portal.
+          Wrap each Button+Menu pair in a single <Box> so it counts as one child.
+        */}
+
         {/* Institution — clickable dropdown for digication_admin, static for others */}
         {isDigicationAdmin ? (
-          <>
+          <Box component="span">
             <Button
               size="small"
               endIcon={<ArrowDropDownIcon />}
@@ -235,7 +243,7 @@ export default function ScopeSelector({ compact = false }: ScopeSelectorProps) {
                 </MenuItem>
               ))}
             </Menu>
-          </>
+          </Box>
         ) : (
           <Typography color="text.primary" fontWeight={500}>
             {institutionName}
@@ -243,38 +251,40 @@ export default function ScopeSelector({ compact = false }: ScopeSelectorProps) {
         )}
 
         {/* Course selector */}
-        <Button
-          size="small"
-          endIcon={<ArrowDropDownIcon />}
-          onClick={(e) => setCourseAnchor(e.currentTarget)}
-          sx={{ textTransform: "none" }}
-        >
-          {coursesLoading
-            ? "Loading..."
-            : selectedCourse?.name ?? "All Courses"}
-        </Button>
-        <Menu
-          anchorEl={courseAnchor}
-          open={Boolean(courseAnchor)}
-          onClose={() => setCourseAnchor(null)}
-        >
-          <MenuItem onClick={handleClearCourse}>
-            <em>All Courses</em>
-          </MenuItem>
-          {courses.map((c) => (
-            <MenuItem
-              key={c.id}
-              selected={c.id === scope.courseId}
-              onClick={() => handleCourseSelect(c.id)}
-            >
-              {c.name}
+        <Box component="span">
+          <Button
+            size="small"
+            endIcon={<ArrowDropDownIcon />}
+            onClick={(e) => setCourseAnchor(e.currentTarget)}
+            sx={{ textTransform: "none" }}
+          >
+            {coursesLoading
+              ? "Loading..."
+              : selectedCourse?.name ?? "All Courses"}
+          </Button>
+          <Menu
+            anchorEl={courseAnchor}
+            open={Boolean(courseAnchor)}
+            onClose={() => setCourseAnchor(null)}
+          >
+            <MenuItem onClick={handleClearCourse}>
+              <em>All Courses</em>
             </MenuItem>
-          ))}
-        </Menu>
+            {courses.map((c) => (
+              <MenuItem
+                key={c.id}
+                selected={c.id === scope.courseId}
+                onClick={() => handleCourseSelect(c.id)}
+              >
+                {c.name}
+              </MenuItem>
+            ))}
+          </Menu>
+        </Box>
 
         {/* Assignment selector (only when a course is selected) */}
-        {scope.courseId && (
-          <>
+        {scope.courseId ? (
+          <Box component="span">
             <Button
               size="small"
               endIcon={<ArrowDropDownIcon />}
@@ -303,8 +313,8 @@ export default function ScopeSelector({ compact = false }: ScopeSelectorProps) {
                 </MenuItem>
               ))}
             </Menu>
-          </>
-        )}
+          </Box>
+        ) : null}
       </Breadcrumbs>
     </Box>
   );
