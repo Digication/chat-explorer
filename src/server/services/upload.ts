@@ -58,6 +58,9 @@ export interface UploadCommitResult extends UploadPreviewResult {
   uploadLogId: string;
   toriTagsExtracted: number;
   courseAccessCreated: boolean;
+  // IDs of newly created USER comments — used by the upload route to fire
+  // off background reflection-classification (Plan 3 / Hatton & Smith).
+  newUserCommentIds: string[];
 }
 
 // ── Institution detection ──────────────────────────────────────────
@@ -319,6 +322,8 @@ export async function commitUpload(
     let newCoursesCount = 0;
     let toriTagsExtracted = 0;
     const courseIdsForAccess = new Set<string>();
+    // Collected for the post-commit reflection-classification hook.
+    const newUserCommentIds: string[] = [];
 
     // Caches to avoid repeated DB lookups within this transaction
     const studentCache = new Map<string, Student>(); // systemId → Student
@@ -547,6 +552,9 @@ export async function commitUpload(
           });
 
           newCommentsCount++;
+          if (comment.role === CommentRole.USER) {
+            newUserCommentIds.push(comment.id);
+          }
 
           newCommentsForTori.push({
             id: comment.id,
@@ -618,6 +626,7 @@ export async function commitUpload(
       uploadLogId: uploadLog.id,
       toriTagsExtracted,
       courseAccessCreated: courseIdsForAccess.size > 0,
+      newUserCommentIds,
     };
   });
 }

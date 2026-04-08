@@ -18,6 +18,7 @@ import {
 } from "./middleware/auth.js";
 import { User } from "./entities/User.js";
 import { previewUpload, commitUpload } from "./services/upload.js";
+import { classifyUserCommentsInBackground } from "./services/reflection/ingest-hook.js";
 import { typeDefs } from "./types/schema.js";
 import { resolvers } from "./resolvers/index.js";
 import type { GraphQLContext } from "./types/context.js";
@@ -134,6 +135,17 @@ app.post(
         institutionId,
         req.file.originalname
       );
+
+      // Fire-and-forget reflection classification (Plan 3 / Hatton & Smith).
+      // Runs outside the upload transaction so a slow LLM call cannot hold
+      // DB locks. Failures are logged inside the hook and never affect the
+      // upload response. The backfill script is the safety net.
+      void classifyUserCommentsInBackground(result.newUserCommentIds).catch(
+        (err) => {
+          console.error("[reflection] background classification failed:", err);
+        }
+      );
+
       res.json(result);
     } catch (err) {
       console.error("Upload commit error:", err);

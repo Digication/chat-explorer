@@ -13,3 +13,7 @@ export { UploadLog } from "./UploadLog.js";
 export { ChatSession, ChatScope } from "./ChatSession.js";
 export { ChatMessage, ChatMessageRole } from "./ChatMessage.js";
 export { UserState } from "./UserState.js";
+export {
+  CommentReflectionClassification,
+  ReflectionCategory,
+} from "./CommentReflectionClassification.js";
