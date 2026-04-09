@@ -26,6 +26,13 @@ import { GOLDEN_EXAMPLES } from "./golden-examples.js";
 export const CLASSIFIER_MODEL = "gemini-2.5-flash";
 export const CLASSIFIER_VERSION = `google/${CLASSIFIER_MODEL}@2026-04-08`;
 
+// Gemini 2.5 Flash uses internal "thinking" tokens that count against
+// `maxOutputTokens`. With our first attempt at 400 the model spent most of
+// its budget reasoning and then truncated the JSON mid-string, causing ~90%
+// of backfill calls to fail. 2048 leaves plenty of room for both reasoning
+// and the final structured output (typical JSON output is <200 tokens).
+const CLASSIFIER_MAX_TOKENS = 2048;
+
 export interface ClassificationResult {
   category: ReflectionCategory;
   evidenceQuote: string | null;
@@ -225,7 +232,7 @@ export async function classifyComment(
         model,
         systemPrompt: SYSTEM_PROMPT,
         temperature: 0.1,
-        maxTokens: 400,
+        maxTokens: CLASSIFIER_MAX_TOKENS,
       }
     );
   } catch (e) {
@@ -252,7 +259,7 @@ export async function classifyComment(
         model,
         systemPrompt: SYSTEM_PROMPT,
         temperature: 0.0,
-        maxTokens: 400,
+        maxTokens: CLASSIFIER_MAX_TOKENS,
       }
     );
     try {
