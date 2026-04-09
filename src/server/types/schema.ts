@@ -352,7 +352,6 @@ export const typeDefs = /* GraphQL */ `
     commentId: ID!
     studentLabel: String!
     textExcerpt: String!
-    engagementScore: Float!
   }
 
   type TagExemplar {

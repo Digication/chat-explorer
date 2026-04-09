@@ -29,7 +29,6 @@ export interface TagExemplar {
     commentId: string;
     studentLabel: string;
     textExcerpt: string;
-    engagementScore: number;
   }>;
 }
 
@@ -194,7 +193,6 @@ export async function getInsights(
             ? studentLabel(s.comment.studentId)
             : "Unknown",
           textExcerpt: s.comment!.text.slice(0, 200),
-          engagementScore: 0, // Legacy field — not used by new UI
         })),
       });
     }
