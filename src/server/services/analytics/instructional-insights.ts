@@ -3,7 +3,13 @@ import { CommentToriTag } from "../../entities/CommentToriTag.js";
 import { ToriTag } from "../../entities/ToriTag.js";
 import { Student } from "../../entities/Student.js";
 import { In } from "typeorm";
-import type { AnalyticsScope, AnalyticsResult, DepthBand } from "./types.js";
+import type {
+  AnalyticsScope,
+  AnalyticsResult,
+  ReflectionCategory,
+  ReflectionCategoryDistribution,
+} from "./types.js";
+import { ALL_REFLECTION_CATEGORIES } from "./types.js";
 import { resolveScope } from "./scope.js";
 import { withCache } from "./cache.js";
 import { getEngagement } from "./engagement.js";
@@ -12,8 +18,7 @@ export interface StudentProfile {
   studentId: string;
   name: string;
   topToriTags: string[]; // top 3 tag names
-  engagementScore: number;
-  depthBand: DepthBand;
+  modalCategory: ReflectionCategory;
   commentCount: number;
   avgWordCount: number;
 }
@@ -39,7 +44,10 @@ export interface InstructionalInsights {
   studentProfiles: StudentProfile[];
   tagExemplars: TagExemplar[];
   promptPatterns: PromptPattern[];
-  depthDistribution: Record<DepthBand, { count: number; percent: number }>;
+  categoryDistribution: Record<
+    ReflectionCategory,
+    { count: number; percent: number }
+  >;
 }
 
 function countWords(text: string): number {
@@ -134,8 +142,7 @@ export async function getInsights(
         studentId: sId,
         name: studentLabel(sId),
         topToriTags: topTags,
-        engagementScore: eng?.averageScore ?? 0,
-        depthBand: eng?.depthBand ?? "SURFACE",
+        modalCategory: eng?.modalCategory ?? "DESCRIPTIVE_WRITING",
         commentCount: sComments.length,
         avgWordCount,
       };
@@ -158,14 +165,25 @@ export async function getInsights(
       const tag = tagMap.get(tagId);
       if (!tag) continue;
 
+      // Sort by reflection depth (higher = better exemplar).
+      const CATEGORY_ORDINAL: Record<string, number> = {
+        DESCRIPTIVE_WRITING: 0,
+        DESCRIPTIVE_REFLECTION: 1,
+        DIALOGIC_REFLECTION: 2,
+        CRITICAL_REFLECTION: 3,
+      };
       const scored = cIds
         .map((cId) => ({
           commentId: cId,
-          score: engagementByComment.get(cId)?.score ?? 0,
+          category: engagementByComment.get(cId)?.category ?? "DESCRIPTIVE_WRITING",
           comment: commentMap.get(cId),
         }))
         .filter((s) => s.comment)
-        .sort((a, b) => b.score - a.score)
+        .sort(
+          (a, b) =>
+            (CATEGORY_ORDINAL[b.category] ?? 0) -
+            (CATEGORY_ORDINAL[a.category] ?? 0)
+        )
         .slice(0, 3);
 
       tagExemplars.push({
@@ -176,7 +194,7 @@ export async function getInsights(
             ? studentLabel(s.comment.studentId)
             : "Unknown",
           textExcerpt: s.comment!.text.slice(0, 200),
-          engagementScore: s.score,
+          engagementScore: 0, // Legacy field — not used by new UI
         })),
       });
     }
@@ -223,9 +241,17 @@ export async function getInsights(
       const threadUserComments = userComments.filter(
         (c) => c.threadId === threadId
       );
+      // Engagement scores no longer exist — kept for prompt pattern
+      // sort key (0/1/2/3 ordinal from the category).
+      const CAT_ORD: Record<string, number> = {
+        DESCRIPTIVE_WRITING: 0,
+        DESCRIPTIVE_REFLECTION: 1,
+        DIALOGIC_REFLECTION: 2,
+        CRITICAL_REFLECTION: 3,
+      };
       for (const c of threadUserComments) {
         const eng = engagementByComment.get(c.id);
-        if (eng) group.engagements.push(eng.score);
+        if (eng) group.engagements.push(CAT_ORD[eng.category] ?? 0);
       }
 
       // Get tags for this thread's comments
@@ -262,39 +288,34 @@ export async function getInsights(
       })
       .sort((a, b) => b.threadCount - a.threadCount);
 
-    // ── Depth distribution ───────────────────────────────────────
+    // ── Category distribution ───────────────────────────────────
     const totalStudents = studentProfiles.length;
-    const depthCounts: Record<DepthBand, number> = {
-      SURFACE: 0,
-      DEVELOPING: 0,
-      DEEP: 0,
+    const catCounts: Record<ReflectionCategory, number> = {
+      DESCRIPTIVE_WRITING: 0,
+      DESCRIPTIVE_REFLECTION: 0,
+      DIALOGIC_REFLECTION: 0,
+      CRITICAL_REFLECTION: 0,
     };
     for (const sp of studentProfiles) {
-      depthCounts[sp.depthBand]++;
+      catCounts[sp.modalCategory]++;
     }
-    const depthDistribution: Record<
-      DepthBand,
+    const categoryDistribution = {} as Record<
+      ReflectionCategory,
       { count: number; percent: number }
-    > = {
-      SURFACE: {
-        count: depthCounts.SURFACE,
-        percent: totalStudents > 0 ? (depthCounts.SURFACE / totalStudents) * 100 : 0,
-      },
-      DEVELOPING: {
-        count: depthCounts.DEVELOPING,
-        percent: totalStudents > 0 ? (depthCounts.DEVELOPING / totalStudents) * 100 : 0,
-      },
-      DEEP: {
-        count: depthCounts.DEEP,
-        percent: totalStudents > 0 ? (depthCounts.DEEP / totalStudents) * 100 : 0,
-      },
-    };
+    >;
+    for (const cat of ALL_REFLECTION_CATEGORIES) {
+      categoryDistribution[cat] = {
+        count: catCounts[cat],
+        percent:
+          totalStudents > 0 ? (catCounts[cat] / totalStudents) * 100 : 0,
+      };
+    }
 
     return {
       studentProfiles,
       tagExemplars,
       promptPatterns,
-      depthDistribution,
+      categoryDistribution,
     };
   });
 

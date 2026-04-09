@@ -12,27 +12,22 @@ import {
   FormControl,
   InputLabel,
   Tooltip,
+  Chip,
 } from "@mui/material";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import { GET_GROWTH } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
 import { useUserSettings } from "@/lib/UserSettingsContext";
+import { CATEGORY_CONFIG, CATEGORY_COLORS, CATEGORY_LABELS } from "@/lib/reflection-categories";
 
 type ViewMode = "sparklines" | "matrix" | "delta";
 
-const DEPTH_COLORS: Record<string, string> = {
-  SURFACE: "#ef5350",
-  DEVELOPING: "#ff9800",
-  DEEP: "#4caf50",
-};
-
-// Color interpolation for matrix cells (0 → red, 0.5 → yellow, 1 → green)
-function scoreColor(score: number): string {
-  if (score <= 0.33) return "#ffcdd2";
-  if (score <= 0.66) return "#fff9c4";
-  return "#c8e6c9";
-}
+/** Map category key → ordinal (0–3) for positioning on sparkline Y axis. */
+const CATEGORY_ORDER: Record<string, number> = Object.fromEntries(
+  CATEGORY_CONFIG.map((c, i) => [c.key, i])
+);
+const MAX_ORDINAL = CATEGORY_CONFIG.length - 1;
 
 interface GrowthVisualizationProps {
   onViewThread?: (threadId: string, studentName: string) => void;
@@ -138,8 +133,8 @@ interface ViewProps {
 
 function SparklineView({ students, assignments, getDisplayName }: ViewProps) {
   const W = 200;
-  const H = 32;
-  const padding = 4;
+  const H = 48;
+  const padding = 6;
 
   return (
     <Box component="table" sx={{ width: "100%", borderCollapse: "collapse" }}>
@@ -166,14 +161,17 @@ function SparklineView({ students, assignments, getDisplayName }: ViewProps) {
 
           const latest = points[points.length - 1];
           const first = points[0];
-          const trend = latest.score - first.score;
+          const latestOrd = CATEGORY_ORDER[latest.category] ?? 0;
+          const firstOrd = CATEGORY_ORDER[first.category] ?? 0;
+          const trend = latestOrd - firstOrd;
 
-          // Build SVG sparkline path
+          // Build SVG sparkline path using category ordinal as Y
           const xStep = points.length > 1 ? (W - padding * 2) / (points.length - 1) : 0;
           const pathD = points
             .map((p: any, i: number) => {
+              const ord = CATEGORY_ORDER[p.category] ?? 0;
               const x = padding + i * xStep;
-              const y = H - padding - p.score * (H - padding * 2);
+              const y = H - padding - (ord / MAX_ORDINAL) * (H - padding * 2);
               return `${i === 0 ? "M" : "L"}${x},${y}`;
             })
             .join(" ");
@@ -186,34 +184,38 @@ function SparklineView({ students, assignments, getDisplayName }: ViewProps) {
               <td style={{ padding: "4px 8px" }}>
                 <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
                   <path d={pathD} fill="none" stroke="#1976d2" strokeWidth={1.5} />
-                  {/* Dots at each point, colored by depth band */}
-                  {points.map((p: any, i: number) => (
-                    <Tooltip key={i} title={`${p.assignmentName}: ${(p.score * 100).toFixed(0)}%`}>
-                      <circle
-                        cx={padding + i * xStep}
-                        cy={H - padding - p.score * (H - padding * 2)}
-                        r={3}
-                        fill={DEPTH_COLORS[p.depthBand] ?? "#999"}
-                      />
-                    </Tooltip>
-                  ))}
+                  {points.map((p: any, i: number) => {
+                    const ord = CATEGORY_ORDER[p.category] ?? 0;
+                    return (
+                      <Tooltip key={i} title={`${p.assignmentName}: ${CATEGORY_LABELS[p.category] ?? p.category}`}>
+                        <circle
+                          cx={padding + i * xStep}
+                          cy={H - padding - (ord / MAX_ORDINAL) * (H - padding * 2)}
+                          r={3}
+                          fill={CATEGORY_COLORS[p.category] ?? "#999"}
+                        />
+                      </Tooltip>
+                    );
+                  })}
                 </svg>
               </td>
-              <td style={{ padding: "6px 8px", textAlign: "center", fontSize: "0.8rem" }}>
-                <Box
-                  component="span"
+              <td style={{ padding: "6px 8px", textAlign: "center" }}>
+                <Chip
+                  label={CATEGORY_CONFIG.find((c) => c.key === latest.category)?.shortLabel ?? latest.category}
+                  size="small"
                   sx={{
-                    color: DEPTH_COLORS[latest.depthBand],
+                    bgcolor: CATEGORY_COLORS[latest.category],
+                    color: "#fff",
                     fontWeight: 600,
+                    fontSize: "0.7rem",
+                    height: 22,
                   }}
-                >
-                  {(latest.score * 100).toFixed(0)}%
-                </Box>
+                />
               </td>
               <td style={{ padding: "6px 8px", textAlign: "center" }}>
-                {trend > 0.02 ? (
+                {trend > 0 ? (
                   <ArrowUpwardIcon sx={{ fontSize: 16, color: "success.main" }} />
-                ) : trend < -0.02 ? (
+                ) : trend < 0 ? (
                   <ArrowDownwardIcon sx={{ fontSize: 16, color: "error.main" }} />
                 ) : (
                   <Typography variant="caption" color="text.disabled">—</Typography>
@@ -230,13 +232,13 @@ function SparklineView({ students, assignments, getDisplayName }: ViewProps) {
 // ── Matrix View ──────────────────────────────────────────────────────
 
 function MatrixView({ students, assignments, getDisplayName }: ViewProps) {
-  // Build lookup: studentId → assignmentId → score
+  // Build lookup: studentId → assignmentId → category
   const lookup = useMemo(() => {
-    const map = new Map<string, Map<string, number>>();
+    const map = new Map<string, Map<string, string>>();
     for (const s of students) {
-      const sMap = new Map<string, number>();
+      const sMap = new Map<string, string>();
       for (const dp of s.dataPoints) {
-        sMap.set(dp.assignmentId, dp.score);
+        sMap.set(dp.assignmentId, dp.category);
       }
       map.set(s.studentId, sMap);
     }
@@ -265,7 +267,7 @@ function MatrixView({ students, assignments, getDisplayName }: ViewProps) {
                 }}
               >
                 <Tooltip title={a.name}>
-                  <span>{a.name.length > 12 ? a.name.slice(0, 12) + "…" : a.name}</span>
+                  <span>{a.name.length > 12 ? a.name.slice(0, 12) + "\u2026" : a.name}</span>
                 </Tooltip>
               </th>
             ))}
@@ -278,20 +280,24 @@ function MatrixView({ students, assignments, getDisplayName }: ViewProps) {
                 {getDisplayName(s.name)}
               </td>
               {assignments.map((a) => {
-                const score = lookup.get(s.studentId)?.get(a.id);
+                const category = lookup.get(s.studentId)?.get(a.id);
+                const color = category ? CATEGORY_COLORS[category] : undefined;
+                const shortLabel = category
+                  ? CATEGORY_CONFIG.find((c) => c.key === category)?.shortLabel ?? category
+                  : undefined;
                 return (
                   <td
                     key={a.id}
                     style={{
                       padding: "4px 6px",
                       textAlign: "center",
-                      background: score != null ? scoreColor(score) : "#fafafa",
+                      background: color ? `${color}22` : "#fafafa",
                       border: "1px solid #e0e0e0",
                     }}
                   >
-                    {score != null ? (
-                      <Tooltip title={`${a.name}: ${(score * 100).toFixed(0)}%`}>
-                        <span>{(score * 100).toFixed(0)}</span>
+                    {shortLabel ? (
+                      <Tooltip title={`${a.name}: ${CATEGORY_LABELS[category!]}`}>
+                        <span style={{ color: color, fontWeight: 600 }}>{shortLabel}</span>
                       </Tooltip>
                     ) : (
                       <span style={{ color: "#ccc" }}>—</span>
@@ -329,14 +335,14 @@ function DeltaView({ students, assignments, getDisplayName, a1, a2, onA1Change, 
         const dp1 = s.dataPoints.find((dp: any) => dp.assignmentId === effectiveA1);
         const dp2 = s.dataPoints.find((dp: any) => dp.assignmentId === effectiveA2);
         if (!dp1 || !dp2) return null;
+        const ordBefore = CATEGORY_ORDER[dp1.category] ?? 0;
+        const ordAfter = CATEGORY_ORDER[dp2.category] ?? 0;
         return {
           studentId: s.studentId,
           name: s.name,
-          scoreBefore: dp1.score,
-          scoreAfter: dp2.score,
-          delta: dp2.score - dp1.score,
-          bandBefore: dp1.depthBand,
-          bandAfter: dp2.depthBand,
+          categoryBefore: dp1.category as string,
+          categoryAfter: dp2.category as string,
+          delta: ordAfter - ordBefore,
         };
       })
       .filter(Boolean)
@@ -392,14 +398,30 @@ function DeltaView({ students, assignments, getDisplayName, a1, a2, onA1Change, 
               <tr key={d.studentId} style={{ borderBottom: "1px solid #eee" }}>
                 <td style={{ padding: "6px 8px" }}>{getDisplayName(d.name)}</td>
                 <td style={{ padding: "6px 8px", textAlign: "center" }}>
-                  <Box component="span" sx={{ color: DEPTH_COLORS[d.bandBefore] }}>
-                    {(d.scoreBefore * 100).toFixed(0)}%
-                  </Box>
+                  <Chip
+                    label={CATEGORY_CONFIG.find((c) => c.key === d.categoryBefore)?.shortLabel ?? d.categoryBefore}
+                    size="small"
+                    sx={{
+                      bgcolor: CATEGORY_COLORS[d.categoryBefore],
+                      color: "#fff",
+                      fontWeight: 600,
+                      fontSize: "0.7rem",
+                      height: 22,
+                    }}
+                  />
                 </td>
                 <td style={{ padding: "6px 8px", textAlign: "center" }}>
-                  <Box component="span" sx={{ color: DEPTH_COLORS[d.bandAfter] }}>
-                    {(d.scoreAfter * 100).toFixed(0)}%
-                  </Box>
+                  <Chip
+                    label={CATEGORY_CONFIG.find((c) => c.key === d.categoryAfter)?.shortLabel ?? d.categoryAfter}
+                    size="small"
+                    sx={{
+                      bgcolor: CATEGORY_COLORS[d.categoryAfter],
+                      color: "#fff",
+                      fontWeight: 600,
+                      fontSize: "0.7rem",
+                      height: 22,
+                    }}
+                  />
                 </td>
                 <td style={{ padding: "6px 8px", textAlign: "center" }}>
                   <Box
@@ -409,12 +431,12 @@ function DeltaView({ students, assignments, getDisplayName, a1, a2, onA1Change, 
                       alignItems: "center",
                       gap: 0.5,
                       fontWeight: 600,
-                      color: d.delta > 0.02 ? "success.main" : d.delta < -0.02 ? "error.main" : "text.secondary",
+                      color: d.delta > 0 ? "success.main" : d.delta < 0 ? "error.main" : "text.secondary",
                     }}
                   >
-                    {d.delta > 0.02 && <ArrowUpwardIcon sx={{ fontSize: 14 }} />}
-                    {d.delta < -0.02 && <ArrowDownwardIcon sx={{ fontSize: 14 }} />}
-                    {d.delta > 0 ? "+" : ""}{(d.delta * 100).toFixed(0)}%
+                    {d.delta > 0 && <ArrowUpwardIcon sx={{ fontSize: 14 }} />}
+                    {d.delta < 0 && <ArrowDownwardIcon sx={{ fontSize: 14 }} />}
+                    {d.delta > 0 ? `+${d.delta}` : d.delta === 0 ? "—" : String(d.delta)}
                   </Box>
                 </td>
               </tr>

@@ -16,31 +16,29 @@ import { GET_STUDENT_ENGAGEMENT } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
 import EvidencePopover from "@/components/insights/EvidencePopover";
 import { useUserSettings } from "@/lib/UserSettingsContext";
+import { CATEGORY_CONFIG, CATEGORY_COLORS, CATEGORY_LABELS } from "@/lib/reflection-categories";
 
-/** Colors for each depth band. */
-const BAND_COLORS: Record<string, string> = {
-  SURFACE: "#ef5350",
-  DEVELOPING: "#ffa726",
-  DEEP: "#66bb6a",
-};
+/** Map category key → ordinal for sorting (higher = deeper reflection). */
+const CATEGORY_ORDER: Record<string, number> = Object.fromEntries(
+  CATEGORY_CONFIG.map((c, i) => [c.key, i])
+);
 
 interface StudentProfile {
   studentId: string;
   name: string;
-  engagementScore: number;
-  depthBand: string;
+  modalCategory: string;
   commentCount: number;
   topToriTags: string[];
 }
 
-type SortKey = "name" | "engagementScore" | "depthBand" | "commentCount";
+type SortKey = "name" | "modalCategory" | "commentCount";
 type SortDir = "asc" | "desc";
 
 /** Sort comparator for any column. */
 function compare(a: StudentProfile, b: StudentProfile, key: SortKey): number {
   if (key === "name") return a.name.localeCompare(b.name);
-  if (key === "engagementScore") return a.engagementScore - b.engagementScore;
-  if (key === "depthBand") return a.depthBand.localeCompare(b.depthBand);
+  if (key === "modalCategory")
+    return (CATEGORY_ORDER[a.modalCategory] ?? 0) - (CATEGORY_ORDER[b.modalCategory] ?? 0);
   if (key === "commentCount") return a.commentCount - b.commentCount;
   return 0;
 }
@@ -61,7 +59,7 @@ export default function StudentEngagementTable({ onViewThread }: Props) {
   const { scope } = useInsightsScope();
   const { getDisplayName } = useUserSettings();
 
-  const [sortKey, setSortKey] = useState<SortKey>("engagementScore");
+  const [sortKey, setSortKey] = useState<SortKey>("modalCategory");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [popover, setPopover] = useState<StudentPopoverState | null>(null);
 
@@ -131,9 +129,6 @@ export default function StudentEngagementTable({ onViewThread }: Props) {
     return sortDir === "asc" ? result : -result;
   });
 
-  // Find max score for the visual bar.
-  const maxScore = Math.max(...students.map((s) => s.engagementScore), 1);
-
   return (
     <Table size="small">
       <TableHead>
@@ -149,20 +144,11 @@ export default function StudentEngagementTable({ onViewThread }: Props) {
           </TableCell>
           <TableCell>
             <TableSortLabel
-              active={sortKey === "engagementScore"}
-              direction={sortKey === "engagementScore" ? sortDir : "asc"}
-              onClick={() => handleSort("engagementScore")}
+              active={sortKey === "modalCategory"}
+              direction={sortKey === "modalCategory" ? sortDir : "asc"}
+              onClick={() => handleSort("modalCategory")}
             >
-              Score
-            </TableSortLabel>
-          </TableCell>
-          <TableCell>
-            <TableSortLabel
-              active={sortKey === "depthBand"}
-              direction={sortKey === "depthBand" ? sortDir : "asc"}
-              onClick={() => handleSort("depthBand")}
-            >
-              Depth Band
+              Reflection Category
             </TableSortLabel>
           </TableCell>
           <TableCell align="right">
@@ -179,11 +165,7 @@ export default function StudentEngagementTable({ onViewThread }: Props) {
       </TableHead>
       <TableBody>
         {sorted.map((student) => {
-          const barPct =
-            maxScore > 0
-              ? (student.engagementScore / maxScore) * 100
-              : 0;
-          const bandColor = BAND_COLORS[student.depthBand] ?? "#757575";
+          const catColor = CATEGORY_COLORS[student.modalCategory] ?? "#757575";
 
           return (
             <TableRow key={student.studentId} hover>
@@ -202,34 +184,13 @@ export default function StudentEngagementTable({ onViewThread }: Props) {
                 {getDisplayName(student.name)}
               </TableCell>
 
-              {/* Score with visual bar */}
-              <TableCell sx={{ minWidth: 160 }}>
-                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                  <Typography variant="body2" fontWeight={600} sx={{ minWidth: 36 }}>
-                    {student.engagementScore.toFixed(2)}
-                  </Typography>
-                  <Box sx={{ flex: 1 }}>
-                    <Box
-                      sx={{
-                        height: 8,
-                        width: `${barPct}%`,
-                        minWidth: barPct > 0 ? 2 : 0,
-                        bgcolor: bandColor,
-                        borderRadius: 0.5,
-                        opacity: 0.7,
-                      }}
-                    />
-                  </Box>
-                </Box>
-              </TableCell>
-
-              {/* Depth band chip */}
+              {/* Reflection category chip */}
               <TableCell>
                 <Chip
-                  label={student.depthBand}
+                  label={CATEGORY_LABELS[student.modalCategory] ?? student.modalCategory}
                   size="small"
                   sx={{
-                    bgcolor: bandColor,
+                    bgcolor: catColor,
                     color: "#fff",
                     fontWeight: 600,
                     fontSize: "0.75rem",

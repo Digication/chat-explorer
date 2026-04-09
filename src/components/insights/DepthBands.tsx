@@ -13,23 +13,15 @@ import Typography from "@mui/material/Typography";
 import { GET_ENGAGEMENT, GET_STUDENT_ENGAGEMENT } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
 import StudentDrillDown, { type StudentItem } from "@/components/insights/StudentDrillDown";
-
-// Color mapping for each depth band.
-const BAND_CONFIG = [
-  { key: "SURFACE", label: "Surface", color: "#ef5350" },
-  { key: "DEVELOPING", label: "Developing", color: "#ffa726" },
-  { key: "DEEP", label: "Deep", color: "#66bb6a" },
-] as const;
+import { CATEGORY_CONFIG } from "@/lib/reflection-categories";
 
 interface DepthBandsProps {
-  /** Called when a student is selected from the drill-down popover. */
   onViewThread?: (threadId: string, studentName: string) => void;
 }
 
-/** State for the drill-down popover. */
 interface DrillDownState {
   anchorEl: HTMLElement;
-  band: string;
+  categoryKey: string;
   students: StudentItem[];
 }
 
@@ -37,19 +29,15 @@ export default function DepthBands({ onViewThread }: DepthBandsProps) {
   const { scope } = useInsightsScope();
   const [drillDown, setDrillDown] = useState<DrillDownState | null>(null);
 
-  // Fetch depth distribution + per-student engagement data.
   const { data, loading, error, refetch } = useQuery<any>(GET_ENGAGEMENT, {
     variables: { scope },
     skip: !scope,
   });
 
-  // Fetch student profiles (for names) from instructionalInsights.
   const { data: profilesData } = useQuery<any>(GET_STUDENT_ENGAGEMENT, {
     variables: { scope },
     skip: !scope,
   });
-
-  // ── Error state ────────────────────────────────────────────────────────────
 
   if (error) {
     return (
@@ -61,86 +49,82 @@ export default function DepthBands({ onViewThread }: DepthBandsProps) {
           </Button>
         }
       >
-        Failed to load engagement data.
+        Failed to load reflection data.
       </Alert>
     );
   }
-
-  // ── Loading state ──────────────────────────────────────────────────────────
 
   if (loading || !data?.engagement?.data) {
     return <Skeleton variant="rectangular" height={120} />;
   }
 
-  const dist = data.engagement.data.depthDistribution;
+  const dist = data.engagement.data.categoryDistribution;
   const perStudent: Array<{
     studentId: string;
-    averageScore: number;
-    depthBand: string;
+    modalCategory: string;
     commentCount: number;
   }> = data.engagement.data.perStudent ?? [];
 
-  // Build a lookup from studentId → name using the profiles query.
-  const studentProfiles: Array<{ studentId: string; name: string; engagementScore?: number; commentCount?: number; depthBand?: string }> =
-    profilesData?.instructionalInsights?.data?.studentProfiles ?? [];
+  const studentProfiles: Array<{
+    studentId: string;
+    name: string;
+    commentCount?: number;
+    modalCategory?: string;
+  }> = profilesData?.instructionalInsights?.data?.studentProfiles ?? [];
   const nameMap = new Map(studentProfiles.map((p) => [p.studentId, p]));
 
-  const total =
-    (dist.SURFACE ?? 0) + (dist.DEVELOPING ?? 0) + (dist.DEEP ?? 0);
+  const total = CATEGORY_CONFIG.reduce(
+    (sum, c) => sum + ((dist[c.key] as number) ?? 0),
+    0
+  );
 
-  // Compute percentages.
-  const bands = BAND_CONFIG.map((b) => {
-    const count = (dist[b.key] as number) ?? 0;
+  const categories = CATEGORY_CONFIG.map((c) => {
+    const count = (dist[c.key] as number) ?? 0;
     const pct = total > 0 ? (count / total) * 100 : 0;
-    return { ...b, count, pct };
+    return { ...c, count, pct };
   });
 
-  /** Open drill-down popover for a specific band. */
-  const handleBandClick = (event: React.MouseEvent<HTMLElement>, bandKey: string) => {
-    // Filter perStudent to this band and resolve names from profiles.
+  const handleCategoryClick = (
+    event: React.MouseEvent<HTMLElement>,
+    categoryKey: string
+  ) => {
     const matching: StudentItem[] = perStudent
-      .filter((s) => s.depthBand === bandKey)
+      .filter((s) => s.modalCategory === categoryKey)
       .map((s) => {
         const profile = nameMap.get(s.studentId);
         return {
           studentId: s.studentId,
           name: profile?.name ?? s.studentId,
-          depthBand: s.depthBand,
+          modalCategory: s.modalCategory,
           commentCount: s.commentCount,
-          engagementScore: profile?.engagementScore,
         };
       });
 
     setDrillDown({
       anchorEl: event.currentTarget,
-      band: bandKey,
+      categoryKey,
       students: matching,
     });
   };
 
-  /** Called when a student is selected in the drill-down. */
   const handleSelectStudent = (studentId: string, studentName: string) => {
-    // Pass through to parent — the parent (InsightsPage) can handle
-    // loading the student's threads in the ThreadPanel.
     if (onViewThread) {
       onViewThread(studentId, studentName);
     }
   };
 
-  // Find the label for the currently selected band.
-  const activeBandLabel =
-    BAND_CONFIG.find((b) => b.key === drillDown?.band)?.label ?? "";
+  const activeLabel =
+    CATEGORY_CONFIG.find((c) => c.key === drillDown?.categoryKey)?.label ?? "";
 
   return (
     <Box>
-      {/* Explanation of how depth bands are computed */}
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Students are classified by a weighted score: TORI tag density (30%),
-        lexical diversity (20%), evidence citations (20%), logical connectors (15%),
-        and question frequency (15%). Surface &le; 0.33, Developing &le; 0.66, Deep &gt; 0.66.
+        Comments are classified into one of four Hatton &amp; Smith (1995)
+        reflection categories by an AI classifier. Each student&apos;s most
+        common category is shown below.
       </Typography>
 
-      {/* Stacked horizontal bar — each segment is clickable */}
+      {/* Stacked horizontal bar */}
       <Box
         sx={{
           display: "flex",
@@ -150,14 +134,14 @@ export default function DepthBands({ onViewThread }: DepthBandsProps) {
           mb: 2,
         }}
       >
-        {bands.map((b) =>
-          b.pct > 0 ? (
+        {categories.map((c) =>
+          c.pct > 0 ? (
             <Box
-              key={b.key}
-              onClick={(e) => handleBandClick(e, b.key)}
+              key={c.key}
+              onClick={(e) => handleCategoryClick(e, c.key)}
               sx={{
-                width: `${b.pct}%`,
-                bgcolor: b.color,
+                width: `${c.pct}%`,
+                bgcolor: c.color,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -166,28 +150,31 @@ export default function DepthBands({ onViewThread }: DepthBandsProps) {
                 "&:hover": { opacity: 0.85 },
               }}
             >
-              {b.pct >= 8 && (
-                <Typography variant="caption" sx={{ color: "#fff", fontWeight: 600 }}>
-                  {Math.round(b.pct)}%
+              {c.pct >= 8 && (
+                <Typography
+                  variant="caption"
+                  sx={{ color: "#fff", fontWeight: 600 }}
+                >
+                  {Math.round(c.pct)}%
                 </Typography>
               )}
             </Box>
-          ) : null,
+          ) : null
         )}
       </Box>
 
-      {/* Summary table — count cells are clickable */}
+      {/* Summary table */}
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell>Band</TableCell>
+            <TableCell>Category</TableCell>
             <TableCell align="right">Count</TableCell>
             <TableCell align="right">Percentage</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
-          {bands.map((b) => (
-            <TableRow key={b.key}>
+          {categories.map((c) => (
+            <TableRow key={c.key}>
               <TableCell>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Box
@@ -195,27 +182,27 @@ export default function DepthBands({ onViewThread }: DepthBandsProps) {
                       width: 12,
                       height: 12,
                       borderRadius: "50%",
-                      bgcolor: b.color,
+                      bgcolor: c.color,
                       flexShrink: 0,
                     }}
                   />
-                  {b.label}
+                  {c.label}
                 </Box>
               </TableCell>
               <TableCell align="right">
                 <Typography
                   component="span"
                   variant="body2"
-                  onClick={(e) => handleBandClick(e as any, b.key)}
+                  onClick={(e) => handleCategoryClick(e as any, c.key)}
                   sx={{
                     cursor: "pointer",
                     "&:hover": { textDecoration: "underline" },
                   }}
                 >
-                  {b.count}
+                  {c.count}
                 </Typography>
               </TableCell>
-              <TableCell align="right">{b.pct.toFixed(1)}%</TableCell>
+              <TableCell align="right">{c.pct.toFixed(1)}%</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -224,7 +211,7 @@ export default function DepthBands({ onViewThread }: DepthBandsProps) {
       {/* Student drill-down popover */}
       <StudentDrillDown
         anchorEl={drillDown?.anchorEl ?? null}
-        title={`${activeBandLabel} — ${drillDown?.students.length ?? 0} student${(drillDown?.students.length ?? 0) !== 1 ? "s" : ""}`}
+        title={`${activeLabel} — ${drillDown?.students.length ?? 0} student${(drillDown?.students.length ?? 0) !== 1 ? "s" : ""}`}
         subtitle="Click a student to view their conversations"
         students={drillDown?.students ?? []}
         onClose={() => setDrillDown(null)}
