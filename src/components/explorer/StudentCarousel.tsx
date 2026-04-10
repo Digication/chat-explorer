@@ -25,7 +25,9 @@ interface StudentCarouselProps {
   students: Student[];
   /** Currently selected student IDs. */
   selectedIds: string[];
-  /** Called when a student is toggled (selected or deselected). */
+  /** Called when a single student is clicked (replaces selection). */
+  onSelect: (id: string) => void;
+  /** Called when a student is added/removed from multi-select (shift+click). */
   onToggle: (id: string) => void;
 }
 
@@ -37,6 +39,7 @@ interface StudentCarouselProps {
 export default function StudentCarousel({
   students,
   selectedIds,
+  onSelect,
   onToggle,
 }: StudentCarouselProps) {
   const { getDisplayName } = useUserSettings();
@@ -79,7 +82,7 @@ export default function StudentCarousel({
             return (
               <Box
                 key={s.studentId}
-                onClick={() => onToggle(s.studentId)}
+                onClick={(e) => e.shiftKey ? onToggle(s.studentId) : onSelect(s.studentId)}
                 sx={{
                   width: SLOT_WIDTH,
                   minWidth: SLOT_WIDTH,

@@ -51,7 +51,7 @@ export default function ChatMessageBubble({ message, isTyping }: ChatMessageBubb
         px: 1,
       }}
     >
-      <Box sx={{ maxWidth: "80%" }}>
+      <Box sx={{ maxWidth: "min(80%, 600px)" }}>
         {/* The bubble */}
         <Paper
           elevation={0}
@@ -59,20 +59,23 @@ export default function ChatMessageBubble({ message, isTyping }: ChatMessageBubb
             px: 2,
             py: 1,
             borderRadius: "12px",
-            // User: blue bg, white text. Assistant: light grey bg.
-            bgcolor: isUser ? "primary.main" : "grey.100",
-            color: isUser ? "#fff" : "text.primary",
+            // User: subtle blue tint with left accent. Assistant: white with full border.
+            bgcolor: isUser ? "#f0f7ff" : "#fff",
+            color: "text.primary",
+            ...(isUser
+              ? { borderLeft: "3px solid", borderColor: "primary.main" }
+              : { border: "1px solid", borderColor: "divider" }),
             // Markdown content inside assistant bubbles
             "& p": { m: 0 },
             "& p + p": { mt: 1 },
             "& code": {
               fontSize: "0.85em",
-              bgcolor: isUser ? "rgba(255,255,255,0.15)" : "grey.200",
+              bgcolor: "grey.100",
               px: 0.5,
               borderRadius: "4px",
             },
             "& pre": {
-              bgcolor: isUser ? "rgba(255,255,255,0.1)" : "grey.200",
+              bgcolor: "grey.100",
               p: 1,
               borderRadius: "4px",
               overflowX: "auto",

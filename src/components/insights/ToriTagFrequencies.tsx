@@ -60,9 +60,15 @@ interface ToriTagFrequenciesProps {
   onViewThread?: (threadId: string, studentName: string) => void;
 }
 
+/** Max tags shown before "Show all" toggle in flat mode. */
+const FLAT_LIMIT = 10;
+/** Max tags shown per domain before "Show all" toggle in grouped mode. */
+const DOMAIN_LIMIT = 3;
+
 export default function ToriTagFrequencies({ onViewThread }: ToriTagFrequenciesProps) {
   const { scope } = useInsightsScope();
   const [viewMode, setViewMode] = useState<"grouped" | "flat">("grouped");
+  const [showAll, setShowAll] = useState(false);
   const [popover, setPopover] = useState<PopoverState | null>(null);
 
   const { data, loading, error, refetch } = useQuery<any>(GET_TORI_ANALYSIS, {
@@ -192,29 +198,53 @@ export default function ToriTagFrequencies({ onViewThread }: ToriTagFrequenciesP
 
       {viewMode === "grouped"
         ? /* Grouped by domain */
-          [...grouped.entries()].map(([domain, domainTags]) => (
-            <Box key={domain} sx={{ mb: 3 }}>
-              <Typography
-                variant="overline"
-                sx={{
-                  color: DOMAIN_COLORS[domain] ?? "#757575",
-                  fontWeight: 700,
-                  letterSpacing: 1,
-                  mb: 1,
-                  display: "block",
-                }}
-              >
-                {domain}
-              </Typography>
-              {domainTags.map((tag) =>
-                renderTagRow(tag, DOMAIN_COLORS[domain] ?? "#757575"),
-              )}
-            </Box>
-          ))
+          [...grouped.entries()].map(([domain, domainTags]) => {
+            const visible = showAll ? domainTags : domainTags.slice(0, DOMAIN_LIMIT);
+            const hasMore = domainTags.length > DOMAIN_LIMIT;
+            return (
+              <Box key={domain} sx={{ mb: 3 }}>
+                <Typography
+                  variant="overline"
+                  sx={{
+                    color: DOMAIN_COLORS[domain] ?? "#757575",
+                    fontWeight: 700,
+                    letterSpacing: 1,
+                    mb: 1,
+                    display: "block",
+                  }}
+                >
+                  {domain}
+                </Typography>
+                {visible.map((tag) =>
+                  renderTagRow(tag, DOMAIN_COLORS[domain] ?? "#757575"),
+                )}
+                {hasMore && !showAll && (
+                  <Typography
+                    variant="caption"
+                    color="primary"
+                    sx={{ cursor: "pointer", ml: 0.5, "&:hover": { textDecoration: "underline" } }}
+                    onClick={() => setShowAll(true)}
+                  >
+                    + {domainTags.length - DOMAIN_LIMIT} more
+                  </Typography>
+                )}
+              </Box>
+            );
+          })
         : /* Flat list sorted by count */
-          flatSorted.map((tag) =>
+          (showAll ? flatSorted : flatSorted.slice(0, FLAT_LIMIT)).map((tag) =>
             renderTagRow(tag, DOMAIN_COLORS[tag.domain] ?? "#757575"),
           )}
+
+      {/* Show all / Show less toggle */}
+      {((viewMode === "flat" && flatSorted.length > FLAT_LIMIT) ||
+        (viewMode === "grouped" && [...grouped.values()].some((g) => g.length > DOMAIN_LIMIT))) && (
+        <Box sx={{ mt: 1, textAlign: "center" }}>
+          <Button size="small" onClick={() => setShowAll((p) => !p)}>
+            {showAll ? "Show less" : `Show all ${tags.length} tags`}
+          </Button>
+        </Box>
+      )}
 
       {/* Evidence popover — shown when a tag row is clicked */}
       {popover && scope && (

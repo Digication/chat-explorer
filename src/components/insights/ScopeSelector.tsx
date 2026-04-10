@@ -15,7 +15,7 @@ import MenuItem from "@mui/material/MenuItem";
 import Skeleton from "@mui/material/Skeleton";
 import Typography from "@mui/material/Typography";
 import NavigateNextIcon from "@mui/icons-material/NavigateNext";
-import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
   GET_ME,
   GET_MY_INSTITUTION,
@@ -222,9 +222,9 @@ export default function ScopeSelector({ compact = false }: ScopeSelectorProps) {
           <Box component="span">
             <Button
               size="small"
-              endIcon={<ArrowDropDownIcon />}
+              endIcon={<ExpandMoreIcon sx={{ opacity: 0, transition: "opacity 0.15s" }} />}
               onClick={(e) => setInstAnchor(e.currentTarget)}
-              sx={{ textTransform: "none", fontWeight: 500 }}
+              sx={{ textTransform: "none", fontWeight: 500, "&:hover .MuiButton-endIcon": { opacity: 1 } }}
             >
               {institutionName}
             </Button>
@@ -250,70 +250,82 @@ export default function ScopeSelector({ compact = false }: ScopeSelectorProps) {
           </Typography>
         )}
 
-        {/* Course selector */}
-        <Box component="span">
-          <Button
-            size="small"
-            endIcon={<ArrowDropDownIcon />}
-            onClick={(e) => setCourseAnchor(e.currentTarget)}
-            sx={{ textTransform: "none" }}
-          >
-            {coursesLoading
-              ? "Loading..."
-              : selectedCourse?.name ?? "All Courses"}
-          </Button>
-          <Menu
-            anchorEl={courseAnchor}
-            open={Boolean(courseAnchor)}
-            onClose={() => setCourseAnchor(null)}
-          >
-            <MenuItem onClick={handleClearCourse}>
-              <em>All Courses</em>
-            </MenuItem>
-            {courses.map((c) => (
-              <MenuItem
-                key={c.id}
-                selected={c.id === scope.courseId}
-                onClick={() => handleCourseSelect(c.id)}
-              >
-                {c.name}
-              </MenuItem>
-            ))}
-          </Menu>
-        </Box>
-
-        {/* Assignment selector (only when a course is selected) */}
-        {scope.courseId ? (
+        {/* Course selector — static text when only 1 course, dropdown otherwise */}
+        {courses.length <= 1 && scope.courseId ? (
+          <Typography color="text.primary">
+            {selectedCourse?.name ?? "All Courses"}
+          </Typography>
+        ) : (
           <Box component="span">
             <Button
               size="small"
-              endIcon={<ArrowDropDownIcon />}
-              onClick={(e) => setAssignAnchor(e.currentTarget)}
-              sx={{ textTransform: "none" }}
+              endIcon={<ExpandMoreIcon sx={{ opacity: 0, transition: "opacity 0.15s" }} />}
+              onClick={(e) => setCourseAnchor(e.currentTarget)}
+              sx={{ textTransform: "none", "&:hover .MuiButton-endIcon": { opacity: 1 } }}
             >
-              {assignLoading
+              {coursesLoading
                 ? "Loading..."
-                : selectedAssignment?.name ?? "All Assignments"}
+                : selectedCourse?.name ?? "All Courses"}
             </Button>
             <Menu
-              anchorEl={assignAnchor}
-              open={Boolean(assignAnchor)}
-              onClose={() => setAssignAnchor(null)}
+              anchorEl={courseAnchor}
+              open={Boolean(courseAnchor)}
+              onClose={() => setCourseAnchor(null)}
             >
-              <MenuItem onClick={handleClearAssignment}>
-                <em>All Assignments</em>
+              <MenuItem onClick={handleClearCourse}>
+                <em>All Courses</em>
               </MenuItem>
-              {assignments.map((a) => (
+              {courses.map((c) => (
                 <MenuItem
-                  key={a.id}
-                  selected={a.id === scope.assignmentId}
-                  onClick={() => handleAssignSelect(a.id)}
+                  key={c.id}
+                  selected={c.id === scope.courseId}
+                  onClick={() => handleCourseSelect(c.id)}
                 >
-                  {a.name}
+                  {c.name}
                 </MenuItem>
               ))}
             </Menu>
           </Box>
+        )}
+
+        {/* Assignment selector (only when a course is selected) */}
+        {scope.courseId ? (
+          assignments.length <= 1 && scope.assignmentId ? (
+            <Typography color="text.primary">
+              {selectedAssignment?.name ?? "All Assignments"}
+            </Typography>
+          ) : (
+            <Box component="span">
+              <Button
+                size="small"
+                endIcon={<ExpandMoreIcon sx={{ opacity: 0, transition: "opacity 0.15s" }} />}
+                onClick={(e) => setAssignAnchor(e.currentTarget)}
+                sx={{ textTransform: "none", "&:hover .MuiButton-endIcon": { opacity: 1 } }}
+              >
+                {assignLoading
+                  ? "Loading..."
+                  : selectedAssignment?.name ?? "All Assignments"}
+              </Button>
+              <Menu
+                anchorEl={assignAnchor}
+                open={Boolean(assignAnchor)}
+                onClose={() => setAssignAnchor(null)}
+              >
+                <MenuItem onClick={handleClearAssignment}>
+                  <em>All Assignments</em>
+                </MenuItem>
+                {assignments.map((a) => (
+                  <MenuItem
+                    key={a.id}
+                    selected={a.id === scope.assignmentId}
+                    onClick={() => handleAssignSelect(a.id)}
+                  >
+                    {a.name}
+                  </MenuItem>
+                ))}
+              </Menu>
+            </Box>
+          )
         ) : null}
       </Breadcrumbs>
     </Box>

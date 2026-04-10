@@ -113,7 +113,7 @@ function Sparkline({
             <circle
               cx={cx}
               cy={cy}
-              r={v > 0 ? 4 : 2}
+              r={v > 0 ? 2 + (t * 4) : 1.5}
               fill={v > 0 ? cellColor(t) : "#ddd"}
               stroke={v > 0 ? "#1565c0" : "#bbb"}
               strokeWidth={0.8}
@@ -487,6 +487,9 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
                         key={ci}
                         title={`${getDisplayName(rowLabels[ri])} × ${colLabels[ci]}: ${raw}`}
                         arrow
+                        enterDelay={0}
+                        enterNextDelay={0}
+                        followCursor
                       >
                         <td
                           onClick={(e) => {
