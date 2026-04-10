@@ -84,6 +84,8 @@ export default function AiChatPanel({
   const [isSending, setIsSending] = useState(false);
   const [scopeOverride, setScopeOverride] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  // Track scope-change dividers shown in the message list (UI-only, not persisted)
+  const [scopeDividers, setScopeDividers] = useState<Array<{ id: string; label: string }>>([]);
 
   // Ref for auto-scrolling the message area to the bottom
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -119,6 +121,13 @@ export default function AiChatPanel({
   const [createSession] = useMutation<any>(CREATE_CHAT_SESSION);
   const [sendMessage] = useMutation<any>(SEND_CHAT_MESSAGE);
   const [deleteSession] = useMutation<any>(DELETE_CHAT_SESSION);
+
+  // ── Auto-load the most recent session when panel opens ─────────────
+  useEffect(() => {
+    if (sessions.length > 0 && !activeSessionId) {
+      setActiveSessionId(sessions[0].id);
+    }
+  }, [sessions]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Auto-scroll when messages change ───────────────────────────────
   useEffect(() => {
@@ -273,16 +282,25 @@ export default function AiChatPanel({
             size="small"
             value={chatScope}
             exclusive
-            onChange={(_, v) => v && setScopeOverride(v)}
+            onChange={(_, v) => {
+              if (!v) return;
+              setScopeOverride(v);
+              const label = v === "SELECTION" ? "student" : v === "COURSE" ? "this course" : "all courses";
+              setScopeDividers((prev) => [...prev, { id: `scope-${Date.now()}`, label: `Context → ${label}` }]);
+            }}
             sx={{ "& .MuiToggleButton-root": { py: 0, px: 1, fontSize: "0.65rem", textTransform: "none" } }}
           >
             {studentId && (
               <ToggleButton value="SELECTION">
-                {studentName ? getDisplayName(studentName) : "Student"}
+                {studentName
+                  ? (studentName.includes("students")
+                      ? `Selected (${studentName})`
+                      : getDisplayName(studentName))
+                  : "This student"}
               </ToggleButton>
             )}
-            {courseId && <ToggleButton value="COURSE">Course</ToggleButton>}
-            <ToggleButton value="CROSS_COURSE">All data</ToggleButton>
+            {courseId && <ToggleButton value="COURSE">This course</ToggleButton>}
+            <ToggleButton value="CROSS_COURSE">All courses</ToggleButton>
           </ToggleButtonGroup>
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
@@ -375,6 +393,17 @@ export default function AiChatPanel({
             <ChatMessageBubble key={msg.id} message={msg} />
           ))
         )}
+
+        {/* Scope-change dividers (UI-only, not persisted) */}
+        {scopeDividers.map((d) => (
+          <Box key={d.id} sx={{ display: "flex", alignItems: "center", gap: 1, px: 2, py: 0.5 }}>
+            <Box sx={{ flex: 1, height: "1px", bgcolor: "divider" }} />
+            <Typography variant="caption" color="text.disabled" sx={{ whiteSpace: "nowrap" }}>
+              {d.label}
+            </Typography>
+            <Box sx={{ flex: 1, height: "1px", bgcolor: "divider" }} />
+          </Box>
+        ))}
 
         {/* Typing indicator while waiting for a response */}
         {isSending && (

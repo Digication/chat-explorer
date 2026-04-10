@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { useQuery } from "@apollo/client/react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -7,6 +7,7 @@ import Skeleton from "@mui/material/Skeleton";
 import Tooltip from "@mui/material/Tooltip";
 import { GET_NETWORK } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
+import EvidencePopover from "@/components/insights/EvidencePopover";
 
 // Six distinct community colors.
 const COMMUNITY_COLORS = [
@@ -17,6 +18,9 @@ const COMMUNITY_COLORS = [
   "#8e24aa", // purple
   "#00acc1", // teal
 ];
+
+/** Collision padding between node edges (px). */
+const COLLISION_PADDING = 8;
 
 interface NodeData {
   id: string;
@@ -33,16 +37,29 @@ interface EdgeData {
   weight: number;
 }
 
-export default function ToriNetworkGraph() {
+interface PopoverState {
+  anchorEl: HTMLElement;
+  toriTagId: string;
+  toriTagName: string;
+}
+
+interface ToriNetworkGraphProps {
+  onViewThread?: (threadId: string, studentName: string) => void;
+}
+
+export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps) {
   const { scope } = useInsightsScope();
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [popover, setPopover] = useState<PopoverState | null>(null);
+  // Hidden anchor element for positioning popovers from SVG clicks
+  const anchorRef = useRef<HTMLDivElement>(null);
 
   const { data, loading, error, refetch } = useQuery<any>(GET_NETWORK, {
     variables: { scope },
     skip: !scope,
   });
 
-  // Force-directed layout: positions nodes based on repulsion + edge attraction.
+  // Force-directed layout with collision avoidance.
   const layout = useMemo(() => {
     if (!data?.network?.data) return null;
 
@@ -56,20 +73,22 @@ export default function ToriNetworkGraph() {
     const maxFreq = Math.max(...nodes.map((n) => n.frequency), 1);
     const maxWeight = Math.max(...edges.map((e) => e.weight), 1);
 
+    // Pre-compute radii for collision detection
+    const radii = nodes.map((n) => 6 + (n.frequency / maxFreq) * 14);
+
     // Build a node-index lookup for edge references
     const nodeIndex: Record<string, number> = {};
     nodes.forEach((n, i) => { nodeIndex[n.id] = i; });
 
-    // Initialize positions randomly (seeded by index for stability)
+    // Initialize positions (seeded by index for stability)
     const pos = nodes.map((_, i) => ({
       x: W * 0.2 + (W * 0.6) * ((i * 7 + 13) % nodes.length) / Math.max(nodes.length - 1, 1),
       y: H * 0.2 + (H * 0.6) * ((i * 11 + 7) % nodes.length) / Math.max(nodes.length - 1, 1),
     }));
 
-    // Run force simulation iterations
     const ITERATIONS = 200;
     for (let iter = 0; iter < ITERATIONS; iter++) {
-      const temp = 1 - iter / ITERATIONS; // cooling factor
+      const temp = 1 - iter / ITERATIONS;
 
       // Repulsion between all node pairs (Coulomb-like)
       for (let i = 0; i < nodes.length; i++) {
@@ -109,21 +128,44 @@ export default function ToriNetworkGraph() {
         pos[i].x += (W / 2 - pos[i].x) * 0.01;
         pos[i].y += (H / 2 - pos[i].y) * 0.01;
       }
+
+      // Collision resolution — push overlapping nodes apart
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const dx = pos[i].x - pos[j].x;
+          const dy = pos[i].y - pos[j].y;
+          const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 0.1);
+          const minDist = radii[i] + radii[j] + COLLISION_PADDING;
+          if (dist < minDist) {
+            const overlap = (minDist - dist) / 2;
+            const nx = dx / dist;
+            const ny = dy / dist;
+            pos[i].x += nx * overlap;
+            pos[i].y += ny * overlap;
+            pos[j].x -= nx * overlap;
+            pos[j].y -= ny * overlap;
+          }
+        }
+      }
     }
 
-    // Clamp positions to stay within bounds (with padding)
+    // Clamp positions to stay within bounds
     const pad = 30;
     for (const p of pos) {
       p.x = Math.max(pad, Math.min(W - pad, p.x));
       p.y = Math.max(pad, Math.min(H - pad, p.y));
     }
 
+    // Compute median frequency for label visibility threshold
+    const freqs = [...nodes.map((n) => n.frequency)].sort((a, b) => a - b);
+    const medianFreq = freqs[Math.floor(freqs.length / 2)] ?? 0;
+
     const positions: Record<string, { x: number; y: number }> = {};
     nodes.forEach((node, i) => {
       positions[node.id] = pos[i];
     });
 
-    return { nodes, edges, positions, maxFreq, maxWeight };
+    return { nodes, edges, positions, maxFreq, maxWeight, radii, medianFreq };
   }, [data]);
 
   // ── Error state ────────────────────────────────────────────────────────────
@@ -149,7 +191,7 @@ export default function ToriNetworkGraph() {
     return <Skeleton variant="rectangular" height={400} />;
   }
 
-  const { nodes, edges, positions, maxFreq, maxWeight } = layout;
+  const { nodes, edges, positions, maxFreq, maxWeight, medianFreq = 0 } = layout;
 
   if (nodes.length === 0) {
     return (
@@ -169,10 +211,27 @@ export default function ToriNetworkGraph() {
     });
   }
 
+  /** Handle node click — position a hidden anchor div and open evidence popover. */
+  const handleNodeClick = (event: React.MouseEvent, node: NodeData) => {
+    if (!anchorRef.current) return;
+    const rect = (event.currentTarget as Element).closest("svg")!.getBoundingClientRect();
+    const svgPos = positions[node.id];
+    // Convert SVG coords to screen coords (accounting for viewBox scaling)
+    const scaleX = rect.width / 500;
+    const scaleY = rect.height / 400;
+    anchorRef.current.style.position = "fixed";
+    anchorRef.current.style.left = `${rect.left + svgPos.x * scaleX}px`;
+    anchorRef.current.style.top = `${rect.top + svgPos.y * scaleY}px`;
+    setPopover({ anchorEl: anchorRef.current, toriTagId: node.id, toriTagName: node.name });
+  };
+
   return (
-    <Box sx={{ display: "flex", justifyContent: "center" }}>
+    <Box sx={{ display: "flex", justifyContent: "center", position: "relative" }}>
+      {/* Hidden anchor for popover positioning */}
+      <div ref={anchorRef} style={{ position: "fixed", width: 1, height: 1, pointerEvents: "none" }} />
+
       <svg
-        width={500}
+        width="100%"
         height={400}
         viewBox="0 0 500 400"
         style={{ maxWidth: "100%", height: "auto" }}
@@ -209,35 +268,57 @@ export default function ToriNetworkGraph() {
           const r = 6 + (node.frequency / maxFreq!) * 14;
           const color =
             COMMUNITY_COLORS[node.communityId % COMMUNITY_COLORS.length];
+          // Only show labels for above-median frequency nodes (or hovered)
+          const showLabel = node.frequency >= medianFreq || hoveredNode === node.id;
 
           return (
             <Tooltip
               key={node.id}
               title={`${node.name} (${node.domain}) — freq: ${node.frequency}, degree: ${node.degree}`}
               arrow
+              enterDelay={0}
+              enterNextDelay={0}
             >
               <g
                 onMouseEnter={() => setHoveredNode(node.id)}
                 onMouseLeave={() => setHoveredNode(null)}
+                onClick={(e) => handleNodeClick(e, node)}
                 style={{ cursor: "pointer" }}
               >
                 <circle cx={pos.x} cy={pos.y} r={r} fill={color} />
-                <text
-                  x={pos.x}
-                  y={pos.y + r + 12}
-                  textAnchor="middle"
-                  fontSize={10}
-                  fill="currentColor"
-                >
-                  {node.name.length > 14
-                    ? node.name.slice(0, 12) + "..."
-                    : node.name}
-                </text>
+                {showLabel && (
+                  <text
+                    x={pos.x}
+                    y={pos.y + r + 12}
+                    textAnchor="middle"
+                    fontSize={10}
+                    fill="currentColor"
+                  >
+                    {node.name.length > 14
+                      ? node.name.slice(0, 12) + "..."
+                      : node.name}
+                  </text>
+                )}
               </g>
             </Tooltip>
           );
         })}
       </svg>
+
+      {/* Evidence popover — shown when a node is clicked */}
+      {popover && scope && (
+        <EvidencePopover
+          anchorEl={popover.anchorEl}
+          toriTagId={popover.toriTagId}
+          toriTagName={popover.toriTagName}
+          scope={scope}
+          onClose={() => setPopover(null)}
+          onViewThread={(threadId, studentName) => {
+            setPopover(null);
+            onViewThread?.(threadId, studentName);
+          }}
+        />
+      )}
     </Box>
   );
 }

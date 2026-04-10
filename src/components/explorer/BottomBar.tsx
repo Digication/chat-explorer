@@ -1,4 +1,4 @@
-import { AppBar, Toolbar, Box, IconButton, Badge, Typography } from "@mui/material";
+import { AppBar, Toolbar, Box, ButtonBase, Badge, Typography } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
 import PeopleIcon from "@mui/icons-material/People";
 import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
@@ -16,7 +16,9 @@ interface BottomBarProps {
   students: Student[];
   /** Currently selected student IDs. */
   selectedStudentIds: string[];
-  /** Called when a student is toggled (selected or deselected). */
+  /** Called when a single student is clicked (replaces selection). */
+  onSelectStudent: (id: string) => void;
+  /** Called when a student is shift+clicked (add/remove from multi-select). */
   onToggleStudent: (id: string) => void;
   /** Called to open the student list panel. */
   onOpenStudentList: () => void;
@@ -36,6 +38,7 @@ interface BottomBarProps {
 export default function BottomBar({
   students,
   selectedStudentIds,
+  onSelectStudent,
   onToggleStudent,
   onOpenStudentList,
   studentListOpen,
@@ -67,65 +70,66 @@ export default function BottomBar({
           px: 2,
         }}
       >
-        {/* Left zone: Students button pinned to left edge */}
-        <Box
+        {/* Left zone: Students button pinned to left edge — entire area clickable */}
+        <ButtonBase
+          onClick={onOpenStudentList}
           sx={{
             position: "absolute",
             left: 16,
             display: "flex",
             alignItems: "center",
             gap: 1,
+            borderRadius: 1,
+            px: 1.5,
+            py: 1,
+            minHeight: 44,
+            color: studentListOpen ? "primary.main" : "text.secondary",
+            "&:hover": { bgcolor: "action.hover" },
           }}
         >
-          <IconButton
-            onClick={onOpenStudentList}
-            sx={{
-              color: studentListOpen ? "primary.main" : "text.secondary",
-            }}
+          <Badge
+            badgeContent={students.length}
+            color="primary"
+            max={999}
           >
-            <Badge
-              badgeContent={students.length}
-              color="primary"
-              max={999}
-            >
-              <PeopleIcon />
-            </Badge>
-          </IconButton>
-          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            <PeopleIcon />
+          </Badge>
+          <Typography variant="caption" sx={{ color: "inherit" }}>
             Students
           </Typography>
-        </Box>
+        </ButtonBase>
 
         {/* Center zone: Student carousel */}
         <StudentCarousel
           students={students}
           selectedIds={selectedStudentIds}
+          onSelect={onSelectStudent}
           onToggle={onToggleStudent}
         />
 
-        {/* Right zone: Analyze button */}
+        {/* Right zone: Analyze button — entire area clickable */}
         {onToggleAnalyze && (
-          <Box
+          <ButtonBase
+            onClick={onToggleAnalyze}
             sx={{
               position: "absolute",
               right: 16,
               display: "flex",
               alignItems: "center",
               gap: 1,
+              borderRadius: 1,
+              px: 1.5,
+              py: 1,
+              minHeight: 44,
+              color: analyzeOpen ? "primary.main" : "text.secondary",
+              "&:hover": { bgcolor: "action.hover" },
             }}
           >
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            <Typography variant="caption" sx={{ color: "inherit" }}>
               Analyze
             </Typography>
-            <IconButton
-              onClick={onToggleAnalyze}
-              sx={{
-                color: analyzeOpen ? "primary.main" : "text.secondary",
-              }}
-            >
-              <SmartToyOutlinedIcon />
-            </IconButton>
-          </Box>
+            <SmartToyOutlinedIcon />
+          </ButtonBase>
         )}
       </Toolbar>
     </AppBar>

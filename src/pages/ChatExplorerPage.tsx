@@ -39,8 +39,8 @@ export default function ChatExplorerPage() {
   const [studentListOpen, setStudentListOpen] = useState(false);
   // TORI tags clicked in chat comments — passed as context to AI chat
   const [aiContextTags, setAiContextTags] = useState<string[]>([]);
-  // AI panel is hidden by default, slides in from the right when toggled
-  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  // AI panel open by default on wide screens (>1024px)
+  const [aiPanelOpen, setAiPanelOpen] = useState(() => window.innerWidth > 1024);
 
   // Reset student selection and TORI filters whenever the course changes
   const prevCourseIdRef = useRef<string | undefined>(undefined);
@@ -63,7 +63,14 @@ export default function ChatExplorerPage() {
     }
   }, [selectedStudentIds]);
 
-  /** Toggle a student in the selection (add or remove). */
+  /** Select a single student (replaces current selection). */
+  const handleSelectStudent = useCallback((id: string) => {
+    setSelectedStudentIds((prev) =>
+      prev.length === 1 && prev[0] === id ? [] : [id]
+    );
+  }, []);
+
+  /** Toggle a student in the multi-selection (add or remove). */
   const handleToggleStudent = useCallback((id: string) => {
     setSelectedStudentIds((prev) =>
       prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
@@ -82,6 +89,13 @@ export default function ChatExplorerPage() {
   );
   const studentProfiles =
     studentsData?.instructionalInsights?.data?.studentProfiles ?? [];
+
+  // Auto-select the first student when profiles load and none are selected
+  useEffect(() => {
+    if (studentProfiles.length > 0 && selectedStudentIds.length === 0) {
+      setSelectedStudentIds([studentProfiles[0].studentId]);
+    }
+  }, [studentProfiles]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Thread data (for extracting available TORI tags and rendering threads)
   const { data: threadsData } = useQuery<any>(GET_ASSIGNMENT_THREADS, {
@@ -302,6 +316,7 @@ export default function ChatExplorerPage() {
       <BottomBar
         students={studentProfiles}
         selectedStudentIds={selectedStudentIds}
+        onSelectStudent={handleSelectStudent}
         onToggleStudent={handleToggleStudent}
         onOpenStudentList={() => setStudentListOpen(true)}
         studentListOpen={studentListOpen}
