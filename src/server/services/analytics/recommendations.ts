@@ -59,18 +59,17 @@ export async function getRecommendations(
       }
     }
 
-    // ── Engagement spread check ──────────────────────────────────
-    const scores = engagement.data.perStudent.map((s) => s.averageScore);
-    if (scores.length > 1) {
-      const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
-      const variance =
-        scores.reduce((sum, s) => sum + (s - mean) ** 2, 0) / scores.length;
-      const stddev = Math.sqrt(variance);
-
-      if (stddev > 0.2) {
+    // ── Category spread check ─────────────────────────────────────
+    // If students span multiple reflection categories, the depth
+    // distribution view is useful for identifying who needs support.
+    if (engagement.data.perStudent.length > 1) {
+      const categoriesUsed = new Set(
+        engagement.data.perStudent.map((s) => s.modalCategory)
+      );
+      if (categoriesUsed.size >= 3) {
         recommendations.push({
           visualization: "Depth Band Distribution",
-          reason: `High engagement variance (stddev: ${stddev.toFixed(2)}). Student profiles show significant differences in reflection depth.`,
+          reason: `Students span ${categoriesUsed.size} reflection categories. The distribution view highlights who may need support.`,
           priority: "HIGH",
         });
       }
