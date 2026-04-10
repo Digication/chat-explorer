@@ -252,6 +252,24 @@ async function main() {
 
     await seedToriTags();
 
+    // Bootstrap: promote a user to digication_admin if BOOTSTRAP_ADMIN_EMAIL
+    // is set. This solves the chicken-and-egg problem where no admin exists
+    // yet to assign roles via the UI. Remove the env var after first use.
+    const bootstrapEmail = process.env.BOOTSTRAP_ADMIN_EMAIL;
+    if (bootstrapEmail) {
+      const userRepo = AppDataSource.getRepository(User);
+      const target = await userRepo.findOne({ where: { email: bootstrapEmail } });
+      if (target && target.role !== "digication_admin") {
+        target.role = "digication_admin" as any;
+        await userRepo.save(target);
+        console.log(`[bootstrap] Promoted ${bootstrapEmail} to digication_admin`);
+      } else if (!target) {
+        console.log(`[bootstrap] No user found with email ${bootstrapEmail}`);
+      } else {
+        console.log(`[bootstrap] ${bootstrapEmail} is already digication_admin`);
+      }
+    }
+
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
