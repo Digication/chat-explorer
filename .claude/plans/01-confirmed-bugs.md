@@ -1,6 +1,6 @@
 # Plan 1 — Confirmed Bugs
 
-**Status:** Draft, awaiting approval
+**Status:** DONE — merged to main
 **Priority:** URGENT — blocks all other work
 **Estimated scope:** ~1 day of focused work. Most bugs are small; #1 is the biggest and will cascade-fix several others.
 

@@ -1,6 +1,6 @@
 # Plan 3 — Reflection Depth (Hatton & Smith 1995)
 
-**Status:** Draft, awaiting approval
+**Status:** DONE — merged to main
 **Priority:** HIGH — replaces a load-bearing analytics primitive (`DepthBand`) used across Insights
 **Depends on:** Plan 1 (merged)
 
