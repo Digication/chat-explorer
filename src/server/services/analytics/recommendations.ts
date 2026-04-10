@@ -94,12 +94,17 @@ export async function getRecommendations(
     // ── Clustering recommendation ────────────────────────────────
     // Simple silhouette approximation: check if students cluster well
     if (engagement.data.perStudent.length >= 6) {
-      const depths = engagement.data.depthDistribution;
+      const cats = engagement.data.categoryDistribution;
       const totalStudents = engagement.data.perStudent.length;
-      const maxBand = Math.max(depths.SURFACE, depths.DEVELOPING, depths.DEEP);
+      const maxCat = Math.max(
+        cats.DESCRIPTIVE_WRITING,
+        cats.DESCRIPTIVE_REFLECTION,
+        cats.DIALOGIC_REFLECTION,
+        cats.CRITICAL_REFLECTION
+      );
 
-      // If one band doesn't completely dominate, clustering is informative
-      if (maxBand / totalStudents < 0.7) {
+      // If one category doesn't completely dominate, clustering is informative
+      if (maxCat / totalStudents < 0.7) {
         recommendations.push({
           visualization: "Clustered Heatmap",
           reason:

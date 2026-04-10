@@ -112,17 +112,15 @@ export default function MetricsCards({ onViewThread }: MetricsCardsProps) {
       const profiles: Array<{
         studentId: string;
         name: string;
-        engagementScore: number;
-        depthBand: string;
+        modalCategory: string;
         commentCount: number;
       }> = profilesData?.instructionalInsights?.data?.studentProfiles ?? [];
 
       const students: StudentItem[] = profiles.map((p) => ({
         studentId: p.studentId,
         name: p.name,
-        depthBand: p.depthBand,
+        modalCategory: p.modalCategory,
         commentCount: p.commentCount,
-        engagementScore: p.engagementScore,
       }));
 
       setDrillDown({ anchorEl: event.currentTarget, students });

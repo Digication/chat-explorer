@@ -24,5 +24,20 @@ export type HeatmapMode = "CLASSIC";
 // How color/size intensity is calculated
 export type ScalingMode = "RAW" | "ROW" | "GLOBAL";
 
-// Engagement depth bands
-export type DepthBand = "SURFACE" | "DEVELOPING" | "DEEP";
+// Hatton & Smith (1995) reflection categories — the primary depth signal.
+// See `project_reflection_framework.md` for operational definitions.
+export type ReflectionCategory =
+  | "DESCRIPTIVE_WRITING"
+  | "DESCRIPTIVE_REFLECTION"
+  | "DIALOGIC_REFLECTION"
+  | "CRITICAL_REFLECTION";
+
+export const ALL_REFLECTION_CATEGORIES: ReflectionCategory[] = [
+  "DESCRIPTIVE_WRITING",
+  "DESCRIPTIVE_REFLECTION",
+  "DIALOGIC_REFLECTION",
+  "CRITICAL_REFLECTION",
+];
+
+// Per-category distribution (used by engagement + instructional-insights).
+export type ReflectionCategoryDistribution = Record<ReflectionCategory, number>;

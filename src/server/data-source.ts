@@ -16,9 +16,11 @@ import {
   ChatSession,
   ChatMessage,
   UserState,
+  CommentReflectionClassification,
 } from "./entities/index.js";
 import { Initial1775574106489 } from "./migrations/1775574106489-Initial.js";
 import { AddBetterAuthTables1775574200000 } from "./migrations/1775574200000-AddBetterAuthTables.js";
+import { AddReflectionClassification1775574300000 } from "./migrations/1775574300000-AddReflectionClassification.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -45,6 +47,11 @@ export const AppDataSource = new DataSource({
     ChatSession,
     ChatMessage,
     UserState,
+    CommentReflectionClassification,
   ],
-  migrations: [Initial1775574106489, AddBetterAuthTables1775574200000],
+  migrations: [
+    Initial1775574106489,
+    AddBetterAuthTables1775574200000,
+    AddReflectionClassification1775574300000,
+  ],
 });

@@ -13,6 +13,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import UserAvatar from "@/components/shared/UserAvatar";
 import ToriChip from "@/components/shared/ToriChip";
 import { useUserSettings } from "@/lib/UserSettingsContext";
+import { CATEGORY_COLORS, CATEGORY_LABELS } from "@/lib/reflection-categories";
 
 /** Width of the student list panel. */
 const PANEL_WIDTH = 360;
@@ -22,7 +23,7 @@ interface StudentProfile {
   name: string;
   topToriTags: string[];
   commentCount: number;
-  depthBand: string;
+  modalCategory: string;
 }
 
 interface StudentListPanelProps {
@@ -38,12 +39,6 @@ interface StudentListPanelProps {
   onToggle: (id: string) => void;
 }
 
-/** Color mapping for depth bands. */
-const DEPTH_COLORS: Record<string, string> = {
-  DEEP: "#2e7d32",
-  DEVELOPING: "#f57c00",
-  SURFACE: "#757575",
-};
 
 /**
  * Slide-out panel from the left showing a searchable list of students.
@@ -130,7 +125,7 @@ export default function StudentListPanel({
                   </Typography>
                 </Box>
 
-                {/* Top 2 TORI tags + depth band */}
+                {/* Top 2 TORI tags + reflection category */}
                 <Box
                   sx={{
                     display: "flex",
@@ -143,15 +138,15 @@ export default function StudentListPanel({
                   {s.topToriTags.slice(0, 2).map((tag) => (
                     <ToriChip key={tag} tag={tag} size="small" />
                   ))}
-                  {s.depthBand && (
+                  {s.modalCategory && (
                     <Chip
-                      label={s.depthBand}
+                      label={CATEGORY_LABELS[s.modalCategory] ?? s.modalCategory}
                       size="small"
                       sx={{
                         fontSize: "0.65rem",
                         height: 18,
-                        color: DEPTH_COLORS[s.depthBand] ?? "#757575",
-                        borderColor: DEPTH_COLORS[s.depthBand] ?? "#757575",
+                        color: CATEGORY_COLORS[s.modalCategory] ?? "#757575",
+                        borderColor: CATEGORY_COLORS[s.modalCategory] ?? "#757575",
                       }}
                       variant="outlined"
                     />

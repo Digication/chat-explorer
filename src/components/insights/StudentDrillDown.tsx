@@ -7,20 +7,13 @@ import ListItemButton from "@mui/material/ListItemButton";
 import ListItemText from "@mui/material/ListItemText";
 import Chip from "@mui/material/Chip";
 import { useUserSettings } from "@/lib/UserSettingsContext";
-
-/** Color mapping for depth band chips. */
-const BAND_COLORS: Record<string, string> = {
-  SURFACE: "#ef5350",
-  DEVELOPING: "#ffa726",
-  DEEP: "#66bb6a",
-};
+import { CATEGORY_COLORS, CATEGORY_LABELS } from "@/lib/reflection-categories";
 
 export interface StudentItem {
   studentId: string;
   name: string;
-  depthBand?: string;
+  modalCategory?: string;
   commentCount?: number;
-  engagementScore?: number;
 }
 
 interface StudentDrillDownProps {
@@ -111,15 +104,15 @@ export default function StudentDrillDown({
                         {s.commentCount} comment{s.commentCount !== 1 ? "s" : ""}
                       </Typography>
                     )}
-                    {s.depthBand && (
+                    {s.modalCategory && (
                       <Chip
-                        label={s.depthBand}
+                        label={CATEGORY_LABELS[s.modalCategory] ?? s.modalCategory}
                         size="small"
                         sx={{
                           ml: 0.5,
                           height: 20,
                           fontSize: "0.7rem",
-                          bgcolor: BAND_COLORS[s.depthBand] ?? "grey.400",
+                          bgcolor: CATEGORY_COLORS[s.modalCategory] ?? "grey.400",
                           color: "#fff",
                           fontWeight: 600,
                         }}

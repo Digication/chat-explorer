@@ -1,69 +1,17 @@
 import { AppDataSource } from "../../data-source.js";
 import { Assignment } from "../../entities/Assignment.js";
-import { CommentToriTag } from "../../entities/CommentToriTag.js";
-import type { AnalyticsScope, AnalyticsResult, DepthBand } from "./types.js";
+import { CommentReflectionClassification } from "../../entities/CommentReflectionClassification.js";
+import type { AnalyticsScope, AnalyticsResult, ReflectionCategory } from "./types.js";
 import { resolveScope } from "./scope.js";
 import { withCache } from "./cache.js";
-
-// Signal weights (same as engagement.ts)
-const WEIGHTS = {
-  toriTagCount: 0.3,
-  lexicalDiversity: 0.2,
-  evidenceCount: 0.2,
-  logicalConnectorCount: 0.15,
-  questionCount: 0.15,
-};
-
-function assignDepthBand(score: number): DepthBand {
-  if (score <= 0.33) return "SURFACE";
-  if (score <= 0.66) return "DEVELOPING";
-  return "DEEP";
-}
-
-function normalize(values: number[]): number[] {
-  if (values.length === 0) return [];
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  if (max === min) return values.map(() => 0.5);
-  return values.map((v) => (v - min) / (max - min));
-}
-
-function extractSignals(text: string) {
-  const words = text.toLowerCase().split(/\s+/).filter(Boolean);
-  const uniqueWords = new Set(words);
-  const lexicalDiversity = words.length > 0 ? uniqueWords.size / words.length : 0;
-  const questionCount = (text.match(/\?/g) ?? []).length;
-
-  const evidencePhrases = [
-    "for example", "such as", "according to",
-    "research shows", "data suggests", "studies indicate",
-  ];
-  const connectors = [
-    "because", "therefore", "however", "although",
-    "furthermore", "consequently", "in contrast",
-  ];
-
-  const lower = text.toLowerCase();
-  let evidenceCount = 0;
-  for (const p of evidencePhrases) {
-    let idx = 0;
-    while ((idx = lower.indexOf(p, idx)) !== -1) { evidenceCount++; idx += p.length; }
-  }
-  let logicalConnectorCount = 0;
-  for (const c of connectors) {
-    let idx = 0;
-    while ((idx = lower.indexOf(c, idx)) !== -1) { logicalConnectorCount++; idx += c.length; }
-  }
-
-  return { lexicalDiversity, evidenceCount, logicalConnectorCount, questionCount };
-}
 
 export interface GrowthDataPoint {
   assignmentId: string;
   assignmentName: string;
   date: string;
-  score: number;
-  depthBand: DepthBand;
+  // The modal (most-common) reflection category for this student in
+  // this assignment. Replaces the old numerical score + depth band.
+  category: ReflectionCategory;
 }
 
 export interface StudentGrowth {
@@ -72,9 +20,11 @@ export interface StudentGrowth {
   dataPoints: GrowthDataPoint[];
 }
 
+const DEFAULT_CATEGORY: ReflectionCategory = "DESCRIPTIVE_WRITING";
+
 /**
- * Computes engagement score per student per assignment, enabling
- * growth-over-time visualization (sparklines, delta comparison).
+ * Computes the modal reflection category per student per assignment,
+ * enabling growth-over-time visualization.
  */
 export async function getGrowth(
   scope: AnalyticsScope
@@ -88,8 +38,10 @@ export async function getGrowth(
   const { data, cached } = await withCache(cacheKey, scope, async () => {
     if (userComments.length === 0) return [];
 
-    // Get assignment info (name, date) for all assignments in scope
-    const assignmentIds = [...new Set(resolved.threads.map((t) => t.assignmentId))];
+    // Get assignment info (name, date) for all assignments in scope.
+    const assignmentIds = [
+      ...new Set(resolved.threads.map((t) => t.assignmentId)),
+    ];
     if (assignmentIds.length === 0) return [];
 
     const assignmentRepo = AppDataSource.getRepository(Assignment);
@@ -103,77 +55,46 @@ export async function getGrowth(
       assignments.map((a) => [a.id, { name: a.name, date: a.importedAt }])
     );
 
-    // Map comment → assignment via thread
+    // Map comment → assignment via thread.
     const threadAssignmentMap = new Map(
       resolved.threads.map((t) => [t.id, t.assignmentId])
     );
 
-    // Get TORI tag counts per comment
+    // Fetch persisted classifications for scoped comments.
     const commentIds = userComments.map((c) => c.id);
-    const cttRepo = AppDataSource.getRepository(CommentToriTag);
-
-    // Batch query tag counts (only if there are comments)
-    let tagCountMap = new Map<string, number>();
+    const classificationRepo = AppDataSource.getRepository(
+      CommentReflectionClassification
+    );
+    let classMap = new Map<string, ReflectionCategory>();
     if (commentIds.length > 0) {
-      const tagCounts = await cttRepo
-        .createQueryBuilder("ctt")
-        .select("ctt.commentId", "commentId")
-        .addSelect("COUNT(*)", "count")
-        .where("ctt.commentId IN (:...ids)", { ids: commentIds })
-        .groupBy("ctt.commentId")
-        .getRawMany<{ commentId: string; count: string }>();
-      tagCountMap = new Map(
-        tagCounts.map((r) => [r.commentId, parseInt(r.count, 10)])
-      );
+      const classifications = await classificationRepo
+        .createQueryBuilder("crc")
+        .select(['"commentId"', "category"])
+        .where('"commentId" IN (:...ids)', { ids: commentIds })
+        .getRawMany<{ commentId: string; category: ReflectionCategory }>();
+      classMap = new Map(classifications.map((c) => [c.commentId, c.category]));
     }
 
-    // Extract raw signals per comment
-    const rawSignals = userComments.map((c) => ({
-      commentId: c.id,
-      studentId: c.studentId!,
-      assignmentId: threadAssignmentMap.get(c.threadId),
-      toriTagCount: tagCountMap.get(c.id) ?? 0,
-      ...extractSignals(c.text),
-    }));
-
-    // Normalize dimensions across all comments
-    const toriNorm = normalize(rawSignals.map((s) => s.toriTagCount));
-    const evidenceNorm = normalize(rawSignals.map((s) => s.evidenceCount));
-    const connectorNorm = normalize(rawSignals.map((s) => s.logicalConnectorCount));
-    const questionNorm = normalize(rawSignals.map((s) => s.questionCount));
-
-    // Compute per-comment engagement scores
-    const commentScores = rawSignals.map((s, i) => {
-      const score =
-        toriNorm[i] * WEIGHTS.toriTagCount +
-        s.lexicalDiversity * WEIGHTS.lexicalDiversity +
-        evidenceNorm[i] * WEIGHTS.evidenceCount +
-        connectorNorm[i] * WEIGHTS.logicalConnectorCount +
-        questionNorm[i] * WEIGHTS.questionCount;
-
-      return {
-        studentId: s.studentId,
-        assignmentId: s.assignmentId,
-        score: Math.min(1, Math.max(0, score)),
-      };
-    });
-
-    // Group by student → assignment → average score
-    const grouped = new Map<string, Map<string, number[]>>();
-    for (const cs of commentScores) {
-      if (!cs.assignmentId) continue;
-      if (!grouped.has(cs.studentId)) grouped.set(cs.studentId, new Map());
-      const studentMap = grouped.get(cs.studentId)!;
-      if (!studentMap.has(cs.assignmentId)) studentMap.set(cs.assignmentId, []);
-      studentMap.get(cs.assignmentId)!.push(cs.score);
+    // Group by student → assignment → list of categories.
+    const grouped = new Map<
+      string,
+      Map<string, ReflectionCategory[]>
+    >();
+    for (const c of userComments) {
+      const aId = threadAssignmentMap.get(c.threadId);
+      if (!aId || !c.studentId) continue;
+      if (!grouped.has(c.studentId)) grouped.set(c.studentId, new Map());
+      const studentMap = grouped.get(c.studentId)!;
+      if (!studentMap.has(aId)) studentMap.set(aId, []);
+      studentMap.get(aId)!.push(classMap.get(c.id) ?? DEFAULT_CATEGORY);
     }
 
-    // Get student names from the comments (resolve from DB)
+    // Get student names.
     const studentIds = [...grouped.keys()];
     let studentNameMap = new Map<string, string>();
     if (studentIds.length > 0) {
       const students = await AppDataSource.createQueryBuilder()
-        .select(["s.id", "s.\"firstName\"", "s.\"lastName\""])
+        .select(["s.id", 's."firstName"', 's."lastName"'])
         .from("student", "s")
         .where("s.id IN (:...ids)", { ids: studentIds })
         .getRawMany();
@@ -185,26 +106,30 @@ export async function getGrowth(
       );
     }
 
-    // Sort assignments by date
+    // Sort assignments by date.
     const sortedAssignmentIds = [...assignmentMap.entries()]
-      .sort((a, b) => new Date(a[1].date).getTime() - new Date(b[1].date).getTime())
+      .sort(
+        (a, b) =>
+          new Date(a[1].date).getTime() - new Date(b[1].date).getTime()
+      )
       .map(([id]) => id);
 
-    // Build growth data
+    // Build growth data — one data point per student per assignment.
     const result: StudentGrowth[] = [];
-    for (const [studentId, assignmentScores] of grouped) {
+    for (const [studentId, assignmentCategories] of grouped) {
       const dataPoints: GrowthDataPoint[] = [];
       for (const aId of sortedAssignmentIds) {
-        const scores = assignmentScores.get(aId);
-        if (!scores) continue;
-        const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+        const cats = assignmentCategories.get(aId);
+        if (!cats || cats.length === 0) continue;
         const info = assignmentMap.get(aId)!;
         dataPoints.push({
           assignmentId: aId,
           assignmentName: info.name,
-          date: info.date instanceof Date ? info.date.toISOString() : String(info.date),
-          score: Math.round(avg * 1000) / 1000,
-          depthBand: assignDepthBand(avg),
+          date:
+            info.date instanceof Date
+              ? info.date.toISOString()
+              : String(info.date),
+          category: modalOf(cats),
         });
       }
       if (dataPoints.length > 0) {
@@ -216,7 +141,6 @@ export async function getGrowth(
       }
     }
 
-    // Sort by student name
     result.sort((a, b) => a.name.localeCompare(b.name));
     return result;
   });
@@ -231,4 +155,26 @@ export async function getGrowth(
       cached,
     },
   };
+}
+
+// Picks the most common category. Ties break toward higher reflective depth.
+function modalOf(categories: ReflectionCategory[]): ReflectionCategory {
+  const counts = new Map<ReflectionCategory, number>();
+  for (const c of categories) counts.set(c, (counts.get(c) ?? 0) + 1);
+  let best: ReflectionCategory = DEFAULT_CATEGORY;
+  let bestCount = -1;
+  const order: ReflectionCategory[] = [
+    "DESCRIPTIVE_WRITING",
+    "DESCRIPTIVE_REFLECTION",
+    "DIALOGIC_REFLECTION",
+    "CRITICAL_REFLECTION",
+  ];
+  for (const cat of order) {
+    const n = counts.get(cat) ?? 0;
+    if (n >= bestCount) {
+      best = cat;
+      bestCount = n;
+    }
+  }
+  return best;
 }

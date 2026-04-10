@@ -37,10 +37,11 @@ export const typeDefs = /* GraphQL */ `
     GLOBAL
   }
 
-  enum DepthBand {
-    SURFACE
-    DEVELOPING
-    DEEP
+  enum ReflectionCategory {
+    DESCRIPTIVE_WRITING
+    DESCRIPTIVE_REFLECTION
+    DIALOGIC_REFLECTION
+    CRITICAL_REFLECTION
   }
 
   enum ExportFormat {
@@ -262,28 +263,29 @@ export const typeDefs = /* GraphQL */ `
   type CommentEngagement {
     commentId: ID!
     studentId: ID
-    score: Float!
-    depthBand: DepthBand!
-    components: EngagementComponents!
+    category: ReflectionCategory!
+    evidenceQuote: String
+    rationale: String
   }
 
   type StudentEngagement {
     studentId: ID!
-    averageScore: Float!
-    depthBand: DepthBand!
+    modalCategory: ReflectionCategory!
+    categoryDistribution: ReflectionCategoryDistribution!
     commentCount: Int!
   }
 
-  type DepthDistribution {
-    SURFACE: Int!
-    DEVELOPING: Int!
-    DEEP: Int!
+  type ReflectionCategoryDistribution {
+    DESCRIPTIVE_WRITING: Int!
+    DESCRIPTIVE_REFLECTION: Int!
+    DIALOGIC_REFLECTION: Int!
+    CRITICAL_REFLECTION: Int!
   }
 
   type EngagementResult {
     perComment: [CommentEngagement!]!
     perStudent: [StudentEngagement!]!
-    depthDistribution: DepthDistribution!
+    categoryDistribution: ReflectionCategoryDistribution!
   }
 
   type HeatmapData {
@@ -341,8 +343,7 @@ export const typeDefs = /* GraphQL */ `
     studentId: ID!
     name: String!
     topToriTags: [String!]!
-    engagementScore: Float!
-    depthBand: DepthBand!
+    modalCategory: ReflectionCategory!
     commentCount: Int!
     avgWordCount: Float!
   }
@@ -351,7 +352,6 @@ export const typeDefs = /* GraphQL */ `
     commentId: ID!
     studentLabel: String!
     textExcerpt: String!
-    engagementScore: Float!
   }
 
   type TagExemplar {
@@ -375,13 +375,14 @@ export const typeDefs = /* GraphQL */ `
     studentProfiles: [StudentProfile!]!
     tagExemplars: [TagExemplar!]!
     promptPatterns: [PromptPattern!]!
-    depthDistribution: DepthDistributionInsight!
+    categoryDistribution: CategoryDistributionInsight!
   }
 
-  type DepthDistributionInsight {
-    SURFACE: DepthDistributionDetail!
-    DEVELOPING: DepthDistributionDetail!
-    DEEP: DepthDistributionDetail!
+  type CategoryDistributionInsight {
+    DESCRIPTIVE_WRITING: DepthDistributionDetail!
+    DESCRIPTIVE_REFLECTION: DepthDistributionDetail!
+    DIALOGIC_REFLECTION: DepthDistributionDetail!
+    CRITICAL_REFLECTION: DepthDistributionDetail!
   }
 
   type Recommendation {
@@ -394,8 +395,7 @@ export const typeDefs = /* GraphQL */ `
     assignmentId: ID!
     assignmentName: String!
     date: String!
-    score: Float!
-    depthBand: DepthBand!
+    category: ReflectionCategory!
   }
 
   type StudentGrowth {

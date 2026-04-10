@@ -87,20 +87,26 @@ export const GET_TORI_ANALYSIS = gql`
   }
 `;
 
-/** Engagement / reflection depth analysis. */
+/** Engagement / reflection category analysis (Hatton & Smith). */
 export const GET_ENGAGEMENT = gql`
   query Engagement($scope: AnalyticsScopeInput!) {
     engagement(scope: $scope) {
       data {
-        depthDistribution {
-          SURFACE
-          DEVELOPING
-          DEEP
+        categoryDistribution {
+          DESCRIPTIVE_WRITING
+          DESCRIPTIVE_REFLECTION
+          DIALOGIC_REFLECTION
+          CRITICAL_REFLECTION
         }
         perStudent {
           studentId
-          averageScore
-          depthBand
+          modalCategory
+          categoryDistribution {
+            DESCRIPTIVE_WRITING
+            DESCRIPTIVE_REFLECTION
+            DIALOGIC_REFLECTION
+            CRITICAL_REFLECTION
+          }
           commentCount
         }
       }
@@ -223,8 +229,7 @@ export const GET_STUDENT_ENGAGEMENT = gql`
         studentProfiles {
           studentId
           name
-          engagementScore
-          depthBand
+          modalCategory
           commentCount
           topToriTags
         }
@@ -298,8 +303,7 @@ export const GET_GROWTH = gql`
           assignmentId
           assignmentName
           date
-          score
-          depthBand
+          category
         }
       }
       meta {

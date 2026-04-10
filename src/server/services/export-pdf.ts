@@ -24,10 +24,11 @@ export interface CourseReport {
     count: number;
     percent: number;
   }>;
-  depthDistribution: {
-    SURFACE: number;
-    DEVELOPING: number;
-    DEEP: number;
+  categoryDistribution: {
+    DESCRIPTIVE_WRITING: number;
+    DESCRIPTIVE_REFLECTION: number;
+    DIALOGIC_REFLECTION: number;
+    CRITICAL_REFLECTION: number;
   };
   topCoOccurrences: Array<{
     tags: string[];
@@ -78,7 +79,7 @@ export async function generateCourseReportData(
       count: f.count,
       percent: Math.round(f.percent * 100) / 100,
     })),
-    depthDistribution: engagement.depthDistribution,
+    categoryDistribution: engagement.categoryDistribution,
     topCoOccurrences: tori.coOccurrencePairs.slice(0, 10).map((co) => ({
       tags: co.tags,
       count: co.count,
