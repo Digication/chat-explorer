@@ -1,7 +1,7 @@
 # Plan 5.4 — Student Profile & Cross-Course Comparison
 
-**Status:** Not started
-**Priority:** Active — next feature to build
+**Status:** ✅ Complete (merged to main 2026-04-11, commit `a25903c`)
+**Priority:** Done
 **Depends on:** Plans 1-4 (all complete)
 
 ## Why this feature exists
