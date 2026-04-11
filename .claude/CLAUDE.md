@@ -12,6 +12,24 @@
 - When adding content, ask: is this a "how to operate" fact or a "how to think/decide" rule?
 - When referencing detailed content in a skill's reference doc, add only a short description and a path here — don't repeat the content. The reference doc is the source of truth.
 
+# Browser Verification (mandatory)
+
+**After any code change that affects what users see, you MUST verify in the browser using the Chrome MCP extension (`mcp__Claude_in_Chrome__*` tools) before declaring work done.** This is not optional. This is not a fallback. Tests passing is not a substitute.
+
+## Rules
+1. **Chrome MCP is the primary verification method.** Use `tabs_context_mcp` → `navigate` → `read_page` / `javascript_tool` to verify changes in the live app.
+2. **Never skip browser verification.** If the app renders UI, you check it in Chrome. Period.
+3. **Never declare work "done" or "complete" based only on passing tests.** Tests are a gate, not the finish line. The browser is the finish line.
+4. **The app URL is `https://chat-explorer.localhost`** (served via Caddy). Navigate there using Chrome MCP. If you hit a cert error, try `http://chat-explorer.localhost` first (Caddy redirects to HTTPS and Chrome may accept the cert on redirect).
+5. **If Chrome MCP is unavailable** (extension not connected), tell the user and ask them to verify manually. Do NOT invent a workaround and call it done.
+
+## Verification checklist (after each feature)
+- Navigate to the affected page(s)
+- Read the accessibility tree (`read_page`) to confirm key elements rendered
+- Interact with new UI (click links, open dialogs) using `javascript_tool`
+- Check for console errors
+- Only then mark the work as complete
+
 # Tech Stack Defaults
 When choosing libraries or setting up new apps, prefer this stack. When adding a dependency, prefer libraries compatible with these choices. Full details and guidelines: `skills/implement/references/TECH_STACK.md`
 
