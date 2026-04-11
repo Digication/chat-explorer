@@ -1,3 +1,4 @@
+import { GraphQLError } from "graphql";
 import { AppDataSource } from "../data-source.js";
 import { Institution } from "../entities/Institution.js";
 import { Course } from "../entities/Course.js";
@@ -33,6 +34,58 @@ export const institutionResolvers = {
       if (!user.institutionId) return null;
       const repo = AppDataSource.getRepository(Institution);
       return repo.findOne({ where: { id: user.institutionId } });
+    },
+  },
+
+  Mutation: {
+    createInstitution: async (
+      _: unknown,
+      { name, domain, slug }: { name: string; domain?: string; slug?: string },
+      ctx: GraphQLContext
+    ) => {
+      requireRole(ctx, [UserRole.DIGICATION_ADMIN]);
+      const repo = AppDataSource.getRepository(Institution);
+
+      // Check name uniqueness
+      const existing = await repo.findOne({ where: { name } });
+      if (existing) {
+        throw new GraphQLError("An institution with this name already exists", {
+          extensions: { code: "BAD_REQUEST" },
+        });
+      }
+
+      return repo.save(
+        repo.create({
+          name,
+          domain: domain ?? null,
+          slug: slug ?? null,
+        })
+      );
+    },
+
+    updateInstitution: async (
+      _: unknown,
+      {
+        id,
+        name,
+        domain,
+        slug,
+      }: { id: string; name?: string; domain?: string; slug?: string },
+      ctx: GraphQLContext
+    ) => {
+      requireRole(ctx, [UserRole.DIGICATION_ADMIN]);
+      const repo = AppDataSource.getRepository(Institution);
+      const inst = await repo.findOne({ where: { id } });
+      if (!inst) {
+        throw new GraphQLError("Institution not found", {
+          extensions: { code: "NOT_FOUND" },
+        });
+      }
+
+      if (name !== undefined) inst.name = name;
+      if (domain !== undefined) inst.domain = domain;
+      if (slug !== undefined) inst.slug = slug;
+      return repo.save(inst);
     },
   },
 

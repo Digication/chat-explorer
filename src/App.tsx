@@ -12,9 +12,9 @@ import { Box, Typography, CircularProgress } from "@mui/material";
 import CsvUploadCard from "@/components/upload/CsvUploadCard";
 import InsightsPage from "@/pages/InsightsPage";
 import ChatExplorerPage from "@/pages/ChatExplorerPage";
-// AiChatPage is no longer used — AI Chat is embedded in ChatExplorerPage
 import ReportsPage from "@/pages/ReportsPage";
 import SettingsPage from "@/pages/SettingsPage";
+import AdminPage from "@/pages/AdminPage";
 import { InsightsScopeProvider } from "@/components/insights/ScopeSelector";
 
 function DashboardPage() {
@@ -71,6 +71,40 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+/**
+ * Redirects to / if the user's role is not in the allowed list.
+ */
+function RoleProtectedRoute({
+  children,
+  allowedRoles,
+}: {
+  children: React.ReactNode;
+  allowedRoles: string[];
+}) {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <Box
+        sx={{
+          height: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (!user?.role || !allowedRoles.includes(user.role)) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <ApolloProvider client={apolloClient}>
@@ -100,6 +134,14 @@ export default function App() {
                 <Route path="ai-chat" element={<Navigate to="/chat" replace />} />
                 <Route path="reports" element={<ReportsPage />} />
                 <Route path="settings" element={<SettingsPage />} />
+                <Route
+                  path="admin"
+                  element={
+                    <RoleProtectedRoute allowedRoles={["institution_admin", "digication_admin"]}>
+                      <AdminPage />
+                    </RoleProtectedRoute>
+                  }
+                />
               </Route>
               <Route path="*" element={<NotFoundPage />} />
             </Routes>

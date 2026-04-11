@@ -17,9 +17,11 @@ import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
+import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 import MenuIcon from "@mui/icons-material/Menu";
 import { sidebarTheme } from "@/lib/theme";
 import { HEADER_HEIGHT } from "./GlobalHeader";
+import { useAuth } from "@/lib/AuthProvider";
 
 const COLLAPSED_WIDTH = 60;
 const EXPANDED_WIDTH = 280;
@@ -41,6 +43,23 @@ function SidebarContent({
 }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  const isAdmin =
+    user?.role === "institution_admin" || user?.role === "digication_admin";
+
+  const navItems = [
+    ...NAV_ITEMS,
+    ...(isAdmin
+      ? [
+          {
+            label: "Admin",
+            icon: <AdminPanelSettingsOutlinedIcon />,
+            path: "/admin",
+          },
+        ]
+      : []),
+  ];
 
   const handleNav = (path: string) => {
     navigate(path);
@@ -59,7 +78,7 @@ function SidebarContent({
     >
       {/* Navigation items */}
       <List sx={{ flex: 1, pt: 2 }}>
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const active = location.pathname === item.path;
           return (
             <Tooltip

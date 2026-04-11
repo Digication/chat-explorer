@@ -46,9 +46,11 @@ export const resolvers = {
     ...consentResolvers.Mutation,
     ...exportResolvers.Mutation,
     ...adminResolvers.Mutation,
+    ...institutionResolvers.Mutation,
   },
 
   // Field resolvers
+  User: adminResolvers.User,
   Institution: institutionResolvers.Institution,
   Course: courseResolvers.Course,
   Assignment: courseResolvers.Assignment,

@@ -1,4 +1,5 @@
 import { createAuthClient } from "better-auth/react";
+import { magicLinkClient } from "better-auth/client/plugins";
 import { API_BASE } from "./api-base";
 
 // In dev, the auth cookie lives on localhost:4000 (a different origin from
@@ -8,8 +9,9 @@ import { API_BASE } from "./api-base";
 export const authClient = createAuthClient({
   baseURL: API_BASE,
   fetchOptions: {
-    credentials: "include",  // send cookies cross-origin
+    credentials: "include", // send cookies cross-origin
   },
+  plugins: [magicLinkClient()],
 });
 
 export const { useSession, signIn, signOut } = authClient;

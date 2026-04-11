@@ -15,7 +15,9 @@
     "test:watch": "vitest",
     "codegen": "graphql-codegen",
     "migration:generate": "typeorm migration:generate -d src/server/data-source.ts",
-    "migration:run": "typeorm migration:run -d src/server/data-source.ts"
+    "migration:run": "typeorm migration:run -d src/server/data-source.ts",
+    "e2e": "npx playwright test",
+    "e2e:headed": "npx playwright test --headed"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
@@ -26,6 +28,7 @@
     "@mui/icons-material": "^7.3.9",
     "@mui/material": "^7.3.9",
     "@react-pdf/renderer": "^4.3.2",
+    "@sendgrid/mail": "^8.1.6",
     "better-auth": "^1.5.6",
     "class-validator": "^0.15.1",
     "cookie-parser": "^1.4.7",
@@ -50,6 +53,7 @@
   "devDependencies": {
     "@graphql-codegen/cli": "^6.2.1",
     "@graphql-codegen/client-preset": "^5.2.4",
+    "@playwright/test": "^1.59.1",
     "@swc-node/register": "^1.11.1",
     "@swc/core": "^1.15.21",
     "@swc/helpers": "^0.5.20",

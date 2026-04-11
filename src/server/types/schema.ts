@@ -585,7 +585,7 @@ export const typeDefs = /* GraphQL */ `
     myExports: [ExportRequest!]!
 
     # Admin
-    users(institutionId: ID): [User!]!
+    users(institutionId: ID, search: String): [User!]!
     courseAccessList(courseId: ID!): [CourseAccessRecord!]!
 
     # TORI tags (reference data)
@@ -615,8 +615,12 @@ export const typeDefs = /* GraphQL */ `
     requestExport(scope: AnalyticsScopeInput!, format: ExportFormat!): ExportRequest!
 
     # Admin
+    inviteUser(email: String!, name: String!, institutionId: ID!, role: UserRole!): User!
     assignRole(userId: ID!, role: UserRole!): User!
     grantCourseAccess(userId: ID!, courseId: ID!, accessLevel: AccessLevel!): CourseAccessRecord!
     revokeCourseAccess(userId: ID!, courseId: ID!): Boolean!
+    updateUserInstitution(userId: ID!, institutionId: ID): User!
+    createInstitution(name: String!, domain: String, slug: String): Institution!
+    updateInstitution(id: ID!, name: String, domain: String, slug: String): Institution!
   }
 `;

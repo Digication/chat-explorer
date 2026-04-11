@@ -79,6 +79,21 @@ app.get("/auth/login/google", (req, res) => {
 // Better Auth handles all /api/auth/* routes
 app.all("/api/auth/*splat", toNodeHandler(auth));
 
+// Notify admin when an uninvited user's sign-in was blocked.
+// Called by the frontend when it detects a sign-up-disabled error.
+app.post("/api/notify-blocked-signin", express.json(), async (req, res) => {
+  const { name, email } = req.body || {};
+  if (email) {
+    try {
+      const { notifyAdminOfBlockedSignIn } = await import("./auth.js");
+      await notifyAdminOfBlockedSignIn(name || "Unknown", email);
+    } catch (err) {
+      console.error("[auth] Failed to send blocked sign-in notification:", err);
+    }
+  }
+  res.json({ ok: true });
+});
+
 // Health check
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
