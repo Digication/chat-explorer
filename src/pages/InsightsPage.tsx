@@ -1,10 +1,14 @@
 import React, { useState, useCallback } from "react";
+import { useNavigate } from "react-router";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
+import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import { useInsightsScope } from "@/components/insights/ScopeSelector";
 import SmartRecommendations from "@/components/insights/SmartRecommendations";
 import MetricsCards from "@/components/insights/MetricsCards";
 import HeatmapView from "@/components/insights/HeatmapView";
@@ -41,6 +45,9 @@ function Section({
 const DEPTH_HIDDEN_KEY = "chat-explorer:hideDepthSection";
 
 export default function InsightsPage() {
+  const navigate = useNavigate();
+  const { scope } = useInsightsScope();
+  const showCompareButton = scope && !scope.courseId; // Institution-level only
   const [openThread, setOpenThread] = useState<{
     threadId: string;
     studentName: string;
@@ -67,6 +74,20 @@ export default function InsightsPage() {
           pr: 2,
         }}
       >
+        {/* Compare Courses button — visible at institution level */}
+        {showCompareButton && (
+          <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<CompareArrowsIcon />}
+              onClick={() => navigate("/insights/compare")}
+            >
+              Compare Courses
+            </Button>
+          </Box>
+        )}
+
         {/* Smart recommendations (top of page) */}
         <SmartRecommendations />
 

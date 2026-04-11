@@ -398,6 +398,77 @@ export const typeDefs = /* GraphQL */ `
     category: ReflectionCategory!
   }
 
+  # ── Student Profile Types ─────────────────────────────────────
+
+  type EvidenceHighlight {
+    commentId: ID!
+    text: String!
+    category: ReflectionCategory!
+    evidenceQuote: String
+    rationale: String
+    assignmentName: String!
+    threadId: ID!
+    timestamp: String
+  }
+
+  type PerAssignmentBreakdown {
+    assignmentId: ID!
+    assignmentName: String!
+    date: String!
+    modalCategory: ReflectionCategory!
+    commentCount: Int!
+    categoryDistribution: ReflectionCategoryDistribution!
+  }
+
+  type StudentProfileReport {
+    studentId: ID!
+    name: String!
+    totalComments: Int!
+    totalWordCount: Int!
+    avgWordCount: Float!
+    threadCount: Int!
+    assignmentCount: Int!
+    overallCategoryDistribution: ReflectionCategoryDistribution!
+    perAssignment: [PerAssignmentBreakdown!]!
+    toriTagDistribution: [TagFrequency!]!
+    topToriTags: [String!]!
+    evidenceHighlights: [EvidenceHighlight!]!
+  }
+
+  type StudentProfileResult {
+    data: StudentProfileReport!
+    meta: AnalyticsMeta!
+  }
+
+  # ── Cross-Course Comparison Types ─────────────────────────────
+
+  type CourseMetricsSummary {
+    courseId: ID!
+    courseName: String!
+    studentCount: Int!
+    commentCount: Int!
+    threadCount: Int!
+    assignmentCount: Int!
+    categoryDistribution: ReflectionCategoryDistribution!
+    topToriTags: [String!]!
+    avgWordCount: Float!
+    growthRate: Float!
+  }
+
+  type CrossCourseComparison {
+    courses: [CourseMetricsSummary!]!
+  }
+
+  type CrossCourseResult {
+    data: CrossCourseComparison!
+    meta: AnalyticsMeta!
+  }
+
+  input CrossCourseInput {
+    institutionId: ID!
+    courseIds: [ID!]!
+  }
+
   type StudentGrowth {
     studentId: ID!
     name: String!
@@ -568,6 +639,8 @@ export const typeDefs = /* GraphQL */ `
     instructionalInsights(scope: AnalyticsScopeInput!): InsightsResult!
     recommendations(scope: AnalyticsScopeInput!): RecommendationsResult!
     growth(scope: AnalyticsScopeInput!): GrowthResult!
+    studentProfile(scope: AnalyticsScopeInput!, studentId: ID!): StudentProfileResult!
+    crossCourseComparison(input: CrossCourseInput!): CrossCourseResult!
 
     # Thread
     thread(id: ID!): Thread

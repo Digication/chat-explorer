@@ -4,6 +4,7 @@ import { CommentReflectionClassification } from "../../entities/CommentReflectio
 import type { AnalyticsScope, AnalyticsResult, ReflectionCategory } from "./types.js";
 import { resolveScope } from "./scope.js";
 import { withCache } from "./cache.js";
+import { modalOf } from "./utils.js";
 
 export interface GrowthDataPoint {
   assignmentId: string;
@@ -157,24 +158,4 @@ export async function getGrowth(
   };
 }
 
-// Picks the most common category. Ties break toward higher reflective depth.
-function modalOf(categories: ReflectionCategory[]): ReflectionCategory {
-  const counts = new Map<ReflectionCategory, number>();
-  for (const c of categories) counts.set(c, (counts.get(c) ?? 0) + 1);
-  let best: ReflectionCategory = DEFAULT_CATEGORY;
-  let bestCount = -1;
-  const order: ReflectionCategory[] = [
-    "DESCRIPTIVE_WRITING",
-    "DESCRIPTIVE_REFLECTION",
-    "DIALOGIC_REFLECTION",
-    "CRITICAL_REFLECTION",
-  ];
-  for (const cat of order) {
-    const n = counts.get(cat) ?? 0;
-    if (n >= bestCount) {
-      best = cat;
-      bestCount = n;
-    }
-  }
-  return best;
-}
+// modalOf() has been extracted to utils.ts for shared use.

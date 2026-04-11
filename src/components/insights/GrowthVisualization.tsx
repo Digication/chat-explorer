@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@apollo/client/react";
+import { useNavigate } from "react-router";
 import {
   Box,
   Typography,
@@ -36,6 +37,7 @@ interface GrowthVisualizationProps {
 export default function GrowthVisualization({ onViewThread }: GrowthVisualizationProps) {
   const { scope } = useInsightsScope();
   const { getDisplayName } = useUserSettings();
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>("sparklines");
   const [deltaA1, setDeltaA1] = useState<string>("");
   const [deltaA2, setDeltaA2] = useState<string>("");
@@ -103,10 +105,10 @@ export default function GrowthVisualization({ onViewThread }: GrowthVisualizatio
       </Box>
 
       {viewMode === "sparklines" && (
-        <SparklineView students={students} assignments={assignments} getDisplayName={getDisplayName} />
+        <SparklineView students={students} assignments={assignments} getDisplayName={getDisplayName} onNavigate={(id) => navigate(`/insights/student/${id}`)} />
       )}
       {viewMode === "matrix" && (
-        <MatrixView students={students} assignments={assignments} getDisplayName={getDisplayName} />
+        <MatrixView students={students} assignments={assignments} getDisplayName={getDisplayName} onNavigate={(id) => navigate(`/insights/student/${id}`)} />
       )}
       {viewMode === "delta" && (
         <DeltaView
@@ -129,9 +131,10 @@ interface ViewProps {
   students: any[];
   assignments: { id: string; name: string; date: string }[];
   getDisplayName: (name: string) => string;
+  onNavigate?: (studentId: string) => void;
 }
 
-function SparklineView({ students, assignments, getDisplayName }: ViewProps) {
+function SparklineView({ students, assignments, getDisplayName, onNavigate }: ViewProps) {
   const W = 200;
   const H = 48;
   const padding = 6;
@@ -178,7 +181,10 @@ function SparklineView({ students, assignments, getDisplayName }: ViewProps) {
 
           return (
             <tr key={s.studentId} style={{ borderBottom: "1px solid #eee" }}>
-              <td style={{ padding: "6px 8px", fontSize: "0.8rem", whiteSpace: "nowrap" }}>
+              <td
+                style={{ padding: "6px 8px", fontSize: "0.8rem", whiteSpace: "nowrap", cursor: "pointer", color: "#1976d2" }}
+                onClick={() => onNavigate?.(s.studentId)}
+              >
                 {getDisplayName(s.name)}
               </td>
               <td style={{ padding: "4px 8px" }}>
@@ -231,7 +237,7 @@ function SparklineView({ students, assignments, getDisplayName }: ViewProps) {
 
 // ── Matrix View ──────────────────────────────────────────────────────
 
-function MatrixView({ students, assignments, getDisplayName }: ViewProps) {
+function MatrixView({ students, assignments, getDisplayName, onNavigate }: ViewProps) {
   // Build lookup: studentId → assignmentId → category
   const lookup = useMemo(() => {
     const map = new Map<string, Map<string, string>>();
@@ -276,7 +282,10 @@ function MatrixView({ students, assignments, getDisplayName }: ViewProps) {
         <tbody>
           {students.map((s: any) => (
             <tr key={s.studentId}>
-              <td style={{ padding: "4px 8px", whiteSpace: "nowrap", position: "sticky", left: 0, background: "#fff", zIndex: 1 }}>
+              <td
+                style={{ padding: "4px 8px", whiteSpace: "nowrap", position: "sticky", left: 0, background: "#fff", zIndex: 1, cursor: "pointer", color: "#1976d2" }}
+                onClick={() => onNavigate?.(s.studentId)}
+              >
                 {getDisplayName(s.name)}
               </td>
               {assignments.map((a) => {

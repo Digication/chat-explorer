@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useQuery } from "@apollo/client/react";
+import { useNavigate } from "react-router";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -12,6 +13,8 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import TableSortLabel from "@mui/material/TableSortLabel";
 import Typography from "@mui/material/Typography";
+import IconButton from "@mui/material/IconButton";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { GET_STUDENT_ENGAGEMENT } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
 import EvidencePopover from "@/components/insights/EvidencePopover";
@@ -58,6 +61,7 @@ interface StudentPopoverState {
 export default function StudentEngagementTable({ onViewThread }: Props) {
   const { scope } = useInsightsScope();
   const { getDisplayName } = useUserSettings();
+  const navigate = useNavigate();
 
   const [sortKey, setSortKey] = useState<SortKey>("modalCategory");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -161,6 +165,7 @@ export default function StudentEngagementTable({ onViewThread }: Props) {
             </TableSortLabel>
           </TableCell>
           <TableCell>Top Tags</TableCell>
+          <TableCell />
         </TableRow>
       </TableHead>
       <TableBody>
@@ -169,17 +174,12 @@ export default function StudentEngagementTable({ onViewThread }: Props) {
 
           return (
             <TableRow key={student.studentId} hover>
-              {/* Student name — clickable for evidence */}
+              {/* Student name — clickable to view profile */}
               <TableCell
-                onClick={(e) =>
-                  setPopover({
-                    anchorEl: e.currentTarget as HTMLElement,
-                    studentId: student.studentId,
-                    studentName: student.name,
-                    commentCount: student.commentCount,
-                  })
+                onClick={() =>
+                  navigate(`/insights/student/${student.studentId}`)
                 }
-                sx={{ cursor: "pointer", "&:hover": { textDecoration: "underline" } }}
+                sx={{ cursor: "pointer", color: "primary.main", "&:hover": { textDecoration: "underline" } }}
               >
                 {getDisplayName(student.name)}
               </TableCell>
@@ -214,6 +214,24 @@ export default function StudentEngagementTable({ onViewThread }: Props) {
                     />
                   ))}
                 </Box>
+              </TableCell>
+
+              {/* Evidence popover trigger */}
+              <TableCell padding="none" sx={{ width: 36 }}>
+                <IconButton
+                  size="small"
+                  onClick={(e) =>
+                    setPopover({
+                      anchorEl: e.currentTarget as HTMLElement,
+                      studentId: student.studentId,
+                      studentName: student.name,
+                      commentCount: student.commentCount,
+                    })
+                  }
+                  aria-label="View evidence"
+                >
+                  <InfoOutlinedIcon fontSize="small" />
+                </IconButton>
               </TableCell>
             </TableRow>
           );

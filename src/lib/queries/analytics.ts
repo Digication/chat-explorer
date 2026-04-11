@@ -313,6 +313,97 @@ export const GET_GROWTH = gql`
   }
 `;
 
+/** Student profile report for a single student. */
+export const GET_STUDENT_PROFILE = gql`
+  query StudentProfile($scope: AnalyticsScopeInput!, $studentId: ID!) {
+    studentProfile(scope: $scope, studentId: $studentId) {
+      data {
+        studentId
+        name
+        totalComments
+        totalWordCount
+        avgWordCount
+        threadCount
+        assignmentCount
+        overallCategoryDistribution {
+          DESCRIPTIVE_WRITING
+          DESCRIPTIVE_REFLECTION
+          DIALOGIC_REFLECTION
+          CRITICAL_REFLECTION
+        }
+        perAssignment {
+          assignmentId
+          assignmentName
+          date
+          modalCategory
+          commentCount
+          categoryDistribution {
+            DESCRIPTIVE_WRITING
+            DESCRIPTIVE_REFLECTION
+            DIALOGIC_REFLECTION
+            CRITICAL_REFLECTION
+          }
+        }
+        toriTagDistribution {
+          tagId
+          tagName
+          domain
+          count
+          percent
+        }
+        topToriTags
+        evidenceHighlights {
+          commentId
+          text
+          category
+          evidenceQuote
+          rationale
+          assignmentName
+          threadId
+          timestamp
+        }
+      }
+      meta {
+        consentedStudentCount
+        excludedStudentCount
+        computedAt
+        cached
+      }
+    }
+  }
+`;
+
+/** Cross-course comparison metrics. */
+export const GET_CROSS_COURSE_COMPARISON = gql`
+  query CrossCourseComparison($input: CrossCourseInput!) {
+    crossCourseComparison(input: $input) {
+      data {
+        courses {
+          courseId
+          courseName
+          studentCount
+          commentCount
+          threadCount
+          assignmentCount
+          categoryDistribution {
+            DESCRIPTIVE_WRITING
+            DESCRIPTIVE_REFLECTION
+            DIALOGIC_REFLECTION
+            CRITICAL_REFLECTION
+          }
+          topToriTags
+          avgWordCount
+          growthRate
+        }
+      }
+      meta {
+        computedAt
+        cached
+      }
+    }
+  }
+`;
+
 /** All institutions (digication_admin only). */
 export const GET_INSTITUTIONS = gql`
   query Institutions {

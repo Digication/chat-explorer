@@ -15,6 +15,8 @@ import ChatExplorerPage from "@/pages/ChatExplorerPage";
 import ReportsPage from "@/pages/ReportsPage";
 import SettingsPage from "@/pages/SettingsPage";
 import AdminPage from "@/pages/AdminPage";
+import StudentProfilePage from "@/pages/StudentProfilePage";
+import CrossCourseComparisonPage from "@/pages/CrossCourseComparisonPage";
 import { InsightsScopeProvider } from "@/components/insights/ScopeSelector";
 
 function DashboardPage() {
@@ -129,6 +131,8 @@ export default function App() {
                 <Route index element={<Navigate to="/insights" replace />} />
                 <Route path="upload" element={<DashboardPage />} />
                 <Route path="insights" element={<InsightsPage />} />
+                <Route path="insights/compare" element={<CrossCourseComparisonPage />} />
+                <Route path="insights/student/:studentId" element={<StudentProfilePage />} />
                 <Route path="chat" element={<ChatExplorerPage />} />
                 {/* AI Chat is now embedded in Chat Explorer — redirect old URL */}
                 <Route path="ai-chat" element={<Navigate to="/chat" replace />} />
