@@ -1,6 +1,6 @@
 # Plan 4 — UX Polish & Interactivity Pass
 
-**Status:** Not started
+**Status:** ✅ Complete (merged to main 2026-04-10, commit `52d7dc2`)
 **Priority:** NEXT — execution order is Plan 1 -> 3 -> **4** -> 2 -> 5
 **Depends on:** Plan 3 (merged)
 

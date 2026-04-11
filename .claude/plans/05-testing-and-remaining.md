@@ -1,6 +1,6 @@
 # Plan 5 — Testing & Remaining Work
 
-**Status:** Not started
+**Status:** In progress (item 4 active, item 7 done)
 **Priority:** Last — execution order is Plan 1 -> 3 -> 4 -> 2 -> **5**
 **Depends on:** All other plans
 
