@@ -199,14 +199,15 @@ Key principles:
 | Insights | `components/insights/MetricsCards.tsx`, `components/insights/HeatmapView.tsx`, `components/insights/HeatmapControls.tsx`, `components/insights/ToriNetworkGraph.tsx`, `components/insights/CoOccurrenceList.tsx`, `components/insights/DepthBands.tsx`, `components/insights/SmartRecommendations.tsx` |
 | Chat Explorer | `components/explorer/StudentCarousel.tsx`, `components/explorer/StudentListPanel.tsx`, `components/explorer/ThreadView.tsx`, `components/explorer/CommentCard.tsx`, `components/explorer/ToriFilters.tsx`, `components/explorer/ConsentToggle.tsx` |
 | AI Chat | `components/ai/AiChatPanel.tsx`, `components/ai/ChatMessage.tsx`, `components/ai/SuggestionChips.tsx`, `components/ai/ContextScopeSelector.tsx`, `components/ai/ModelPicker.tsx`, `components/ai/ChatHistory.tsx` |
-| Export | `components/export/ExportDialog.tsx`, `components/export/ReportPreview.tsx` |
+| Export | `components/export/ExportDialog.tsx`, `components/export/ReportPreview.tsx`, `components/export/CourseReportPdf.tsx`, `components/export/renderPdfBlob.tsx`, `components/export/types.ts` |
 | Shared | `components/shared/ConsentBadge.tsx`, `components/shared/ToriChip.tsx`, `components/shared/UserAvatar.tsx` |
 
 ### Test Files
 | Category | Files |
 |----------|-------|
 | Unit | `src/server/services/__tests__/csv-parser.test.ts`, `src/server/services/__tests__/tori-extractor.test.ts`, `src/server/services/__tests__/consent.test.ts`, `src/server/services/__tests__/dedup.test.ts`, `src/server/services/analytics/__tests__/tori.test.ts`, `src/server/services/analytics/__tests__/text-signals.test.ts`, `src/server/services/analytics/__tests__/engagement.test.ts`, `src/server/services/analytics/__tests__/clustering.test.ts`, `src/server/services/analytics/__tests__/network.test.ts`, `src/server/services/analytics/__tests__/recommendations.test.ts`, `src/server/services/llm/__tests__/provider.test.ts` |
-| E2E | `e2e/login.spec.ts`, `e2e/csv-upload.spec.ts`, `e2e/insights.spec.ts`, `e2e/chat-explorer.spec.ts`, `e2e/consent.spec.ts`, `e2e/ai-chat.spec.ts` |
+| Export unit | `src/components/export/__tests__/CourseReportPdf.test.tsx`, `src/components/export/__tests__/renderPdfBlob.test.tsx`, `src/components/export/__tests__/ExportDialog.test.tsx`, `src/server/resolvers/export.test.ts`, `src/server/services/export-pdf.test.ts` |
+| E2E | `e2e/login.spec.ts`, `e2e/csv-upload.spec.ts`, `e2e/insights.spec.ts`, `e2e/chat-explorer.spec.ts`, `e2e/consent.spec.ts`, `e2e/ai-chat.spec.ts`, `e2e/export.spec.ts` |
 
 ### Skill Files
 | Category | Files |

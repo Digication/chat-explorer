@@ -217,11 +217,14 @@ A dedicated page accessible from the sidebar that:
 
 | File | Purpose |
 |------|---------|
-| `src/server/services/export-pdf.ts` | PDF report generation with @react-pdf/renderer |
+| `src/server/services/export-pdf.ts` | PDF report data generation (CourseReport JSON) |
 | `src/server/services/export-csv.ts` | CSV data export with json2csv |
 | `src/pages/ReportsPage.tsx` | Reports & Export page |
 | `src/components/export/ExportDialog.tsx` | Export configuration modal |
 | `src/components/export/ReportPreview.tsx` | Pre-generation preview of report contents |
+| `src/components/export/types.ts` | Shared `CourseReport` interface for client |
+| `src/components/export/CourseReportPdf.tsx` | React PDF document component (@react-pdf/renderer) |
+| `src/components/export/renderPdfBlob.tsx` | Async helper: `pdf().toBlob()` for client-side PDF rendering |
 
 ## Files to Modify
 
@@ -231,15 +234,60 @@ A dedicated page accessible from the sidebar that:
 | `src/App.tsx` | Add /reports route |
 | `src/components/layout/Sidebar.tsx` | Add Reports navigation link |
 
+## Test Files
+
+| File | Purpose |
+|------|---------|
+| `src/components/export/__tests__/CourseReportPdf.test.tsx` | Component instantiation (4 tests) |
+| `src/components/export/__tests__/renderPdfBlob.test.tsx` | PDF blob output validation (2 tests) |
+| `src/components/export/__tests__/ExportDialog.test.tsx` | Dialog UI + CSV/PDF mutation flows (6 tests) |
+| `src/server/resolvers/export.test.ts` | Resolver auth, validation, response shapes (8 tests) |
+| `src/server/services/export-pdf.test.ts` | Service output shape, rounding, limits (9 tests) |
+| `e2e/export.spec.ts` | Page structure, dialog interactions, downloads (10 tests) |
+
+## Implementation Status
+
+### Completed
+
+- [x] **Step 1** — CSV export service (`export-csv.ts`) with consent filtering
+- [x] **Step 2** — PDF report data service (`export-pdf.ts`) returning CourseReport JSON
+- [x] **Step 3** — Export GraphQL resolver (`export.ts`) with auth checks
+- [x] **Step 4** — ExportDialog component with format picker, course selector, preview
+- [x] **Step 5** — ReportPreview component showing data summary before generation
+- [x] **Step 6** — ReportsPage with 3 report type cards (Course Analytics PDF, Raw Data CSV, TORI Summary CSV)
+- [x] **Step 7** — Wired into App.tsx (`/reports` route) and Sidebar navigation
+- [x] **Client-side PDF rendering** — `CourseReportPdf.tsx` renders structured report using `@react-pdf/renderer` (Document/Page/View/Text), `renderPdfBlob.tsx` provides `pdf().toBlob()` helper, ExportDialog decodes server JSON and renders to PDF blob in-browser
+- [x] **Full test coverage** — 39 new tests across 6 test files (unit + e2e)
+
+### Architecture
+
+PDF generation uses a **client-side rendering** approach:
+1. Server returns `CourseReport` JSON as a base64 data URL (lightweight, fast)
+2. Client decodes the JSON and passes it to `@react-pdf/renderer`
+3. `pdf(<CourseReportPdf />).toBlob()` renders a real PDF in the browser
+4. The blob is converted to an object URL and triggers a browser download
+
+This avoids server-side PDF rendering dependencies (no Puppeteer, no headless Chrome) while producing styled, multi-section reports.
+
+### PDF Report Sections
+
+The generated PDF includes:
+1. **Header** — course name, generation date, horizontal rule
+2. **Overview stats** — 4 boxes: comments, threads, participants, TORI tags
+3. **TORI Frequency table** — tag name, domain, count, percent with alternating row backgrounds
+4. **Reflection Depth Distribution** — Hatton & Smith depth bands with counts and percentages
+5. **Top Tag Co-occurrences** — numbered list of tag pairs
+
 ## Verification
 
 ```bash
 docker compose up -d --build
 docker compose exec app pnpm typecheck
-docker compose exec app pnpm build
+docker compose exec app pnpm test
+docker compose run --rm e2e
 ```
 
-Expected: TypeScript compiles. Vite build succeeds. The Reports page renders in the browser. The ExportDialog opens with format and scope options. Generating a CSV export produces a valid CSV file. Generating a PDF export produces a downloadable PDF with the correct header, data tables, and no consent-excluded students.
+Expected: TypeScript compiles. All 151 unit tests pass (27 files). The Reports page renders in the browser. The ExportDialog opens with format and scope options. Generating a CSV export produces a valid CSV file. Generating a PDF export produces a downloadable PDF (verified: 11KB, `%PDF-` header, `application/pdf` MIME type) with correct header, data tables, and no consent-excluded students.
 
 ## When done
 
