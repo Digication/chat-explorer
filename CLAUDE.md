@@ -8,6 +8,13 @@
 # Reference repos (read-only, for UI/pattern reference)
 - **campus-web** — `/Users/jeffreyyan/code/file-based-reflections/campus-web`. This is the Digication Campus web app. It is the source of truth for the UI look-and-feel this project should match: dark sidebar, bottom bar + student carousel spacing, slide-out panels, AI chat history pattern (auto-load latest chat on open, not a fresh one), and general Digication design language. When asked to match "Campus UI" or "Digication patterns", read this repo directly — do NOT rely on memory.
 
+# CI/CD
+- **CI:** GitHub Actions (`.github/workflows/ci.yml`)
+  - Every push: typecheck + client unit tests
+  - PRs to main: typecheck + all tests (unit + integration) + build
+- **Deploy:** Railway auto-deploys on merge to `main`
+- **Branch protection:** Recommended but not yet enforced (see `docs/implementation-plan/test-coverage/08-ci-cd.md`)
+
 # Production
 - **Hosted on:** Railway (Pro plan), project `chat-explorer`
 - **URL:** https://chat-explorer.digication.com
