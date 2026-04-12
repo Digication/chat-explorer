@@ -20,7 +20,7 @@
     "e2e:headed": "npx playwright test --headed"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.80.0",
+    "@anthropic-ai/sdk": "^0.88.0",
     "@apollo/client": "^4.1.6",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
@@ -29,7 +29,7 @@
     "@mui/material": "^7.3.9",
     "@react-pdf/renderer": "^4.3.2",
     "@sendgrid/mail": "^8.1.6",
-    "better-auth": "^1.5.6",
+    "better-auth": "^1.6.2",
     "class-validator": "^0.15.1",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
@@ -73,7 +73,13 @@
     "jsdom": "^29.0.1",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
-    "vite": "^8.0.3",
+    "vite": "^8.0.8",
     "vitest": "^4.1.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "lodash": ">=4.18.0",
+      "defu": ">=6.1.5"
+    }
   }
 }
