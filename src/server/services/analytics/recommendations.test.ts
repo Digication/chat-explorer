@@ -328,9 +328,9 @@ describe("getRecommendations", () => {
 
   it("clustering: max ≥ 70% → no clustering rec", async () => {
     // 10 students: DW=7, DR=1, DLG=1, CR=1 → max=7, 7/10=0.7 → NOT < 0.7
-    const perStudent = Array.from({ length: 7 }, (_, i) => ({
+    const perStudent: Array<{ studentId: string; modalCategory: string; categoryDistribution: Record<string, number>; commentCount: number }> = Array.from({ length: 7 }, (_, i) => ({
       studentId: `s${i}`,
-      modalCategory: "DESCRIPTIVE_WRITING" as const,
+      modalCategory: "DESCRIPTIVE_WRITING",
       categoryDistribution: { DESCRIPTIVE_WRITING: 1, DESCRIPTIVE_REFLECTION: 0, DIALOGIC_REFLECTION: 0, CRITICAL_REFLECTION: 0 },
       commentCount: 1,
     }));

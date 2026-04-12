@@ -68,7 +68,7 @@ function makeCtx(
   };
 }
 
-const noUserCtx: GraphQLContext = { user: undefined };
+const noUserCtx: GraphQLContext = { user: null };
 
 describe("export resolvers", () => {
   beforeEach(() => {

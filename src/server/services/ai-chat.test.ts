@@ -38,7 +38,7 @@ repos.set(ToriTag, makeMockRepo());
 const mockGetRepository = vi.fn((entity: unknown) => repos.get(entity) ?? makeMockRepo());
 
 vi.mock("../data-source.js", () => ({
-  AppDataSource: { getRepository: (...args: unknown[]) => mockGetRepository(...args) },
+  AppDataSource: { getRepository: (entity: unknown) => mockGetRepository(entity) },
 }));
 
 // ── LLM mock — CRITICAL: match the barrel import path ──────────────

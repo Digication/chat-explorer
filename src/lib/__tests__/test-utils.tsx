@@ -17,7 +17,7 @@ export function renderWithProviders({
   children: ReactNode;
 }) {
   return (
-    <MockedProvider mocks={mocks} addTypename={false}>
+    <MockedProvider mocks={mocks}>
       <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>
     </MockedProvider>
   );

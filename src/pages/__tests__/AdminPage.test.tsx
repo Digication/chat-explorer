@@ -23,7 +23,7 @@ function renderAdminPage(role = "digication_admin", initialEntries = ["/admin"])
   });
 
   return render(
-    <MockedProvider mocks={[]} addTypename={false}>
+    <MockedProvider mocks={[]}>
       <MemoryRouter initialEntries={initialEntries}>
         <AdminPage />
       </MemoryRouter>

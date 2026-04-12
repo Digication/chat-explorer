@@ -54,7 +54,7 @@ function getAccessListMock(courseId = "c1"): MockedResponse {
 
 function renderCourseAccessTab(mocks: MockedResponse[] = []) {
   return render(
-    <MockedProvider mocks={mocks} addTypename={false}>
+    <MockedProvider mocks={mocks}>
       <MemoryRouter>
         <CourseAccessTab />
       </MemoryRouter>

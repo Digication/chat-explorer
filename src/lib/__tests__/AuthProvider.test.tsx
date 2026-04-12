@@ -42,7 +42,7 @@ describe("AuthProvider", () => {
     mockUseSession.mockReturnValue({ data: null, isPending: false });
 
     render(
-      <MockedProvider mocks={[]} addTypename={false}>
+      <MockedProvider mocks={[]}>
         <AuthProvider>
           <AuthConsumer />
         </AuthProvider>
@@ -77,7 +77,7 @@ describe("AuthProvider", () => {
     };
 
     render(
-      <MockedProvider mocks={[meMock]} addTypename={false}>
+      <MockedProvider mocks={[meMock]}>
         <AuthProvider>
           <AuthConsumer />
         </AuthProvider>
@@ -94,7 +94,7 @@ describe("AuthProvider", () => {
     mockUseSession.mockReturnValue({ data: null, isPending: true });
 
     render(
-      <MockedProvider mocks={[]} addTypename={false}>
+      <MockedProvider mocks={[]}>
         <AuthProvider>
           <AuthConsumer />
         </AuthProvider>

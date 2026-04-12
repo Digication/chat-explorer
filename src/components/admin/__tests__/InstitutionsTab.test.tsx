@@ -23,7 +23,7 @@ function getInstitutionsMock(
 
 function renderInstitutionsTab(mocks: MockedResponse[] = []) {
   return render(
-    <MockedProvider mocks={mocks} addTypename={false}>
+    <MockedProvider mocks={mocks}>
       <MemoryRouter>
         <InstitutionsTab />
       </MemoryRouter>
