@@ -51,6 +51,29 @@ services:
     networks:
       - default
 
+  e2e:
+    image: mcr.microsoft.com/playwright:v1.59.1-noble
+    container_name: chat-explorer-e2e
+    working_dir: /app
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        corepack enable &&
+        corepack prepare --activate &&
+        pnpm install --frozen-lockfile &&
+        npx playwright test --reporter=line
+    environment:
+      E2E_BASE_URL: http://app:5173
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      - app
+    profiles:
+      - e2e
+    networks:
+      - default
+
 networks:
   web:
     external: true
