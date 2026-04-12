@@ -68,10 +68,10 @@ const METRICS: MetricDef[] = [
 
 interface MetricsCardsProps {
   /** Called when a student is selected from the drill-down popover. */
-  onViewThread?: (threadId: string, studentName: string) => void;
+  onOpenStudent?: (studentId: string, studentName: string) => void;
 }
 
-export default function MetricsCards({ onViewThread }: MetricsCardsProps) {
+export default function MetricsCards({ onOpenStudent }: MetricsCardsProps) {
   const { scope } = useInsightsScope();
   const [drillDown, setDrillDown] = useState<{
     anchorEl: HTMLElement;
@@ -129,8 +129,8 @@ export default function MetricsCards({ onViewThread }: MetricsCardsProps) {
 
   /** Called when a student is selected in the drill-down. */
   const handleSelectStudent = (studentId: string, studentName: string) => {
-    if (onViewThread) {
-      onViewThread(studentId, studentName);
+    if (onOpenStudent) {
+      onOpenStudent(studentId, studentName);
     }
   };
 

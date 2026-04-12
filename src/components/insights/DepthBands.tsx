@@ -16,7 +16,7 @@ import StudentDrillDown, { type StudentItem } from "@/components/insights/Studen
 import { CATEGORY_CONFIG } from "@/lib/reflection-categories";
 
 interface DepthBandsProps {
-  onViewThread?: (threadId: string, studentName: string) => void;
+  onOpenStudent?: (studentId: string, studentName: string) => void;
 }
 
 interface DrillDownState {
@@ -25,7 +25,7 @@ interface DrillDownState {
   students: StudentItem[];
 }
 
-export default function DepthBands({ onViewThread }: DepthBandsProps) {
+export default function DepthBands({ onOpenStudent }: DepthBandsProps) {
   const { scope } = useInsightsScope();
   const [drillDown, setDrillDown] = useState<DrillDownState | null>(null);
 
@@ -108,8 +108,8 @@ export default function DepthBands({ onViewThread }: DepthBandsProps) {
   };
 
   const handleSelectStudent = (studentId: string, studentName: string) => {
-    if (onViewThread) {
-      onViewThread(studentId, studentName);
+    if (onOpenStudent) {
+      onOpenStudent(studentId, studentName);
     }
   };
 
@@ -174,7 +174,11 @@ export default function DepthBands({ onViewThread }: DepthBandsProps) {
         </TableHead>
         <TableBody>
           {categories.map((c) => (
-            <TableRow key={c.key}>
+            <TableRow
+              key={c.key}
+              onClick={(e) => handleCategoryClick(e as any, c.key)}
+              sx={{ cursor: "pointer", "&:hover": { bgcolor: "action.hover" } }}
+            >
               <TableCell>
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <Box

@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@apollo/client/react";
-import { useNavigate } from "react-router";
 import {
   Box,
   Typography,
@@ -31,13 +30,12 @@ const CATEGORY_ORDER: Record<string, number> = Object.fromEntries(
 const MAX_ORDINAL = CATEGORY_CONFIG.length - 1;
 
 interface GrowthVisualizationProps {
-  onViewThread?: (threadId: string, studentName: string) => void;
+  onOpenStudent?: (studentId: string, studentName: string) => void;
 }
 
-export default function GrowthVisualization({ onViewThread }: GrowthVisualizationProps) {
+export default function GrowthVisualization({ onOpenStudent }: GrowthVisualizationProps) {
   const { scope } = useInsightsScope();
   const { getDisplayName } = useUserSettings();
-  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>("matrix");
   const [deltaA1, setDeltaA1] = useState<string>("");
   const [deltaA2, setDeltaA2] = useState<string>("");
@@ -105,16 +103,17 @@ export default function GrowthVisualization({ onViewThread }: GrowthVisualizatio
       </Box>
 
       {viewMode === "sparklines" && (
-        <SparklineView students={students} assignments={assignments} getDisplayName={getDisplayName} onNavigate={(id) => navigate(`/insights/student/${id}`)} />
+        <SparklineView students={students} assignments={assignments} getDisplayName={getDisplayName} onNavigate={(id, name) => onOpenStudent?.(id, name)} />
       )}
       {viewMode === "matrix" && (
-        <MatrixView students={students} assignments={assignments} getDisplayName={getDisplayName} onNavigate={(id) => navigate(`/insights/student/${id}`)} />
+        <MatrixView students={students} assignments={assignments} getDisplayName={getDisplayName} onNavigate={(id, name) => onOpenStudent?.(id, name)} />
       )}
       {viewMode === "delta" && (
         <DeltaView
           students={students}
           assignments={assignments}
           getDisplayName={getDisplayName}
+          onNavigate={(id, name) => onOpenStudent?.(id, name)}
           a1={deltaA1}
           a2={deltaA2}
           onA1Change={setDeltaA1}
@@ -131,7 +130,7 @@ interface ViewProps {
   students: any[];
   assignments: { id: string; name: string; date: string }[];
   getDisplayName: (name: string) => string;
-  onNavigate?: (studentId: string) => void;
+  onNavigate?: (studentId: string, studentName: string) => void;
 }
 
 function SparklineView({ students, assignments, getDisplayName, onNavigate }: ViewProps) {
@@ -183,7 +182,7 @@ function SparklineView({ students, assignments, getDisplayName, onNavigate }: Vi
             <tr key={s.studentId} style={{ borderBottom: "1px solid #eee" }}>
               <td
                 style={{ padding: "6px 8px", fontSize: "0.8rem", whiteSpace: "nowrap", cursor: "pointer", color: "#1976d2" }}
-                onClick={() => onNavigate?.(s.studentId)}
+                onClick={() => onNavigate?.(s.studentId, s.name)}
               >
                 {getDisplayName(s.name)}
               </td>
@@ -284,7 +283,7 @@ function MatrixView({ students, assignments, getDisplayName, onNavigate }: ViewP
             <tr key={s.studentId}>
               <td
                 style={{ padding: "4px 8px", whiteSpace: "nowrap", position: "sticky", left: 0, background: "#fff", zIndex: 1, cursor: "pointer", color: "#1976d2" }}
-                onClick={() => onNavigate?.(s.studentId)}
+                onClick={() => onNavigate?.(s.studentId, s.name)}
               >
                 {getDisplayName(s.name)}
               </td>
@@ -331,7 +330,7 @@ interface DeltaViewProps extends ViewProps {
   onA2Change: (id: string) => void;
 }
 
-function DeltaView({ students, assignments, getDisplayName, a1, a2, onA1Change, onA2Change }: DeltaViewProps) {
+function DeltaView({ students, assignments, getDisplayName, onNavigate, a1, a2, onA1Change, onA2Change }: DeltaViewProps) {
   // Default to first and last assignment
   const effectiveA1 = a1 || (assignments.length > 0 ? assignments[0].id : "");
   const effectiveA2 = a2 || (assignments.length > 1 ? assignments[assignments.length - 1].id : "");
@@ -405,7 +404,10 @@ function DeltaView({ students, assignments, getDisplayName, a1, a2, onA1Change, 
           <tbody>
             {deltas.map((d: any) => (
               <tr key={d.studentId} style={{ borderBottom: "1px solid #eee" }}>
-                <td style={{ padding: "6px 8px" }}>{getDisplayName(d.name)}</td>
+                <td
+                  onClick={() => onNavigate?.(d.studentId, d.name)}
+                  style={{ padding: "6px 8px", cursor: "pointer", color: "#1976d2" }}
+                >{getDisplayName(d.name)}</td>
                 <td style={{ padding: "6px 8px", textAlign: "center" }}>
                   <Chip
                     label={CATEGORY_CONFIG.find((c) => c.key === d.categoryBefore)?.shortLabel ?? d.categoryBefore}

@@ -37,8 +37,16 @@ export default function InsightsPage() {
   const { scope } = useInsightsScope();
   const panel = useFacultyPanel();
 
-  // Thread/evidence clicks open in the Faculty Panel
-  const handleViewThread = useCallback(
+  // Student name clicks → open Student Profile in Faculty Panel
+  const handleOpenStudent = useCallback(
+    (studentId: string, studentName: string) => {
+      panel.openStudentProfile(studentId, studentName);
+    },
+    [panel.openStudentProfile],
+  );
+
+  // Thread/evidence clicks → open Thread in Faculty Panel
+  const handleOpenThread = useCallback(
     (threadId: string, studentName: string) => {
       panel.openThread(threadId, studentName);
     },
@@ -56,36 +64,39 @@ export default function InsightsPage() {
         }}
       >
         {/* Overview metric cards */}
-        <MetricsCards onViewThread={handleViewThread} />
+        <MetricsCards onOpenStudent={handleOpenStudent} />
 
         {/* Heatmap — with drill-down */}
         <Section id="heatmap" title="Reflection Heatmap">
-          <HeatmapView onViewThread={handleViewThread} />
+          <HeatmapView onViewThread={handleOpenThread} />
         </Section>
 
         {/* TORI tag frequency bars */}
         <Section id="tori-frequencies" title="TORI Tag Frequencies">
-          <ToriTagFrequencies onViewThread={handleViewThread} />
+          <ToriTagFrequencies onViewThread={handleOpenThread} />
         </Section>
 
         {/* Network graph */}
         <Section id="network" title="TORI Network">
-          <ToriNetworkGraph onViewThread={handleViewThread} />
+          <ToriNetworkGraph onViewThread={handleOpenThread} />
         </Section>
 
         {/* Reflection depth bands */}
         <Section id="depth" title="Reflection Depth">
-          <DepthBands onViewThread={handleViewThread} />
+          <DepthBands onOpenStudent={handleOpenStudent} />
         </Section>
 
         {/* Student engagement table */}
         <Section id="engagement-table" title="Student Engagement">
-          <StudentEngagementTable onViewThread={handleViewThread} />
+          <StudentEngagementTable
+            onOpenStudent={handleOpenStudent}
+            onViewThread={handleOpenThread}
+          />
         </Section>
 
         {/* Student growth over time */}
         <Section id="growth" title="Student Growth Over Time">
-          <GrowthVisualization onViewThread={handleViewThread} />
+          <GrowthVisualization onOpenStudent={handleOpenStudent} />
         </Section>
 
         {/* Co-occurrence patterns */}
