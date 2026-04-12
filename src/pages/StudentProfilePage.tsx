@@ -59,8 +59,19 @@ function Section({
   );
 }
 
-export default function StudentProfilePage() {
-  const { studentId } = useParams<{ studentId: string }>();
+interface StudentProfilePageProps {
+  /** When provided, uses this instead of route params. */
+  studentId?: string;
+  /** When true, hides breadcrumb and reduces padding for panel embedding. */
+  embedded?: boolean;
+}
+
+export default function StudentProfilePage({
+  studentId: propStudentId,
+  embedded,
+}: StudentProfilePageProps = {}) {
+  const { studentId: routeStudentId } = useParams<{ studentId: string }>();
+  const studentId = propStudentId ?? routeStudentId;
   const { scope } = useInsightsScope();
   const { getDisplayName } = useUserSettings();
 
@@ -91,10 +102,14 @@ export default function StudentProfilePage() {
     }
   );
 
+  const wrapperSx = embedded
+    ? { py: 2, px: 1 }
+    : { maxWidth: 1000, mx: "auto", py: 4, px: 3 };
+
   // ── Loading state ──────────────────────────────────────────────
   if (loading || (!data && !error)) {
     return (
-      <Box sx={{ maxWidth: 1000, mx: "auto", py: 4, px: 3 }}>
+      <Box sx={wrapperSx}>
         <Skeleton variant="text" width={300} height={32} sx={{ mb: 2 }} />
         <Grid container spacing={2} sx={{ mb: 4 }}>
           {[0, 1, 2, 3].map((i) => (
@@ -112,7 +127,7 @@ export default function StudentProfilePage() {
   // ── Error state ────────────────────────────────────────────────
   if (error) {
     return (
-      <Box sx={{ maxWidth: 1000, mx: "auto", py: 4, px: 3 }}>
+      <Box sx={wrapperSx}>
         <Alert
           severity="error"
           action={
@@ -135,13 +150,15 @@ export default function StudentProfilePage() {
   // ── Empty state ────────────────────────────────────────────────
   if (profile.totalComments === 0) {
     return (
-      <Box sx={{ maxWidth: 1000, mx: "auto", py: 4, px: 3 }}>
-        <Breadcrumbs sx={{ mb: 3 }}>
-          <Link component={RouterLink} to="/insights" underline="hover">
-            Insights
-          </Link>
-          <Typography color="text.primary">Student Profile</Typography>
-        </Breadcrumbs>
+      <Box sx={wrapperSx}>
+        {!embedded && (
+          <Breadcrumbs sx={{ mb: 3 }}>
+            <Link component={RouterLink} to="/insights" underline="hover">
+              Insights
+            </Link>
+            <Typography color="text.primary">Student Profile</Typography>
+          </Breadcrumbs>
+        )}
         <Paper
           variant="outlined"
           sx={{ p: 6, textAlign: "center" }}
@@ -149,9 +166,11 @@ export default function StudentProfilePage() {
           <Typography color="text.secondary" sx={{ mb: 2 }}>
             No reflection data found for this student in the current scope.
           </Typography>
-          <Button component={RouterLink} to="/insights" variant="outlined">
-            Back to Insights
-          </Button>
+          {!embedded && (
+            <Button component={RouterLink} to="/insights" variant="outlined">
+              Back to Insights
+            </Button>
+          )}
         </Paper>
       </Box>
     );
@@ -172,17 +191,19 @@ export default function StudentProfilePage() {
   ).key;
 
   return (
-    <Box sx={{ display: "flex", p: 4 }}>
-      <Box sx={{ flex: 1, minWidth: 0, maxWidth: 1000, mx: "auto", py: 4, px: 2 }}>
-        {/* ── Breadcrumb ──────────────────────────────────────── */}
-        <Breadcrumbs sx={{ mb: 3 }}>
-          <Link component={RouterLink} to="/insights" underline="hover">
-            Insights
-          </Link>
-          <Typography color="text.primary">
-            Student Profile: {displayName}
-          </Typography>
-        </Breadcrumbs>
+    <Box sx={embedded ? { p: 1 } : { display: "flex", p: 4 }}>
+      <Box sx={embedded ? {} : { flex: 1, minWidth: 0, maxWidth: 1000, mx: "auto", py: 4, px: 2 }}>
+        {/* ── Breadcrumb (hidden when embedded in panel) ──────── */}
+        {!embedded && (
+          <Breadcrumbs sx={{ mb: 3 }}>
+            <Link component={RouterLink} to="/insights" underline="hover">
+              Insights
+            </Link>
+            <Typography color="text.primary">
+              Student Profile: {displayName}
+            </Typography>
+          </Breadcrumbs>
+        )}
 
         {/* ── Summary Cards ───────────────────────────────────── */}
         <Grid container spacing={2} sx={{ mb: 4 }}>
@@ -332,8 +353,8 @@ export default function StudentProfilePage() {
         </Section>
       </Box>
 
-      {/* ── Thread Panel (slide-in) ─────────────────────────────── */}
-      {openThread && (
+      {/* ── Thread Panel (slide-in) — only when not embedded ──── */}
+      {!embedded && openThread && (
         <>
           <Box
             onClick={() => setOpenThread(null)}

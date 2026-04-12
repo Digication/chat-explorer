@@ -15,9 +15,11 @@ interface ThreadPanelProps {
   threadId: string;
   studentName: string;
   onClose: () => void;
+  /** When true, renders as normal-flow component instead of fixed overlay. */
+  embedded?: boolean;
 }
 
-export default function ThreadPanel({ threadId, studentName, onClose }: ThreadPanelProps) {
+export default function ThreadPanel({ threadId, studentName, onClose, embedded }: ThreadPanelProps) {
   const { getDisplayName } = useUserSettings();
   const { data, loading, error, refetch } = useQuery<any>(GET_THREAD_BY_ID, {
     variables: { id: threadId },
@@ -27,20 +29,29 @@ export default function ThreadPanel({ threadId, studentName, onClose }: ThreadPa
 
   return (
     <Box
-      sx={{
-        position: "fixed",
-        top: 52, // below GlobalHeader (HEADER_HEIGHT)
-        right: 0,
-        bottom: 0,
-        width: 420,
-        zIndex: 1100,
-        bgcolor: "background.paper",
-        borderLeft: 1,
-        borderColor: "divider",
-        display: "flex",
-        flexDirection: "column",
-        boxShadow: 6,
-      }}
+      sx={
+        embedded
+          ? {
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
+              bgcolor: "background.paper",
+            }
+          : {
+              position: "fixed",
+              top: 52,
+              right: 0,
+              bottom: 0,
+              width: 420,
+              zIndex: 1100,
+              bgcolor: "background.paper",
+              borderLeft: 1,
+              borderColor: "divider",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: 6,
+            }
+      }
     >
       {/* Sticky header */}
       <Box

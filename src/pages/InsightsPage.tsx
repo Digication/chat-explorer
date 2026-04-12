@@ -1,8 +1,9 @@
-import React, { useState, useCallback } from "react";
+import React, { useCallback } from "react";
 import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
+import { useFacultyPanel } from "@/components/faculty-panel/FacultyPanelContext";
 import MetricsCards from "@/components/insights/MetricsCards";
 import HeatmapView from "@/components/insights/HeatmapView";
 import ToriNetworkGraph from "@/components/insights/ToriNetworkGraph";
@@ -10,7 +11,6 @@ import DepthBands from "@/components/insights/DepthBands";
 import CoOccurrenceList from "@/components/insights/CoOccurrenceList";
 import ToriTagFrequencies from "@/components/insights/ToriTagFrequencies";
 import StudentEngagementTable from "@/components/insights/StudentEngagementTable";
-import ThreadPanel from "@/components/insights/ThreadPanel";
 import GrowthVisualization from "@/components/insights/GrowthVisualization";
 
 /** Consistent wrapper for each analytics section. */
@@ -35,27 +35,24 @@ function Section({
 
 export default function InsightsPage() {
   const { scope } = useInsightsScope();
-  const [openThread, setOpenThread] = useState<{
-    threadId: string;
-    studentName: string;
-  } | null>(null);
+  const panel = useFacultyPanel();
 
-  const handleViewThread = useCallback((threadId: string, studentName: string) => {
-    setOpenThread({ threadId, studentName });
-  }, []);
+  // Thread/evidence clicks open in the Faculty Panel
+  const handleViewThread = useCallback(
+    (threadId: string, studentName: string) => {
+      panel.openThread(threadId, studentName);
+    },
+    [panel.openThread],
+  );
 
   return (
-    <Box sx={{ display: "flex", p: 4 }}>
-      {/* Main insights content — shrinks when fixed panel is open */}
+    <Box sx={{ p: 4 }}>
       <Box
         sx={{
-          flex: 1,
-          minWidth: 0,
           maxWidth: 1200,
           mx: "auto",
           py: 4,
           px: 2,
-          pr: 2,
         }}
       >
         {/* Overview metric cards */}
@@ -76,7 +73,7 @@ export default function InsightsPage() {
           <ToriNetworkGraph onViewThread={handleViewThread} />
         </Section>
 
-        {/* Reflection depth bands — moved above student engagement */}
+        {/* Reflection depth bands */}
         <Section id="depth" title="Reflection Depth">
           <DepthBands onViewThread={handleViewThread} />
         </Section>
@@ -96,26 +93,6 @@ export default function InsightsPage() {
           <CoOccurrenceList />
         </Section>
       </Box>
-
-      {/* Slide-in thread panel with backdrop */}
-      {openThread && (
-        <>
-          <Box
-            onClick={() => setOpenThread(null)}
-            sx={{
-              position: "fixed",
-              inset: 0,
-              zIndex: 1099,
-              bgcolor: "rgba(0,0,0,0.15)",
-            }}
-          />
-          <ThreadPanel
-            threadId={openThread.threadId}
-            studentName={openThread.studentName}
-            onClose={() => setOpenThread(null)}
-          />
-        </>
-      )}
     </Box>
   );
 }

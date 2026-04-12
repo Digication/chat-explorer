@@ -24,7 +24,6 @@ describe("StudentCarousel", () => {
         students={students}
         selectedIds={[]}
         onSelect={() => {}}
-        onToggle={() => {}}
       />
     );
     // MUI Avatar renders text initials — look for Avatar elements
@@ -32,39 +31,33 @@ describe("StudentCarousel", () => {
     expect(avatars.length).toBe(3);
   });
 
-  it("single click calls onSelect (not onToggle)", () => {
+  it("click calls onSelect", () => {
     const onSelect = vi.fn();
-    const onToggle = vi.fn();
     const { container } = render(
       <StudentCarousel
         students={students}
         selectedIds={[]}
         onSelect={onSelect}
-        onToggle={onToggle}
       />
     );
     // Find the first student slot and click it
     const slots = container.querySelectorAll('[class*="MuiBox-root"]');
-    // The student slots are nested; find one that matches our width
     const studentSlot = Array.from(slots).find(
       (el) => (el as HTMLElement).style.width === "80px" || el.getAttribute("style")?.includes("80")
     );
     if (studentSlot) {
       fireEvent.click(studentSlot);
       expect(onSelect).toHaveBeenCalledWith("s1");
-      expect(onToggle).not.toHaveBeenCalled();
     }
   });
 
-  it("shift+click calls onToggle (not onSelect)", () => {
+  it("shift+click still calls onSelect (no multi-select)", () => {
     const onSelect = vi.fn();
-    const onToggle = vi.fn();
     const { container } = render(
       <StudentCarousel
         students={students}
         selectedIds={["s1"]}
         onSelect={onSelect}
-        onToggle={onToggle}
       />
     );
     const slots = container.querySelectorAll('[class*="MuiBox-root"]');
@@ -73,8 +66,7 @@ describe("StudentCarousel", () => {
     );
     if (studentSlot) {
       fireEvent.click(studentSlot, { shiftKey: true });
-      expect(onToggle).toHaveBeenCalled();
-      expect(onSelect).not.toHaveBeenCalled();
+      expect(onSelect).toHaveBeenCalled();
     }
   });
 
@@ -84,7 +76,6 @@ describe("StudentCarousel", () => {
         students={students}
         selectedIds={["s1"]}
         onSelect={() => {}}
-        onToggle={() => {}}
       />
     );
     expect(screen.getByText("Alice")).toBeInTheDocument();
