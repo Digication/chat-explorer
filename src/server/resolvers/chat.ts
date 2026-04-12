@@ -3,19 +3,19 @@ import { AppDataSource } from "../data-source.js";
 import { ChatSession, ChatScope } from "../entities/ChatSession.js";
 import { ChatMessage, ChatMessageRole } from "../entities/ChatMessage.js";
 import type { GraphQLContext } from "../types/context.js";
-import { requireAuth } from "./middleware/auth.js";
+import { requireAuth, requireInstitutionAccess } from "./middleware/auth.js";
 import { sendChatMessage as sendChatMessageService } from "../services/ai-chat.js";
 
 export const chatResolvers = {
   Query: {
     chatSessions: async (
       _: unknown,
-      { courseId, assignmentId }: { courseId?: string; assignmentId?: string },
+      { institutionId, courseId, assignmentId }: { institutionId: string; courseId?: string; assignmentId?: string },
       ctx: GraphQLContext
     ) => {
-      const user = requireAuth(ctx);
+      const user = requireInstitutionAccess(ctx, institutionId);
       const repo = AppDataSource.getRepository(ChatSession);
-      const where: Record<string, unknown> = { userId: user.id };
+      const where: Record<string, unknown> = { userId: user.id, institutionId };
       if (courseId) where.courseId = courseId;
       if (assignmentId) where.assignmentId = assignmentId;
       return repo.find({ where, order: { updatedAt: "DESC" } });
@@ -34,6 +34,10 @@ export const chatResolvers = {
           extensions: { code: "NOT_FOUND" },
         });
       }
+      // Verify institutional access (skip for legacy sessions without institutionId)
+      if (session.institutionId) {
+        requireInstitutionAccess(ctx, session.institutionId);
+      }
       return session;
     },
   },
@@ -42,6 +46,7 @@ export const chatResolvers = {
     createChatSession: async (
       _: unknown,
       args: {
+        institutionId: string;
         courseId?: string;
         assignmentId?: string;
         studentId?: string;
@@ -52,10 +57,11 @@ export const chatResolvers = {
       },
       ctx: GraphQLContext
     ) => {
-      const user = requireAuth(ctx);
+      const user = requireInstitutionAccess(ctx, args.institutionId);
       const repo = AppDataSource.getRepository(ChatSession);
       const session = repo.create({
         userId: user.id,
+        institutionId: args.institutionId,
         courseId: args.courseId ?? null,
         assignmentId: args.assignmentId ?? null,
         studentId: args.studentId ?? null,

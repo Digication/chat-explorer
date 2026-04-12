@@ -122,6 +122,7 @@ export default function FacultyPanel() {
             open={true}
             onClose={panel.close}
             anchor="embedded"
+            institutionId={scope?.institutionId}
             courseId={scope?.courseId}
             assignmentId={scope?.assignmentId}
           />

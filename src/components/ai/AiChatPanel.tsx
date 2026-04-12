@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@apollo/client/react";
 import {
   Box,
+  Chip,
   Collapse,
   Drawer,
   Typography,
@@ -10,13 +11,19 @@ import {
   CircularProgress,
   Alert,
   Divider,
-  ToggleButton,
-  ToggleButtonGroup,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
 } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
 import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add";
 import HistoryIcon from "@mui/icons-material/History";
+import PersonIcon from "@mui/icons-material/Person";
+import SchoolIcon from "@mui/icons-material/School";
+import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
   GET_CHAT_SESSIONS,
   GET_CHAT_SESSION,
@@ -34,6 +41,8 @@ interface AiChatPanelProps {
   open: boolean;
   /** Called to close the panel (only relevant when anchor="right"). */
   onClose: () => void;
+  /** Institution ID for institutional isolation. Required for session queries. */
+  institutionId?: string;
   /** Optional course context for scoping sessions. */
   courseId?: string;
   /** Optional assignment context for scoping sessions. */
@@ -70,6 +79,7 @@ const SIDEBAR_WIDTH = 260;
 export default function AiChatPanel({
   open,
   onClose,
+  institutionId,
   courseId,
   assignmentId,
   studentId,
@@ -86,6 +96,8 @@ export default function AiChatPanel({
   const [showHistory, setShowHistory] = useState(false);
   // Track scope-change dividers shown in the message list (UI-only, not persisted)
   const [scopeDividers, setScopeDividers] = useState<Array<{ id: string; label: string }>>([]);
+  // Anchor element for the scope dropdown menu
+  const [scopeMenuAnchor, setScopeMenuAnchor] = useState<null | HTMLElement>(null);
 
   // Ref for auto-scrolling the message area to the bottom
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -99,8 +111,8 @@ export default function AiChatPanel({
     error: sessionsError,
     refetch: refetchSessions,
   } = useQuery<any>(GET_CHAT_SESSIONS, {
-    variables: { courseId, assignmentId },
-    skip: !open,
+    variables: { institutionId, courseId, assignmentId },
+    skip: !open || !institutionId,
   });
   const sessions = sessionsData?.chatSessions ?? [];
 
@@ -140,11 +152,38 @@ export default function AiChatPanel({
   const defaultScope = studentId ? "SELECTION" : courseId ? "COURSE" : "CROSS_COURSE";
   const chatScope = scopeOverride ?? defaultScope;
 
+  /** Human-readable label for each scope value. */
+  const getScopeLabel = (scope: string) => {
+    if (scope === "SELECTION") {
+      return studentName
+        ? (studentName.includes("students")
+            ? `Selected (${studentName})`
+            : getDisplayName(studentName))
+        : "This student";
+    }
+    if (scope === "COURSE") return "This course";
+    return "All courses";
+  };
+
+  /** Handle scope change from the dropdown menu. */
+  const handleScopeChange = (newScope: string) => {
+    setScopeMenuAnchor(null);
+    if (newScope === chatScope) return;
+    setScopeOverride(newScope);
+    const label = getScopeLabel(newScope);
+    setScopeDividers((prev) => [
+      ...prev,
+      { id: `scope-${Date.now()}`, label: `Context changed to: ${label} — AI context cleared` },
+    ]);
+  };
+
   /** Create a new session and make it active. */
   const handleNewChat = useCallback(async () => {
+    if (!institutionId) return;
     try {
       const { data } = await createSession({
         variables: {
+          institutionId,
           courseId,
           assignmentId,
           studentId,
@@ -161,7 +200,7 @@ export default function AiChatPanel({
       // Error will show via sessionsError on next render
       console.error("Failed to create session:", err);
     }
-  }, [courseId, assignmentId, studentId, chatScope, selectedToriTags, createSession, refetchSessions]);
+  }, [institutionId, courseId, assignmentId, studentId, chatScope, selectedToriTags, createSession, refetchSessions]);
 
   /** Send a message (either typed or from a suggestion chip). */
   const handleSend = useCallback(
@@ -172,9 +211,11 @@ export default function AiChatPanel({
       // If no active session exists, create one first
       let sessionId = activeSessionId;
       if (!sessionId) {
+        if (!institutionId) return;
         try {
           const { data } = await createSession({
             variables: {
+              institutionId,
               courseId,
               assignmentId,
               studentId,
@@ -277,31 +318,53 @@ export default function AiChatPanel({
           <Typography variant="subtitle1" fontWeight={600} noWrap>
             {sessionData?.chatSession?.title || "AI Chat"}
           </Typography>
-          {/* Context scope selector */}
-          <ToggleButtonGroup
+          {/* Scope indicator chip with dropdown override */}
+          <Chip
             size="small"
-            value={chatScope}
-            exclusive
-            onChange={(_, v) => {
-              if (!v) return;
-              setScopeOverride(v);
-              const label = v === "SELECTION" ? "student" : v === "COURSE" ? "this course" : "all courses";
-              setScopeDividers((prev) => [...prev, { id: `scope-${Date.now()}`, label: `Context → ${label}` }]);
-            }}
-            sx={{ "& .MuiToggleButton-root": { py: 0, px: 1, fontSize: "0.65rem", textTransform: "none" } }}
+            icon={
+              chatScope === "SELECTION" ? <PersonIcon sx={{ fontSize: 14 }} /> :
+              chatScope === "COURSE" ? <SchoolIcon sx={{ fontSize: 14 }} /> :
+              <AccountBalanceIcon sx={{ fontSize: 14 }} />
+            }
+            label={getScopeLabel(chatScope)}
+            deleteIcon={<ExpandMoreIcon sx={{ fontSize: 14 }} />}
+            onDelete={(e) => setScopeMenuAnchor(e.currentTarget as HTMLElement)}
+            onClick={(e) => setScopeMenuAnchor(e.currentTarget)}
+            variant="outlined"
+            sx={{ height: 22, fontSize: "0.7rem", "& .MuiChip-icon": { ml: 0.5 } }}
+          />
+          <Menu
+            anchorEl={scopeMenuAnchor}
+            open={Boolean(scopeMenuAnchor)}
+            onClose={() => setScopeMenuAnchor(null)}
+            slotProps={{ paper: { sx: { minWidth: 180 } } }}
           >
             {studentId && (
-              <ToggleButton value="SELECTION">
-                {studentName
-                  ? (studentName.includes("students")
-                      ? `Selected (${studentName})`
-                      : getDisplayName(studentName))
-                  : "This student"}
-              </ToggleButton>
+              <MenuItem
+                selected={chatScope === "SELECTION"}
+                onClick={() => handleScopeChange("SELECTION")}
+              >
+                <ListItemIcon><PersonIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>{getScopeLabel("SELECTION")}</ListItemText>
+              </MenuItem>
             )}
-            {courseId && <ToggleButton value="COURSE">This course</ToggleButton>}
-            <ToggleButton value="CROSS_COURSE">All courses</ToggleButton>
-          </ToggleButtonGroup>
+            {courseId && (
+              <MenuItem
+                selected={chatScope === "COURSE"}
+                onClick={() => handleScopeChange("COURSE")}
+              >
+                <ListItemIcon><SchoolIcon fontSize="small" /></ListItemIcon>
+                <ListItemText>This course</ListItemText>
+              </MenuItem>
+            )}
+            <MenuItem
+              selected={chatScope === "CROSS_COURSE"}
+              onClick={() => handleScopeChange("CROSS_COURSE")}
+            >
+              <ListItemIcon><AccountBalanceIcon fontSize="small" /></ListItemIcon>
+              <ListItemText>All courses</ListItemText>
+            </MenuItem>
+          </Menu>
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
           {/* History toggle (embedded & drawer modes) */}

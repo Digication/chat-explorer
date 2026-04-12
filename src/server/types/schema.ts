@@ -548,6 +548,7 @@ export const typeDefs = /* GraphQL */ `
   type ChatSession {
     id: ID!
     userId: ID!
+    institutionId: ID!
     title: String
     scope: String
     courseId: ID
@@ -661,7 +662,7 @@ export const typeDefs = /* GraphQL */ `
     thread(id: ID!): Thread
 
     # Chat
-    chatSessions(courseId: ID, assignmentId: ID): [ChatSession!]!
+    chatSessions(institutionId: ID!, courseId: ID, assignmentId: ID): [ChatSession!]!
     chatSession(id: ID!): ChatSession
 
     # Consent
@@ -685,7 +686,7 @@ export const typeDefs = /* GraphQL */ `
 
   type Mutation {
     # Chat
-    createChatSession(courseId: ID, assignmentId: ID, studentId: ID, scope: String, selectedToriTags: [String!], selectedCommentIds: [ID!], title: String): ChatSession!
+    createChatSession(institutionId: ID!, courseId: ID, assignmentId: ID, studentId: ID, scope: String, selectedToriTags: [String!], selectedCommentIds: [ID!], title: String): ChatSession!
     sendChatMessage(sessionId: ID!, content: String!): ChatMessage!
     deleteChatSession(id: ID!): Boolean!
     renameChatSession(id: ID!, title: String!): ChatSession!

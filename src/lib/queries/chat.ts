@@ -2,11 +2,12 @@ import { gql } from "@apollo/client";
 
 /** Fetch chat sessions, optionally filtered by course or assignment. */
 export const GET_CHAT_SESSIONS = gql`
-  query ChatSessions($courseId: ID, $assignmentId: ID) {
-    chatSessions(courseId: $courseId, assignmentId: $assignmentId) {
+  query ChatSessions($institutionId: ID!, $courseId: ID, $assignmentId: ID) {
+    chatSessions(institutionId: $institutionId, courseId: $courseId, assignmentId: $assignmentId) {
       id
       title
       courseId
+      institutionId
       createdAt
       updatedAt
     }
@@ -32,6 +33,7 @@ export const GET_CHAT_SESSION = gql`
 /** Create a new chat session with optional context for the AI. */
 export const CREATE_CHAT_SESSION = gql`
   mutation CreateChatSession(
+    $institutionId: ID!
     $courseId: ID
     $assignmentId: ID
     $studentId: ID
@@ -41,6 +43,7 @@ export const CREATE_CHAT_SESSION = gql`
     $title: String
   ) {
     createChatSession(
+      institutionId: $institutionId
       courseId: $courseId
       assignmentId: $assignmentId
       studentId: $studentId
@@ -52,6 +55,7 @@ export const CREATE_CHAT_SESSION = gql`
       id
       title
       courseId
+      institutionId
       createdAt
       updatedAt
     }

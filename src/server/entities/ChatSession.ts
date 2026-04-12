@@ -27,6 +27,9 @@ export class ChatSession {
   userId!: string;
 
   @Column({ type: "varchar", nullable: true })
+  institutionId!: string | null;
+
+  @Column({ type: "varchar", nullable: true })
   title!: string | null;
 
   @Column({ type: "enum", enum: ChatScope, default: ChatScope.SELECTION })

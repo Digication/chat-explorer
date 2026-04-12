@@ -1,6 +1,7 @@
 import { useParams } from "react-router";
 import { Box } from "@mui/material";
 import AiChatPanel from "@/components/ai/AiChatPanel";
+import { useInsightsScope } from "@/components/insights/ScopeSelector";
 
 /**
  * Dedicated full-page AI chat view.
@@ -12,6 +13,7 @@ import AiChatPanel from "@/components/ai/AiChatPanel";
 export default function AiChatPage() {
   // Pick up an optional courseId from the URL (e.g. /chat/:courseId)
   const { courseId } = useParams<{ courseId?: string }>();
+  const { scope } = useInsightsScope();
 
   return (
     <Box sx={{ height: "100%" }}>
@@ -20,6 +22,7 @@ export default function AiChatPage() {
         onClose={() => {
           /* no-op in full-page mode */
         }}
+        institutionId={scope?.institutionId}
         courseId={courseId}
         anchor="full"
       />
