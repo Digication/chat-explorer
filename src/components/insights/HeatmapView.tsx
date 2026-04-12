@@ -240,7 +240,7 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
   const { getDisplayName } = useUserSettings();
 
   const [mode, setMode] = useState<DisplayMode>("CLASSIC");
-  const [scaling, setScaling] = useState<"RAW" | "ROW" | "GLOBAL">("RAW");
+  const [scaling, setScaling] = useState<"RAW" | "ROW" | "GLOBAL">("ROW");
   const [popoverState, setPopoverState] = useState<PopoverState | null>(null);
 
   const { data, loading, error, refetch } = useQuery<any>(GET_HEATMAP, {

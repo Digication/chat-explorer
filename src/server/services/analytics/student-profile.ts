@@ -96,7 +96,7 @@ export async function getStudentProfile(
       .getRawMany();
     const nameRow = studentRows[0];
     const name = nameRow
-      ? [nameRow.s_firstName, nameRow.s_lastName].filter(Boolean).join(" ") || "Student"
+      ? [nameRow.firstName, nameRow.lastName].filter(Boolean).join(" ") || "Student"
       : "Student";
 
     // ── Word counts ─────────────────────────────────────────────

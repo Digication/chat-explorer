@@ -102,7 +102,7 @@ export async function getGrowth(
       studentNameMap = new Map(
         students.map((s: any) => [
           s.s_id,
-          [s.s_firstName, s.s_lastName].filter(Boolean).join(" ") || "Student",
+          [s.firstName, s.lastName].filter(Boolean).join(" ") || "Student",
         ])
       );
     }

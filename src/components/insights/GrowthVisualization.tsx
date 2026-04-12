@@ -38,7 +38,7 @@ export default function GrowthVisualization({ onViewThread }: GrowthVisualizatio
   const { scope } = useInsightsScope();
   const { getDisplayName } = useUserSettings();
   const navigate = useNavigate();
-  const [viewMode, setViewMode] = useState<ViewMode>("sparklines");
+  const [viewMode, setViewMode] = useState<ViewMode>("matrix");
   const [deltaA1, setDeltaA1] = useState<string>("");
   const [deltaA2, setDeltaA2] = useState<string>("");
 
