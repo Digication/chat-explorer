@@ -1,12 +1,18 @@
 import { Box } from "@mui/material";
-import { Outlet } from "react-router";
+import { Outlet, useLocation } from "react-router";
 import Sidebar, { COLLAPSED_WIDTH } from "./Sidebar";
 import GlobalHeader, { HEADER_HEIGHT } from "./GlobalHeader";
 import { useFacultyPanel } from "@/components/faculty-panel/FacultyPanelContext";
 import FacultyPanel from "@/components/faculty-panel/FacultyPanel";
 
+/** Height of the fixed BottomBar on the Chat Explorer page. */
+const BOTTOM_BAR_HEIGHT = 60;
+
 export default function AppShell() {
   const { isOpen: panelOpen } = useFacultyPanel();
+  const location = useLocation();
+  // Chat Explorer has a fixed bottom bar — Faculty Panel needs to clear it
+  const hasBottomBar = location.pathname === "/chat";
 
   return (
     <>
@@ -39,6 +45,8 @@ export default function AppShell() {
                 maxWidth: { md: 500 },
                 overflow: "auto",
                 flexShrink: 0,
+                // Clear the fixed BottomBar on Chat Explorer
+                pb: hasBottomBar ? `${BOTTOM_BAR_HEIGHT}px` : 0,
               }}
             >
               <FacultyPanel />

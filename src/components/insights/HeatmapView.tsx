@@ -350,6 +350,36 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
         <Box>
           <table style={{ borderCollapse: "collapse", fontSize: 12, width: "100%" }}>
             <tbody>
+              {/* Summary row — aggregate across all students */}
+              {(() => {
+                const summaryValues = colOrder.map((ci) =>
+                  rowOrder.reduce((sum, ri) => sum + (matrix[ri]?.[ci] ?? 0), 0),
+                );
+                return (
+                  <tr style={{ background: "#f5f7fa", borderBottom: "2px solid #ccc" }}>
+                    <td
+                      style={{
+                        padding: "3px 12px 3px 0",
+                        fontWeight: 700,
+                        whiteSpace: "nowrap",
+                        width: 140,
+                        verticalAlign: "middle",
+                        fontSize: 11,
+                        color: "#1565c0",
+                      }}
+                    >
+                      All Students
+                    </td>
+                    <td style={{ padding: "2px 0", verticalAlign: "middle", width: "100%" }}>
+                      <Sparkline
+                        values={summaryValues}
+                        labels={colOrder.map((ci) => colLabels[ci])}
+                        globalMax={Math.max(...summaryValues, 1)}
+                      />
+                    </td>
+                  </tr>
+                );
+              })()}
               {rowOrder.map((ri) => {
                 const values = colOrder.map((ci) => matrix[ri]?.[ci] ?? 0);
                 return (

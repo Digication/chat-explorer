@@ -420,6 +420,20 @@ export const typeDefs = /* GraphQL */ `
     categoryDistribution: ReflectionCategoryDistribution!
   }
 
+  type AssignmentTagCount {
+    tagId: ID!
+    tagName: String!
+    domain: String!
+    count: Int!
+  }
+
+  type PerAssignmentToriTags {
+    assignmentId: ID!
+    assignmentName: String!
+    date: String!
+    tags: [AssignmentTagCount!]!
+  }
+
   type StudentProfileReport {
     studentId: ID!
     name: String!
@@ -431,6 +445,7 @@ export const typeDefs = /* GraphQL */ `
     overallCategoryDistribution: ReflectionCategoryDistribution!
     perAssignment: [PerAssignmentBreakdown!]!
     toriTagDistribution: [TagFrequency!]!
+    perAssignmentToriTags: [PerAssignmentToriTags!]!
     topToriTags: [String!]!
     evidenceHighlights: [EvidenceHighlight!]!
   }

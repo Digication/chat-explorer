@@ -36,7 +36,7 @@ describe("ChatMessageBubble", () => {
     expect(dots.length).toBeGreaterThanOrEqual(3);
   });
 
-  it("caps message width at min(80%, 600px)", () => {
+  it("caps message width at min(75%, 520px)", () => {
     const { container } = render(<ChatMessageBubble message={userMsg} />);
     // The outer Box wrapping the bubble has maxWidth set
     const wrapper = container.firstChild?.firstChild as HTMLElement;

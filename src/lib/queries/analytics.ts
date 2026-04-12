@@ -351,6 +351,17 @@ export const GET_STUDENT_PROFILE = gql`
           count
           percent
         }
+        perAssignmentToriTags {
+          assignmentId
+          assignmentName
+          date
+          tags {
+            tagId
+            tagName
+            domain
+            count
+          }
+        }
         topToriTags
         evidenceHighlights {
           commentId

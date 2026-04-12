@@ -5,6 +5,7 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Skeleton from "@mui/material/Skeleton";
 import Tooltip from "@mui/material/Tooltip";
+import Typography from "@mui/material/Typography";
 import { GET_NETWORK } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
 import EvidencePopover from "@/components/insights/EvidencePopover";
@@ -156,16 +157,12 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
       p.y = Math.max(pad, Math.min(H - pad, p.y));
     }
 
-    // Compute median frequency for label visibility threshold
-    const freqs = [...nodes.map((n) => n.frequency)].sort((a, b) => a - b);
-    const medianFreq = freqs[Math.floor(freqs.length / 2)] ?? 0;
-
     const positions: Record<string, { x: number; y: number }> = {};
     nodes.forEach((node, i) => {
       positions[node.id] = pos[i];
     });
 
-    return { nodes, edges, positions, maxFreq, maxWeight, radii, medianFreq };
+    return { nodes, edges, positions, maxFreq, maxWeight, radii };
   }, [data]);
 
   // ── Error state ────────────────────────────────────────────────────────────
@@ -191,7 +188,7 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
     return <Skeleton variant="rectangular" height={400} />;
   }
 
-  const { nodes, edges, positions, maxFreq, maxWeight, medianFreq = 0 } = layout;
+  const { nodes, edges, positions, maxFreq, maxWeight } = layout;
 
   if (nodes.length === 0) {
     return (
@@ -211,6 +208,9 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
     });
   }
 
+  // Sort nodes by frequency descending for the legend
+  const legendNodes = [...nodes].sort((a, b) => b.frequency - a.frequency);
+
   /** Handle node click — position a hidden anchor div and open evidence popover. */
   const handleNodeClick = (event: React.MouseEvent, node: NodeData) => {
     if (!anchorRef.current) return;
@@ -225,8 +225,13 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
     setPopover({ anchorEl: anchorRef.current, toriTagId: node.id, toriTagName: node.name });
   };
 
+  /** Handle legend row click — use the legend element as popover anchor. */
+  const handleLegendClick = (event: React.MouseEvent<HTMLElement>, node: NodeData) => {
+    setPopover({ anchorEl: event.currentTarget as HTMLElement, toriTagId: node.id, toriTagName: node.name });
+  };
+
   return (
-    <Box sx={{ display: "flex", justifyContent: "center", position: "relative" }}>
+    <Box sx={{ position: "relative" }}>
       {/* Hidden anchor for popover positioning */}
       <div ref={anchorRef} style={{ position: "fixed", width: 1, height: 1, pointerEvents: "none" }} />
 
@@ -234,7 +239,7 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
         width="100%"
         height={400}
         viewBox="0 0 500 400"
-        style={{ maxWidth: "100%", height: "auto" }}
+        style={{ maxWidth: 600, height: "auto", display: "block", margin: "0 auto" }}
       >
         {/* Edges */}
         {edges.map((edge, i) => {
@@ -268,8 +273,16 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
           const r = 6 + (node.frequency / maxFreq!) * 14;
           const color =
             COMMUNITY_COLORS[node.communityId % COMMUNITY_COLORS.length];
-          // Only show labels for above-median frequency nodes (or hovered)
-          const showLabel = node.frequency >= medianFreq || hoveredNode === node.id;
+          const isHovered = hoveredNode === node.id;
+          // Dim nodes not connected to the hovered node
+          const isNeighbor =
+            hoveredNode === null ||
+            isHovered ||
+            edges.some(
+              (e) =>
+                (e.source === hoveredNode && e.target === node.id) ||
+                (e.target === hoveredNode && e.source === node.id),
+            );
 
           return (
             <Tooltip
@@ -285,25 +298,70 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
                 onClick={(e) => handleNodeClick(e, node)}
                 style={{ cursor: "pointer" }}
               >
-                <circle cx={pos.x} cy={pos.y} r={r} fill={color} />
-                {showLabel && (
-                  <text
-                    x={pos.x}
-                    y={pos.y + r + 12}
-                    textAnchor="middle"
-                    fontSize={10}
-                    fill="currentColor"
-                  >
-                    {node.name.length > 14
-                      ? node.name.slice(0, 12) + "..."
-                      : node.name}
-                  </text>
-                )}
+                <circle
+                  cx={pos.x}
+                  cy={pos.y}
+                  r={r}
+                  fill={color}
+                  opacity={isNeighbor ? 1 : 0.2}
+                />
               </g>
             </Tooltip>
           );
         })}
       </svg>
+
+      {/* Legend — colored dot + tag name + frequency for each node */}
+      <Box
+        sx={{
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 0.5,
+          mt: 1.5,
+          px: 1,
+          justifyContent: "center",
+        }}
+      >
+        {legendNodes.map((node) => {
+          const color = COMMUNITY_COLORS[node.communityId % COMMUNITY_COLORS.length];
+          const isActive = hoveredNode === node.id;
+          return (
+            <Box
+              key={node.id}
+              onMouseEnter={() => setHoveredNode(node.id)}
+              onMouseLeave={() => setHoveredNode(null)}
+              onClick={(e) => handleLegendClick(e, node)}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 0.5,
+                px: 1,
+                py: 0.25,
+                borderRadius: 1,
+                cursor: "pointer",
+                bgcolor: isActive ? "action.hover" : "transparent",
+                "&:hover": { bgcolor: "action.hover" },
+              }}
+            >
+              <Box
+                sx={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  bgcolor: color,
+                  flexShrink: 0,
+                }}
+              />
+              <Typography variant="caption" noWrap sx={{ fontSize: 11, maxWidth: 120 }}>
+                {node.name}
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>
+                {node.frequency}
+              </Typography>
+            </Box>
+          );
+        })}
+      </Box>
 
       {/* Evidence popover — shown when a node is clicked */}
       {popover && scope && (

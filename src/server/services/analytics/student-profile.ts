@@ -43,6 +43,13 @@ export interface TagFrequencyItem {
   percent: number;
 }
 
+export interface PerAssignmentToriTags {
+  assignmentId: string;
+  assignmentName: string;
+  date: string;
+  tags: { tagId: string; tagName: string; domain: string; count: number }[];
+}
+
 export interface StudentProfileReport {
   studentId: string;
   name: string;
@@ -54,6 +61,7 @@ export interface StudentProfileReport {
   overallCategoryDistribution: ReflectionCategoryDistribution;
   perAssignment: PerAssignmentBreakdown[];
   toriTagDistribution: TagFrequencyItem[];
+  perAssignmentToriTags: PerAssignmentToriTags[];
   topToriTags: string[];
   evidenceHighlights: EvidenceHighlight[];
 }
@@ -208,8 +216,10 @@ export async function getStudentProfile(
       }
     );
 
-    // ── TORI tag distribution ───────────────────────────────────
+    // ── TORI tag distribution + per-assignment breakdown ────────
     let toriTagDistribution: TagFrequencyItem[] = [];
+    let perAssignmentToriTags: PerAssignmentToriTags[] = [];
+
     if (commentIds.length > 0) {
       const cttRepo = AppDataSource.getRepository(CommentToriTag);
       const associations = await cttRepo
@@ -221,6 +231,7 @@ export async function getStudentProfile(
       const allTags = await tagRepo.find();
       const tagLookup = new Map(allTags.map((t) => [t.id, t]));
 
+      // Overall tag counts
       const tagCounts = new Map<string, number>();
       for (const assoc of associations) {
         tagCounts.set(
@@ -243,6 +254,48 @@ export async function getStudentProfile(
           };
         })
         .sort((a, b) => b.count - a.count);
+
+      // Per-assignment tag counts (reuse same associations + tagLookup)
+      const commentAssignmentMap = new Map<string, string>();
+      for (const c of userComments) {
+        const aId = threadAssignmentMap.get(c.threadId);
+        if (aId) commentAssignmentMap.set(c.id, aId);
+      }
+
+      const assignmentTagCounts = new Map<string, Map<string, number>>();
+      for (const assoc of associations) {
+        const aId = commentAssignmentMap.get(assoc.commentId);
+        if (!aId) continue;
+        if (!assignmentTagCounts.has(aId)) assignmentTagCounts.set(aId, new Map());
+        const tagMap = assignmentTagCounts.get(aId)!;
+        tagMap.set(assoc.toriTagId, (tagMap.get(assoc.toriTagId) ?? 0) + 1);
+      }
+
+      perAssignmentToriTags = sortedAssignmentIds.map((aId) => {
+        const info = assignmentMap.get(aId);
+        const tagMap = assignmentTagCounts.get(aId) ?? new Map();
+        const tags = [...tagMap.entries()]
+          .map(([tagId, count]) => {
+            const tag = tagLookup.get(tagId);
+            return {
+              tagId,
+              tagName: tag?.name ?? "Unknown",
+              domain: tag?.domain ?? "Unknown",
+              count,
+            };
+          })
+          .sort((a, b) => b.count - a.count);
+
+        return {
+          assignmentId: aId,
+          assignmentName: info?.name ?? "Unknown",
+          date:
+            info?.date instanceof Date
+              ? info.date.toISOString()
+              : String(info?.date ?? ""),
+          tags,
+        };
+      });
     }
 
     const topToriTags = toriTagDistribution.slice(0, 5).map((t) => t.tagName);
@@ -280,6 +333,7 @@ export async function getStudentProfile(
       overallCategoryDistribution: overallDist,
       perAssignment,
       toriTagDistribution,
+      perAssignmentToriTags,
       topToriTags,
       evidenceHighlights,
     };
@@ -309,6 +363,7 @@ function emptyReport(studentId: string): StudentProfileReport {
     overallCategoryDistribution: emptyCategoryDistribution(),
     perAssignment: [],
     toriTagDistribution: [],
+    perAssignmentToriTags: [],
     topToriTags: [],
     evidenceHighlights: [],
   };

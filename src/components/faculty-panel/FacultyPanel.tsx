@@ -103,7 +103,7 @@ export default function FacultyPanel() {
       </Tabs>
 
       {/* ── Tab content ────────────────────────────────────────── */}
-      <Box sx={{ flex: 1, overflow: "auto", minHeight: 0 }}>
+      <Box sx={{ flex: 1, overflow: panel.activeTab === "chat" ? "hidden" : "auto", minHeight: 0 }}>
         {panel.activeTab === "student" && panel.studentId && (
           <StudentProfilePage studentId={panel.studentId} embedded />
         )}
