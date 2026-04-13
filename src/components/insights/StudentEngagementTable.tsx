@@ -1,6 +1,5 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery } from "@apollo/client/react";
-import { useNavigate } from "react-router";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -13,12 +12,11 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import TableSortLabel from "@mui/material/TableSortLabel";
 import Typography from "@mui/material/Typography";
-import IconButton from "@mui/material/IconButton";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { GET_STUDENT_ENGAGEMENT } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
 import EvidencePopover from "@/components/insights/EvidencePopover";
 import { useUserSettings } from "@/lib/UserSettingsContext";
+import { useInsightsAnalytics } from "@/components/insights/InsightsAnalyticsContext";
 import { CATEGORY_CONFIG, CATEGORY_COLORS, CATEGORY_LABELS } from "@/lib/reflection-categories";
 
 /** Map category key → ordinal for sorting (higher = deeper reflection). */
@@ -47,8 +45,10 @@ function compare(a: StudentProfile, b: StudentProfile, key: SortKey): number {
 }
 
 interface Props {
-  /** Optional callback for future thread drill-down. */
-  onViewThread?: (threadId: string, studentName: string) => void;
+  /** Called when a student name is clicked — opens Student Profile in panel. */
+  onOpenStudent?: (studentId: string, studentName: string) => void;
+  /** Called when a thread is selected from the evidence popover. */
+  onViewThread?: (threadId: string, studentName: string, studentId?: string, initialToriTag?: string) => void;
 }
 
 interface StudentPopoverState {
@@ -58,14 +58,22 @@ interface StudentPopoverState {
   commentCount: number;
 }
 
-export default function StudentEngagementTable({ onViewThread }: Props) {
+interface TagPopoverState {
+  anchorEl: HTMLElement;
+  toriTagName: string;
+  studentId: string;
+  studentName: string;
+}
+
+export default function StudentEngagementTable({ onOpenStudent, onViewThread }: Props) {
   const { scope } = useInsightsScope();
   const { getDisplayName } = useUserSettings();
-  const navigate = useNavigate();
+  const { registerSummary } = useInsightsAnalytics();
 
   const [sortKey, setSortKey] = useState<SortKey>("modalCategory");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [popover, setPopover] = useState<StudentPopoverState | null>(null);
+  const [tagPopover, setTagPopover] = useState<TagPopoverState | null>(null);
 
   const { data, loading, error, refetch } = useQuery<any>(
     GET_STUDENT_ENGAGEMENT,
@@ -74,6 +82,28 @@ export default function StudentEngagementTable({ onViewThread }: Props) {
       skip: !scope,
     },
   );
+
+  // Register student engagement summary for AI Chat context
+  useEffect(() => {
+    const profiles: StudentProfile[] =
+      data?.instructionalInsights?.data?.studentProfiles ?? [];
+    if (profiles.length > 0) {
+      const avgComments = Math.round(
+        profiles.reduce((sum, s) => sum + s.commentCount, 0) / profiles.length
+      );
+      const categoryCounts = new Map<string, number>();
+      for (const s of profiles) {
+        categoryCounts.set(s.modalCategory, (categoryCounts.get(s.modalCategory) ?? 0) + 1);
+      }
+      const catParts = [...categoryCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([cat, n]) => `${cat}: ${n}`);
+      registerSummary(
+        "Student Engagement",
+        `${profiles.length} students, avg ${avgComments} comments/student. Modal categories: ${catParts.join(", ")}`
+      );
+    }
+  }, [data, registerSummary]);
 
   // ── Error state ────────────────────────────────────────────────────────────
 
@@ -165,7 +195,6 @@ export default function StudentEngagementTable({ onViewThread }: Props) {
             </TableSortLabel>
           </TableCell>
           <TableCell>Top Tags</TableCell>
-          <TableCell />
         </TableRow>
       </TableHead>
       <TableBody>
@@ -174,10 +203,10 @@ export default function StudentEngagementTable({ onViewThread }: Props) {
 
           return (
             <TableRow key={student.studentId} hover>
-              {/* Student name — clickable to view profile */}
+              {/* Student name — clickable to open profile in panel */}
               <TableCell
                 onClick={() =>
-                  navigate(`/insights/student/${student.studentId}`)
+                  onOpenStudent?.(student.studentId, student.name)
                 }
                 sx={{ cursor: "pointer", color: "primary.main", "&:hover": { textDecoration: "underline" } }}
               >
@@ -198,8 +227,21 @@ export default function StudentEngagementTable({ onViewThread }: Props) {
                 />
               </TableCell>
 
-              {/* Comment count */}
-              <TableCell align="right">{student.commentCount}</TableCell>
+              {/* Comment count — clickable to show evidence popover */}
+              <TableCell
+                align="right"
+                onClick={(e) =>
+                  setPopover({
+                    anchorEl: e.currentTarget as HTMLElement,
+                    studentId: student.studentId,
+                    studentName: student.name,
+                    commentCount: student.commentCount,
+                  })
+                }
+                sx={{ cursor: "pointer", "&:hover": { color: "primary.main" } }}
+              >
+                {student.commentCount}
+              </TableCell>
 
               {/* Top TORI tags (max 3) */}
               <TableCell>
@@ -210,35 +252,27 @@ export default function StudentEngagementTable({ onViewThread }: Props) {
                       label={tag}
                       size="small"
                       variant="outlined"
-                      sx={{ fontSize: "0.7rem" }}
+                      clickable
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTagPopover({
+                          anchorEl: e.currentTarget,
+                          toriTagName: tag,
+                          studentId: student.studentId,
+                          studentName: student.name,
+                        });
+                      }}
+                      sx={{ fontSize: "0.7rem", cursor: "pointer" }}
                     />
                   ))}
                 </Box>
-              </TableCell>
-
-              {/* Evidence popover trigger */}
-              <TableCell padding="none" sx={{ width: 36 }}>
-                <IconButton
-                  size="small"
-                  onClick={(e) =>
-                    setPopover({
-                      anchorEl: e.currentTarget as HTMLElement,
-                      studentId: student.studentId,
-                      studentName: student.name,
-                      commentCount: student.commentCount,
-                    })
-                  }
-                  aria-label="View evidence"
-                >
-                  <InfoOutlinedIcon fontSize="small" />
-                </IconButton>
               </TableCell>
             </TableRow>
           );
         })}
       </TableBody>
 
-      {/* Evidence popover — shown when a student name is clicked */}
+      {/* Evidence popover — shown when comment count is clicked */}
       {popover && scope && (
         <EvidencePopover
           anchorEl={popover.anchorEl}
@@ -247,9 +281,29 @@ export default function StudentEngagementTable({ onViewThread }: Props) {
           count={popover.commentCount}
           scope={scope}
           onClose={() => setPopover(null)}
-          onViewThread={(threadId, studentName) => {
+          onViewThread={(threadId, studentName, studentId, initialToriTag) => {
             setPopover(null);
-            onViewThread?.(threadId, studentName);
+            onViewThread?.(threadId, studentName, studentId, initialToriTag);
+          }}
+        />
+      )}
+
+      {/* Evidence popover — shown when a TORI tag chip is clicked */}
+      {tagPopover && scope && (
+        <EvidencePopover
+          anchorEl={tagPopover.anchorEl}
+          studentId={tagPopover.studentId}
+          studentName={tagPopover.studentName}
+          toriTagName={tagPopover.toriTagName}
+          scope={scope}
+          onClose={() => setTagPopover(null)}
+          onViewThread={(threadId, studentName, studentId, initialToriTag) => {
+            setTagPopover(null);
+            onViewThread?.(threadId, studentName, studentId, initialToriTag);
+          }}
+          onStudentClick={(studentId, studentName) => {
+            setTagPopover(null);
+            onOpenStudent?.(studentId, studentName);
           }}
         />
       )}

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { useQuery } from "@apollo/client/react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -9,38 +9,92 @@ import Typography from "@mui/material/Typography";
 import CloseIcon from "@mui/icons-material/Close";
 import { GET_THREAD_BY_ID } from "@/lib/queries/explorer";
 import CommentCard from "@/components/explorer/CommentCard";
+import ToriFilters from "@/components/explorer/ToriFilters";
 import { useUserSettings } from "@/lib/UserSettingsContext";
 
 interface ThreadPanelProps {
   threadId: string;
   studentName: string;
   onClose: () => void;
+  /** When true, renders as normal-flow component instead of fixed overlay. */
+  embedded?: boolean;
+  /** When provided, student name in the header becomes clickable. */
+  onStudentClick?: (studentId: string, studentName: string) => void;
+  /** Student ID — needed for onStudentClick to work. */
+  studentId?: string;
+  /** Pre-select this TORI tag on mount for highlighting. */
+  initialToriTag?: string;
 }
 
-export default function ThreadPanel({ threadId, studentName, onClose }: ThreadPanelProps) {
+export default function ThreadPanel({ threadId, studentName, onClose, embedded, onStudentClick, studentId, initialToriTag }: ThreadPanelProps) {
   const { getDisplayName } = useUserSettings();
+  const [activeFilters, setActiveFilters] = useState<string[]>(
+    initialToriTag ? [initialToriTag] : []
+  );
   const { data, loading, error, refetch } = useQuery<any>(GET_THREAD_BY_ID, {
     variables: { id: threadId },
   });
 
   const thread = data?.thread;
 
+  // Reset filters when thread changes
+  useEffect(() => {
+    setActiveFilters(initialToriTag ? [initialToriTag] : []);
+  }, [threadId, initialToriTag]);
+
+  // Derive available TORI tags from thread comments
+  const availableTags = useMemo(() => {
+    if (!thread?.comments) return [];
+    const tagCounts = new Map<string, { name: string; domain: string; count: number }>();
+    for (const comment of thread.comments) {
+      if (comment.role !== "USER") continue;
+      for (const tag of comment.toriTags ?? []) {
+        const existing = tagCounts.get(tag.name);
+        if (existing) {
+          existing.count++;
+        } else {
+          tagCounts.set(tag.name, { name: tag.name, domain: tag.domain, count: 1 });
+        }
+      }
+    }
+    return [...tagCounts.values()].sort((a, b) => b.count - a.count);
+  }, [thread]);
+
+  const handleToggleFilter = useCallback((tagName: string) => {
+    setActiveFilters((prev) =>
+      prev.includes(tagName) ? prev.filter((t) => t !== tagName) : [...prev, tagName]
+    );
+  }, []);
+
+  const handleClearFilters = useCallback(() => setActiveFilters([]), []);
+
+  const hasActiveFilters = activeFilters.length > 0;
+
   return (
     <Box
-      sx={{
-        position: "fixed",
-        top: 52, // below GlobalHeader (HEADER_HEIGHT)
-        right: 0,
-        bottom: 0,
-        width: 420,
-        zIndex: 1100,
-        bgcolor: "background.paper",
-        borderLeft: 1,
-        borderColor: "divider",
-        display: "flex",
-        flexDirection: "column",
-        boxShadow: 6,
-      }}
+      sx={
+        embedded
+          ? {
+              display: "flex",
+              flexDirection: "column",
+              height: "100%",
+              bgcolor: "background.paper",
+            }
+          : {
+              position: "fixed",
+              top: 52,
+              right: 0,
+              bottom: 0,
+              width: 420,
+              zIndex: 1100,
+              bgcolor: "background.paper",
+              borderLeft: 1,
+              borderColor: "divider",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: 6,
+            }
+      }
     >
       {/* Sticky header */}
       <Box
@@ -55,7 +109,19 @@ export default function ThreadPanel({ threadId, studentName, onClose }: ThreadPa
         }}
       >
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="subtitle1" fontWeight={700} noWrap>
+          <Typography
+            variant="subtitle1"
+            fontWeight={700}
+            noWrap
+            sx={{
+              ...(onStudentClick && studentId
+                ? { cursor: "pointer", color: "primary.main", "&:hover": { textDecoration: "underline" } }
+                : {}),
+            }}
+            onClick={() => {
+              if (onStudentClick && studentId) onStudentClick(studentId, studentName);
+            }}
+          >
             {getDisplayName(studentName)}
           </Typography>
           {thread && (
@@ -68,6 +134,18 @@ export default function ThreadPanel({ threadId, studentName, onClose }: ThreadPa
           <CloseIcon fontSize="small" />
         </IconButton>
       </Box>
+
+      {/* TORI tag filter bar */}
+      {availableTags.length > 0 && (
+        <Box sx={{ flexShrink: 0, borderBottom: 1, borderColor: "divider" }}>
+          <ToriFilters
+            availableTags={availableTags}
+            activeFilters={activeFilters}
+            onToggle={handleToggleFilter}
+            onClear={handleClearFilters}
+          />
+        </Box>
+      )}
 
       {/* Body — scrollable */}
       <Box sx={{ flex: 1, overflowY: "auto", p: 2 }}>
@@ -101,10 +179,23 @@ export default function ThreadPanel({ threadId, studentName, onClose }: ThreadPa
           </Typography>
         )}
 
-        {/* Comments */}
-        {thread?.comments?.map((comment: any) => (
-          <CommentCard key={comment.id} comment={comment} />
-        ))}
+        {/* Comments — highlight/dim based on active TORI filters */}
+        {thread?.comments?.map((comment: any) => {
+          const commentTags = (comment.toriTags ?? []).map((t: any) => t.name);
+          const matches = hasActiveFilters && commentTags.some((t: string) => activeFilters.includes(t));
+          return (
+            <Box
+              key={comment.id}
+              sx={{
+                opacity: hasActiveFilters && !matches ? 0.3 : 1,
+                transition: "opacity 0.2s",
+                ...(matches ? { borderLeft: "3px solid", borderColor: "primary.main", pl: 1, ml: -1 } : {}),
+              }}
+            >
+              <CommentCard comment={comment} />
+            </Box>
+          );
+        })}
       </Box>
     </Box>
   );

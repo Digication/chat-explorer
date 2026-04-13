@@ -23,6 +23,7 @@ import {
   CREATE_CHAT_SESSION,
   SEND_CHAT_MESSAGE,
   DELETE_CHAT_SESSION,
+  UPDATE_CHAT_SESSION_SCOPE,
 } from "@/lib/queries/chat";
 import ChatMessageBubble from "./ChatMessageBubble";
 import SuggestionChips from "./SuggestionChips";
@@ -34,6 +35,8 @@ interface AiChatPanelProps {
   open: boolean;
   /** Called to close the panel (only relevant when anchor="right"). */
   onClose: () => void;
+  /** Institution ID for institutional isolation. Required for session queries. */
+  institutionId?: string;
   /** Optional course context for scoping sessions. */
   courseId?: string;
   /** Optional assignment context for scoping sessions. */
@@ -44,6 +47,8 @@ interface AiChatPanelProps {
   studentName?: string;
   /** TORI tags to focus the AI conversation on. */
   selectedToriTags?: string[];
+  /** Analytics context summary from Insights page sections (passed to AI system prompt). */
+  analyticsContext?: string;
   /**
    * Display mode:
    * - "right": renders inside a right-anchored MUI Drawer (400px wide)
@@ -70,11 +75,13 @@ const SIDEBAR_WIDTH = 260;
 export default function AiChatPanel({
   open,
   onClose,
+  institutionId,
   courseId,
   assignmentId,
   studentId,
   studentName,
   selectedToriTags,
+  analyticsContext,
   anchor = "right",
 }: AiChatPanelProps) {
   const { getDisplayName } = useUserSettings();
@@ -82,10 +89,11 @@ export default function AiChatPanel({
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const [scopeOverride, setScopeOverride] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
-  // Track scope-change dividers shown in the message list (UI-only, not persisted)
-  const [scopeDividers, setScopeDividers] = useState<Array<{ id: string; label: string }>>([]);
+  // Scope toggles: track each axis independently
+  const [scopeCourse, setScopeCourse] = useState<"this" | "all">(courseId ? "this" : "all");
+  const [scopeStudent, setScopeStudent] = useState<"this" | "all">(studentId ? "this" : "all");
+  const [scopeAssignment, setScopeAssignment] = useState<"this" | "all">(assignmentId ? "this" : "all");
 
   // Ref for auto-scrolling the message area to the bottom
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -99,8 +107,8 @@ export default function AiChatPanel({
     error: sessionsError,
     refetch: refetchSessions,
   } = useQuery<any>(GET_CHAT_SESSIONS, {
-    variables: { courseId, assignmentId },
-    skip: !open,
+    variables: { institutionId, courseId, assignmentId },
+    skip: !open || !institutionId,
   });
   const sessions = sessionsData?.chatSessions ?? [];
 
@@ -121,6 +129,7 @@ export default function AiChatPanel({
   const [createSession] = useMutation<any>(CREATE_CHAT_SESSION);
   const [sendMessage] = useMutation<any>(SEND_CHAT_MESSAGE);
   const [deleteSession] = useMutation<any>(DELETE_CHAT_SESSION);
+  const [updateScope] = useMutation<any>(UPDATE_CHAT_SESSION_SCOPE);
 
   // ── Auto-load the most recent session when panel opens ─────────────
   useEffect(() => {
@@ -136,15 +145,46 @@ export default function AiChatPanel({
 
   // ── Handlers ───────────────────────────────────────────────────────
 
-  /** Determine the AI chat scope — user override takes precedence. */
-  const defaultScope = studentId ? "SELECTION" : courseId ? "COURSE" : "CROSS_COURSE";
-  const chatScope = scopeOverride ?? defaultScope;
+  /** Derive the backend scope enum from the toggle state. */
+  const chatScope =
+    scopeStudent === "this" && studentId ? "SELECTION" :
+    scopeCourse === "this" && courseId ? "COURSE" :
+    "CROSS_COURSE";
+
+  /** Persist scope change to backend. */
+  const persistScopeChange = useCallback(async (
+    newCourse: "this" | "all",
+    newStudent: "this" | "all",
+    newAssignment: "this" | "all",
+  ) => {
+    if (!activeSessionId) return;
+    const newScope =
+      newStudent === "this" && studentId ? "SELECTION" :
+      newCourse === "this" && courseId ? "COURSE" :
+      "CROSS_COURSE";
+    try {
+      await updateScope({
+        variables: {
+          id: activeSessionId,
+          scope: newScope,
+          studentId: newStudent === "this" ? studentId : undefined,
+          courseId: newCourse === "this" ? courseId : undefined,
+          assignmentId: newCourse === "this" && newAssignment === "this" ? assignmentId : undefined,
+        },
+      });
+      await refetchSession();
+    } catch (err) {
+      console.error("Failed to update scope:", err);
+    }
+  }, [activeSessionId, studentId, courseId, assignmentId, updateScope, refetchSession]);
 
   /** Create a new session and make it active. */
   const handleNewChat = useCallback(async () => {
+    if (!institutionId) return;
     try {
       const { data } = await createSession({
         variables: {
+          institutionId,
           courseId,
           assignmentId,
           studentId,
@@ -161,7 +201,7 @@ export default function AiChatPanel({
       // Error will show via sessionsError on next render
       console.error("Failed to create session:", err);
     }
-  }, [courseId, assignmentId, studentId, chatScope, selectedToriTags, createSession, refetchSessions]);
+  }, [institutionId, courseId, assignmentId, studentId, chatScope, selectedToriTags, createSession, refetchSessions]);
 
   /** Send a message (either typed or from a suggestion chip). */
   const handleSend = useCallback(
@@ -172,9 +212,11 @@ export default function AiChatPanel({
       // If no active session exists, create one first
       let sessionId = activeSessionId;
       if (!sessionId) {
+        if (!institutionId) return;
         try {
           const { data } = await createSession({
             variables: {
+              institutionId,
               courseId,
               assignmentId,
               studentId,
@@ -200,7 +242,7 @@ export default function AiChatPanel({
       setIsSending(true);
 
       try {
-        await sendMessage({ variables: { sessionId, content } });
+        await sendMessage({ variables: { sessionId, content, analyticsContext: analyticsContext || undefined } });
         // Refetch session to get both the user message and assistant reply
         await refetchSession();
         await refetchSessions(); // Update the session list (updatedAt changes)
@@ -219,6 +261,7 @@ export default function AiChatPanel({
       studentId,
       chatScope,
       selectedToriTags,
+      analyticsContext,
       createSession,
       sendMessage,
       refetchSession,
@@ -277,31 +320,85 @@ export default function AiChatPanel({
           <Typography variant="subtitle1" fontWeight={600} noWrap>
             {sessionData?.chatSession?.title || "AI Chat"}
           </Typography>
-          {/* Context scope selector */}
-          <ToggleButtonGroup
-            size="small"
-            value={chatScope}
-            exclusive
-            onChange={(_, v) => {
-              if (!v) return;
-              setScopeOverride(v);
-              const label = v === "SELECTION" ? "student" : v === "COURSE" ? "this course" : "all courses";
-              setScopeDividers((prev) => [...prev, { id: `scope-${Date.now()}`, label: `Context → ${label}` }]);
-            }}
-            sx={{ "& .MuiToggleButton-root": { py: 0, px: 1, fontSize: "0.65rem", textTransform: "none" } }}
-          >
-            {studentId && (
-              <ToggleButton value="SELECTION">
-                {studentName
-                  ? (studentName.includes("students")
-                      ? `Selected (${studentName})`
-                      : getDisplayName(studentName))
-                  : "This student"}
-              </ToggleButton>
+          {/* 2x2 scope selector toggles */}
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 0.5 }}>
+            {/* Course axis */}
+            {courseId && (
+              <ToggleButtonGroup
+                size="small"
+                exclusive
+                value={scopeCourse}
+                onChange={(_, v) => {
+                  if (!v) return;
+                  setScopeCourse(v);
+                  // When switching to "all courses", reset assignment to "all"
+                  const newAssignment = v === "all" ? "all" : scopeAssignment;
+                  if (v === "all") setScopeAssignment("all");
+                  void persistScopeChange(v, scopeStudent, newAssignment);
+                }}
+                sx={{ height: 22 }}
+              >
+                <ToggleButton value="this" sx={{ fontSize: "0.65rem", px: 1, py: 0, textTransform: "none" }}>
+                  This course
+                </ToggleButton>
+                <ToggleButton value="all" sx={{ fontSize: "0.65rem", px: 1, py: 0, textTransform: "none" }}>
+                  All courses
+                </ToggleButton>
+              </ToggleButtonGroup>
             )}
-            {courseId && <ToggleButton value="COURSE">This course</ToggleButton>}
-            <ToggleButton value="CROSS_COURSE">All courses</ToggleButton>
-          </ToggleButtonGroup>
+            {/* Student axis */}
+            {studentId && (
+              <ToggleButtonGroup
+                size="small"
+                exclusive
+                value={scopeStudent}
+                onChange={(_, v) => {
+                  if (!v) return;
+                  setScopeStudent(v);
+                  void persistScopeChange(scopeCourse, v, scopeAssignment);
+                }}
+                sx={{ height: 22 }}
+              >
+                <ToggleButton value="this" sx={{ fontSize: "0.65rem", px: 1, py: 0, textTransform: "none" }}>
+                  {studentName ? getDisplayName(studentName) : "This student"}
+                </ToggleButton>
+                <ToggleButton value="all" sx={{ fontSize: "0.65rem", px: 1, py: 0, textTransform: "none" }}>
+                  All students
+                </ToggleButton>
+              </ToggleButtonGroup>
+            )}
+            {/* Assignment axis — shown when in "this course" mode */}
+            {courseId && scopeCourse === "this" && (
+              <ToggleButtonGroup
+                size="small"
+                exclusive
+                value={scopeAssignment}
+                onChange={(_, v) => {
+                  if (!v) return;
+                  setScopeAssignment(v);
+                  void persistScopeChange(scopeCourse, scopeStudent, v);
+                }}
+                sx={{ height: 22 }}
+              >
+                <ToggleButton
+                  value="this"
+                  disabled={!assignmentId}
+                  sx={{ fontSize: "0.65rem", px: 1, py: 0, textTransform: "none" }}
+                >
+                  This assignment
+                </ToggleButton>
+                <ToggleButton value="all" sx={{ fontSize: "0.65rem", px: 1, py: 0, textTransform: "none" }}>
+                  All assignments
+                </ToggleButton>
+              </ToggleButtonGroup>
+            )}
+            {/* Fallback when no context toggles are available */}
+            {!courseId && !studentId && (
+              <Typography variant="caption" color="text.secondary" sx={{ lineHeight: "22px" }}>
+                All courses
+              </Typography>
+            )}
+          </Box>
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
           {/* History toggle (embedded & drawer modes) */}
@@ -393,17 +490,6 @@ export default function AiChatPanel({
             <ChatMessageBubble key={msg.id} message={msg} />
           ))
         )}
-
-        {/* Scope-change dividers (UI-only, not persisted) */}
-        {scopeDividers.map((d) => (
-          <Box key={d.id} sx={{ display: "flex", alignItems: "center", gap: 1, px: 2, py: 0.5 }}>
-            <Box sx={{ flex: 1, height: "1px", bgcolor: "divider" }} />
-            <Typography variant="caption" color="text.disabled" sx={{ whiteSpace: "nowrap" }}>
-              {d.label}
-            </Typography>
-            <Box sx={{ flex: 1, height: "1px", bgcolor: "divider" }} />
-          </Box>
-        ))}
 
         {/* Typing indicator while waiting for a response */}
         {isSending && (

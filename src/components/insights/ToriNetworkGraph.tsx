@@ -1,10 +1,10 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useCallback } from "react";
 import { useQuery } from "@apollo/client/react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Skeleton from "@mui/material/Skeleton";
-import Tooltip from "@mui/material/Tooltip";
+import Typography from "@mui/material/Typography";
 import { GET_NETWORK } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
 import EvidencePopover from "@/components/insights/EvidencePopover";
@@ -19,8 +19,25 @@ const COMMUNITY_COLORS = [
   "#00acc1", // teal
 ];
 
-/** Collision padding between node edges (px). */
-const COLLISION_PADDING = 8;
+// Light fills per community (used as node background).
+const COMMUNITY_FILLS = [
+  "#e3f2fd", // blue
+  "#ffebee", // red
+  "#e8f5e9", // green
+  "#fff3e0", // orange
+  "#f3e5f5", // purple
+  "#e0f7fa", // teal
+];
+
+/** Layout constants */
+const NODE_HEIGHT_MIN = 22;
+const NODE_HEIGHT_MAX = 80;
+const NODE_PAD_X_MIN = 10; // horizontal padding inside rect (low frequency)
+const NODE_PAD_X_MAX = 24; // horizontal padding inside rect (high frequency)
+const NODE_PAD_Y = 8;  // vertical padding between nodes in collision
+const FONT = "12px Inter, system-ui, sans-serif";
+const MAX_VISIBLE_NODES = 30;
+const MIN_FREQ_THRESHOLD = 3; // collapse nodes below this when count > MAX_VISIBLE_NODES
 
 interface NodeData {
   id: string;
@@ -37,6 +54,12 @@ interface EdgeData {
   weight: number;
 }
 
+interface LayoutNode extends NodeData {
+  labelWidth: number; // measured text width
+  boxWidth: number;   // labelWidth + padding
+  boxHeight: number;  // scaled by frequency
+}
+
 interface PopoverState {
   anchorEl: HTMLElement;
   toriTagId: string;
@@ -44,14 +67,38 @@ interface PopoverState {
 }
 
 interface ToriNetworkGraphProps {
-  onViewThread?: (threadId: string, studentName: string) => void;
+  onViewThread?: (threadId: string, studentName: string, studentId?: string, initialToriTag?: string) => void;
+  onStudentClick?: (studentId: string, studentName: string) => void;
 }
 
-export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps) {
+/** Measure text width using an off-screen canvas. */
+function measureTextWidths(nodes: NodeData[]): Map<string, number> {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d")!;
+  ctx.font = FONT;
+  const widths = new Map<string, number>();
+  for (const node of nodes) {
+    widths.set(node.id, ctx.measureText(node.name).width);
+  }
+  return widths;
+}
+
+/** Get the set of node IDs connected to a given node via edges. */
+function getConnectedNodes(nodeId: string, edges: EdgeData[]): Set<string> {
+  const connected = new Set<string>();
+  connected.add(nodeId);
+  for (const e of edges) {
+    if (e.source === nodeId) connected.add(e.target);
+    if (e.target === nodeId) connected.add(e.source);
+  }
+  return connected;
+}
+
+export default function ToriNetworkGraph({ onViewThread, onStudentClick }: ToriNetworkGraphProps) {
   const { scope } = useInsightsScope();
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [lockedNode, setLockedNode] = useState<string | null>(null);
   const [popover, setPopover] = useState<PopoverState | null>(null);
-  // Hidden anchor element for positioning popovers from SVG clicks
   const anchorRef = useRef<HTMLDivElement>(null);
 
   const { data, loading, error, refetch } = useQuery<any>(GET_NETWORK, {
@@ -59,44 +106,69 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
     skip: !scope,
   });
 
-  // Force-directed layout with collision avoidance.
+  // Force-directed layout with AABB collision avoidance and rectangle nodes.
   const layout = useMemo(() => {
     if (!data?.network?.data) return null;
 
-    const nodes: NodeData[] = data.network.data.nodes;
+    let nodes: NodeData[] = data.network.data.nodes;
     const edges: EdgeData[] = data.network.data.edges;
 
-    if (nodes.length === 0) return { nodes: [], edges: [], positions: {} as Record<string, { x: number; y: number }> };
+    if (nodes.length === 0) return { nodes: [] as LayoutNode[], edges: [], positions: {} as Record<string, { x: number; y: number }>, W: 500, H: 400 };
 
-    const W = 500;
-    const H = 400;
+    // Dense graph handling: collapse low-frequency nodes when there are too many
+    if (nodes.length > MAX_VISIBLE_NODES) {
+      const sorted = [...nodes].sort((a, b) => b.frequency - a.frequency);
+      nodes = sorted.filter((n) => n.frequency >= MIN_FREQ_THRESHOLD).slice(0, MAX_VISIBLE_NODES);
+      // If we still have too many, just take the top N
+      if (nodes.length > MAX_VISIBLE_NODES) {
+        nodes = nodes.slice(0, MAX_VISIBLE_NODES);
+      }
+    }
+
+    // Measure text widths
+    const textWidths = measureTextWidths(nodes);
+
+    // Build layout nodes with measured dimensions (height AND width scale with frequency)
     const maxFreq = Math.max(...nodes.map((n) => n.frequency), 1);
-    const maxWeight = Math.max(...edges.map((e) => e.weight), 1);
+    const layoutNodes: LayoutNode[] = nodes.map((n) => {
+      const labelWidth = textWidths.get(n.id) ?? 60;
+      const freqRatio = n.frequency / maxFreq;
+      const boxHeight = NODE_HEIGHT_MIN + (NODE_HEIGHT_MAX - NODE_HEIGHT_MIN) * freqRatio;
+      const padX = NODE_PAD_X_MIN + (NODE_PAD_X_MAX - NODE_PAD_X_MIN) * freqRatio;
+      return { ...n, labelWidth, boxWidth: labelWidth + padX * 2, boxHeight };
+    });
 
-    // Pre-compute radii for collision detection
-    const radii = nodes.map((n) => 6 + (n.frequency / maxFreq) * 14);
+    // Filter edges to only include visible nodes
+    const nodeIds = new Set(layoutNodes.map((n) => n.id));
+    const visibleEdges = edges.filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target));
 
-    // Build a node-index lookup for edge references
+    const W = 700;
+    const H = Math.max(400, layoutNodes.length * 16);
+    const maxWeight = Math.max(...visibleEdges.map((e) => e.weight), 1);
+
+    // Build a node-index lookup
     const nodeIndex: Record<string, number> = {};
-    nodes.forEach((n, i) => { nodeIndex[n.id] = i; });
+    layoutNodes.forEach((n, i) => { nodeIndex[n.id] = i; });
 
     // Initialize positions (seeded by index for stability)
-    const pos = nodes.map((_, i) => ({
-      x: W * 0.2 + (W * 0.6) * ((i * 7 + 13) % nodes.length) / Math.max(nodes.length - 1, 1),
-      y: H * 0.2 + (H * 0.6) * ((i * 11 + 7) % nodes.length) / Math.max(nodes.length - 1, 1),
+    const pos = layoutNodes.map((_, i) => ({
+      x: W * 0.15 + (W * 0.7) * ((i * 7 + 13) % layoutNodes.length) / Math.max(layoutNodes.length - 1, 1),
+      y: H * 0.15 + (H * 0.7) * ((i * 11 + 7) % layoutNodes.length) / Math.max(layoutNodes.length - 1, 1),
     }));
 
-    const ITERATIONS = 200;
+    const ITERATIONS = 300;
     for (let iter = 0; iter < ITERATIONS; iter++) {
       const temp = 1 - iter / ITERATIONS;
 
-      // Repulsion between all node pairs (Coulomb-like)
-      for (let i = 0; i < nodes.length; i++) {
-        for (let j = i + 1; j < nodes.length; j++) {
+      // Repulsion between all node pairs (Coulomb-like, scaled by label width)
+      for (let i = 0; i < layoutNodes.length; i++) {
+        for (let j = i + 1; j < layoutNodes.length; j++) {
           const dx = pos[i].x - pos[j].x;
           const dy = pos[i].y - pos[j].y;
           const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-          const force = (2000 * temp) / (dist * dist);
+          // Increase repulsion for wider nodes
+          const avgWidth = (layoutNodes[i].boxWidth + layoutNodes[j].boxWidth) / 2;
+          const force = (4000 * temp * (avgWidth / 60)) / (dist * dist);
           const fx = (dx / dist) * force;
           const fy = (dy / dist) * force;
           pos[i].x += fx;
@@ -107,14 +179,14 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
       }
 
       // Attraction along edges (Hooke-like)
-      for (const edge of edges) {
+      for (const edge of visibleEdges) {
         const si = nodeIndex[edge.source];
         const ti = nodeIndex[edge.target];
         if (si === undefined || ti === undefined) continue;
         const dx = pos[ti].x - pos[si].x;
         const dy = pos[ti].y - pos[si].y;
         const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 1);
-        const force = (dist - 80) * 0.01 * (edge.weight / maxWeight) * temp;
+        const force = (dist - 100) * 0.008 * (edge.weight / maxWeight) * temp;
         const fx = (dx / dist) * force;
         const fy = (dy / dist) * force;
         pos[si].x += fx;
@@ -124,49 +196,144 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
       }
 
       // Centering force
-      for (let i = 0; i < nodes.length; i++) {
+      for (let i = 0; i < layoutNodes.length; i++) {
         pos[i].x += (W / 2 - pos[i].x) * 0.01;
         pos[i].y += (H / 2 - pos[i].y) * 0.01;
       }
 
-      // Collision resolution — push overlapping nodes apart
-      for (let i = 0; i < nodes.length; i++) {
-        for (let j = i + 1; j < nodes.length; j++) {
+      // AABB collision resolution — push overlapping rectangles apart
+      for (let i = 0; i < layoutNodes.length; i++) {
+        for (let j = i + 1; j < layoutNodes.length; j++) {
           const dx = pos[i].x - pos[j].x;
           const dy = pos[i].y - pos[j].y;
-          const dist = Math.max(Math.sqrt(dx * dx + dy * dy), 0.1);
-          const minDist = radii[i] + radii[j] + COLLISION_PADDING;
-          if (dist < minDist) {
-            const overlap = (minDist - dist) / 2;
-            const nx = dx / dist;
-            const ny = dy / dist;
-            pos[i].x += nx * overlap;
-            pos[i].y += ny * overlap;
-            pos[j].x -= nx * overlap;
-            pos[j].y -= ny * overlap;
+
+          const halfW_i = layoutNodes[i].boxWidth / 2 + NODE_PAD_Y;
+          const halfW_j = layoutNodes[j].boxWidth / 2 + NODE_PAD_Y;
+          const halfH_i = layoutNodes[i].boxHeight / 2 + NODE_PAD_Y;
+          const halfH_j = layoutNodes[j].boxHeight / 2 + NODE_PAD_Y;
+
+          const overlapX = (halfW_i + halfW_j) - Math.abs(dx);
+          const overlapY = (halfH_i + halfH_j) - Math.abs(dy);
+
+          if (overlapX > 0 && overlapY > 0) {
+            // Resolve along the axis with smallest overlap
+            if (overlapX < overlapY) {
+              const push = overlapX / 2;
+              const sign = dx >= 0 ? 1 : -1;
+              pos[i].x += sign * push;
+              pos[j].x -= sign * push;
+            } else {
+              const push = overlapY / 2;
+              const sign = dy >= 0 ? 1 : -1;
+              pos[i].y += sign * push;
+              pos[j].y -= sign * push;
+            }
           }
         }
       }
     }
 
-    // Clamp positions to stay within bounds
-    const pad = 30;
-    for (const p of pos) {
-      p.x = Math.max(pad, Math.min(W - pad, p.x));
-      p.y = Math.max(pad, Math.min(H - pad, p.y));
+    // Post-layout: interleaved clamp + collision resolution.
+    // Allow canvas to expand so boundary-clamped nodes don't get stuck overlapping.
+    let finalW = W, finalH = H;
+    for (let pass = 0; pass < 100; pass++) {
+      // Clamp to left/top boundary
+      for (let i = 0; i < layoutNodes.length; i++) {
+        const halfW = layoutNodes[i].boxWidth / 2;
+        pos[i].x = Math.max(halfW + 4, pos[i].x);
+        pos[i].y = Math.max(layoutNodes[i].boxHeight / 2 + 4, pos[i].y);
+      }
+      // Resolve overlaps
+      let hadOverlap = false;
+      for (let i = 0; i < layoutNodes.length; i++) {
+        for (let j = i + 1; j < layoutNodes.length; j++) {
+          const dx = pos[i].x - pos[j].x;
+          const dy = pos[i].y - pos[j].y;
+          const halfW_i = layoutNodes[i].boxWidth / 2 + NODE_PAD_Y;
+          const halfW_j = layoutNodes[j].boxWidth / 2 + NODE_PAD_Y;
+          const halfH_i = layoutNodes[i].boxHeight / 2 + NODE_PAD_Y;
+          const halfH_j = layoutNodes[j].boxHeight / 2 + NODE_PAD_Y;
+          const overlapX = (halfW_i + halfW_j) - Math.abs(dx);
+          const overlapY = (halfH_i + halfH_j) - Math.abs(dy);
+          if (overlapX > 0 && overlapY > 0) {
+            hadOverlap = true;
+            if (overlapX < overlapY) {
+              const push = overlapX / 2 + 1;
+              const sign = dx >= 0 ? 1 : -1;
+              pos[i].x += sign * push;
+              pos[j].x -= sign * push;
+            } else {
+              const push = overlapY / 2 + 1;
+              const sign = dy >= 0 ? 1 : -1;
+              pos[i].y += sign * push;
+              pos[j].y -= sign * push;
+            }
+          }
+        }
+      }
+      if (!hadOverlap) break;
+    }
+    // Compute final canvas size to fit all nodes
+    for (let i = 0; i < layoutNodes.length; i++) {
+      const halfW = layoutNodes[i].boxWidth / 2;
+      pos[i].x = Math.max(halfW + 4, pos[i].x);
+      pos[i].y = Math.max(layoutNodes[i].boxHeight / 2 + 4, pos[i].y);
+      finalW = Math.max(finalW, pos[i].x + halfW + 8);
+      finalH = Math.max(finalH, pos[i].y + layoutNodes[i].boxHeight / 2 + 8);
     }
 
-    // Compute median frequency for label visibility threshold
-    const freqs = [...nodes.map((n) => n.frequency)].sort((a, b) => a - b);
-    const medianFreq = freqs[Math.floor(freqs.length / 2)] ?? 0;
-
     const positions: Record<string, { x: number; y: number }> = {};
-    nodes.forEach((node, i) => {
+    layoutNodes.forEach((node, i) => {
       positions[node.id] = pos[i];
     });
 
-    return { nodes, edges, positions, maxFreq, maxWeight, radii, medianFreq };
+    return { nodes: layoutNodes, edges: visibleEdges, positions, maxWeight, W: finalW, H: finalH };
   }, [data]);
+
+  // The "active" node is whichever is locked, or hovered if none is locked
+  const activeNode = lockedNode ?? hoveredNode;
+
+  // Connected nodes for highlighting
+  const connectedNodes = useMemo(() => {
+    if (!activeNode || !layout) return null;
+    return getConnectedNodes(activeNode, layout.edges);
+  }, [activeNode, layout]);
+
+  const handleNodeHover = useCallback((nodeId: string | null) => {
+    // Don't change hover state while a node is locked
+    if (!lockedNode) {
+      setHoveredNode(nodeId);
+    }
+  }, [lockedNode]);
+
+  const handleNodeClick = useCallback((event: React.MouseEvent, node: LayoutNode) => {
+    if (!anchorRef.current || !layout) return;
+
+    // Toggle lock: clicking the locked node unlocks it, otherwise lock the new one
+    if (lockedNode === node.id) {
+      setLockedNode(null);
+      setPopover(null);
+      return;
+    }
+
+    setLockedNode(node.id);
+
+    // Position hidden anchor for popover
+    const svgEl = (event.currentTarget as Element).closest("svg")!;
+    const rect = svgEl.getBoundingClientRect();
+    const svgPos = layout.positions[node.id];
+    const scaleX = rect.width / layout.W;
+    const scaleY = rect.height / layout.H;
+    anchorRef.current.style.position = "fixed";
+    anchorRef.current.style.left = `${rect.left + svgPos.x * scaleX}px`;
+    anchorRef.current.style.top = `${rect.top + svgPos.y * scaleY + (node.boxHeight / 2) * scaleY}px`;
+    setPopover({ anchorEl: anchorRef.current, toriTagId: node.id, toriTagName: node.name });
+  }, [lockedNode, layout]);
+
+  const handleBackgroundClick = useCallback(() => {
+    setLockedNode(null);
+    setPopover(null);
+  }, []);
 
   // ── Error state ────────────────────────────────────────────────────────────
 
@@ -191,7 +358,7 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
     return <Skeleton variant="rectangular" height={400} />;
   }
 
-  const { nodes, edges, positions, maxFreq, maxWeight, medianFreq = 0 } = layout;
+  const { nodes, edges, positions, maxWeight, W, H } = layout;
 
   if (nodes.length === 0) {
     return (
@@ -201,122 +368,139 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
     );
   }
 
-  // Build a set of edges connected to the hovered node for highlighting.
-  const connectedEdges = new Set<number>();
-  if (hoveredNode) {
-    edges.forEach((e, i) => {
-      if (e.source === hoveredNode || e.target === hoveredNode) {
-        connectedEdges.add(i);
-      }
-    });
-  }
-
-  /** Handle node click — position a hidden anchor div and open evidence popover. */
-  const handleNodeClick = (event: React.MouseEvent, node: NodeData) => {
-    if (!anchorRef.current) return;
-    const rect = (event.currentTarget as Element).closest("svg")!.getBoundingClientRect();
-    const svgPos = positions[node.id];
-    // Convert SVG coords to screen coords (accounting for viewBox scaling)
-    const scaleX = rect.width / 500;
-    const scaleY = rect.height / 400;
-    anchorRef.current.style.position = "fixed";
-    anchorRef.current.style.left = `${rect.left + svgPos.x * scaleX}px`;
-    anchorRef.current.style.top = `${rect.top + svgPos.y * scaleY}px`;
-    setPopover({ anchorEl: anchorRef.current, toriTagId: node.id, toriTagName: node.name });
-  };
-
   return (
-    <Box sx={{ display: "flex", justifyContent: "center", position: "relative" }}>
+    <Box sx={{ position: "relative" }}>
       {/* Hidden anchor for popover positioning */}
       <div ref={anchorRef} style={{ position: "fixed", width: 1, height: 1, pointerEvents: "none" }} />
 
-      <svg
-        width="100%"
-        height={400}
-        viewBox="0 0 500 400"
-        style={{ maxWidth: "100%", height: "auto" }}
-      >
-        {/* Edges */}
-        {edges.map((edge, i) => {
-          const from = positions[edge.source];
-          const to = positions[edge.target];
-          if (!from || !to) return null;
+      {/* Hint text */}
+      <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
+        Hover to highlight connections. Click a tag to lock and view evidence.
+      </Typography>
 
-          const highlighted =
-            hoveredNode === null || connectedEdges.has(i);
-          const thickness = 1 + (edge.weight / maxWeight!) * 4;
+      <Box sx={{ overflowX: "auto" }}>
+        <svg
+          width="100%"
+          viewBox={`0 0 ${W} ${H}`}
+          style={{ minWidth: 500, maxWidth: 900, height: "auto", display: "block", margin: "0 auto" }}
+        >
+          {/* Background click target to unlock */}
+          <rect
+            x={0} y={0} width={W} height={H}
+            fill="transparent"
+            onClick={handleBackgroundClick}
+          />
 
-          return (
-            <line
-              key={`e-${i}`}
-              x1={from.x}
-              y1={from.y}
-              x2={to.x}
-              y2={to.y}
-              stroke={highlighted ? "#999" : "#eee"}
-              strokeWidth={highlighted ? thickness : 0.5}
-              strokeOpacity={highlighted ? 0.7 : 0.2}
-            />
-          );
-        })}
+          {/* Edges */}
+          {edges.map((edge, i) => {
+            const from = positions[edge.source];
+            const to = positions[edge.target];
+            if (!from || !to) return null;
 
-        {/* Nodes */}
-        {nodes.map((node) => {
-          const pos = positions[node.id];
-          if (!pos) return null;
+            const isHighlighted = !activeNode
+              || (connectedNodes?.has(edge.source) && connectedNodes?.has(edge.target));
+            const thickness = 1 + (edge.weight / maxWeight!) * 2; // 1-3px range
 
-          const r = 6 + (node.frequency / maxFreq!) * 14;
-          const color =
-            COMMUNITY_COLORS[node.communityId % COMMUNITY_COLORS.length];
-          // Only show labels for above-median frequency nodes (or hovered)
-          const showLabel = node.frequency >= medianFreq || hoveredNode === node.id;
+            return (
+              <line
+                key={`e-${i}`}
+                x1={from.x}
+                y1={from.y}
+                x2={to.x}
+                y2={to.y}
+                stroke={isHighlighted ? "#bbb" : "#eee"}
+                strokeWidth={isHighlighted ? thickness : 0.5}
+                strokeOpacity={isHighlighted ? 0.6 : 0.15}
+              />
+            );
+          })}
 
-          return (
-            <Tooltip
-              key={node.id}
-              title={`${node.name} (${node.domain}) — freq: ${node.frequency}, degree: ${node.degree}`}
-              arrow
-              enterDelay={0}
-              enterNextDelay={0}
-            >
+          {/* Nodes — rounded rectangles with text labels */}
+          {nodes.map((node) => {
+            const pos = positions[node.id];
+            if (!pos) return null;
+
+            const colorIdx = node.communityId % COMMUNITY_COLORS.length;
+            const strokeColor = COMMUNITY_COLORS[colorIdx];
+            const fillColor = COMMUNITY_FILLS[colorIdx];
+            const isActive = activeNode === node.id;
+            const isConnected = !activeNode || connectedNodes?.has(node.id);
+
+            // Font size scales with node height
+            const freqScale = (node.boxHeight - NODE_HEIGHT_MIN) / (NODE_HEIGHT_MAX - NODE_HEIGHT_MIN);
+            const fontSize = 10 + freqScale * 6; // 10-16px
+
+            return (
               <g
-                onMouseEnter={() => setHoveredNode(node.id)}
-                onMouseLeave={() => setHoveredNode(null)}
-                onClick={(e) => handleNodeClick(e, node)}
+                key={node.id}
+                onMouseEnter={() => handleNodeHover(node.id)}
+                onMouseLeave={() => handleNodeHover(null)}
+                onClick={(e) => { e.stopPropagation(); handleNodeClick(e, node); }}
                 style={{ cursor: "pointer" }}
+                opacity={isConnected ? 1 : 0.15}
               >
-                <circle cx={pos.x} cy={pos.y} r={r} fill={color} />
-                {showLabel && (
-                  <text
-                    x={pos.x}
-                    y={pos.y + r + 12}
-                    textAnchor="middle"
-                    fontSize={10}
-                    fill="currentColor"
-                  >
-                    {node.name.length > 14
-                      ? node.name.slice(0, 12) + "..."
-                      : node.name}
-                  </text>
-                )}
+                <rect
+                  x={pos.x - node.boxWidth / 2}
+                  y={pos.y - node.boxHeight / 2}
+                  width={node.boxWidth}
+                  height={node.boxHeight}
+                  rx={6}
+                  ry={6}
+                  fill={isActive ? strokeColor : fillColor}
+                  stroke={strokeColor}
+                  strokeWidth={isActive ? 2 : 1}
+                />
+                {/* Frequency count badge */}
+                <text
+                  x={pos.x + node.boxWidth / 2 - 4}
+                  y={pos.y - node.boxHeight / 2 + 4}
+                  textAnchor="end"
+                  dominantBaseline="hanging"
+                  fill={isActive ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.35)"}
+                  fontSize={9}
+                  fontFamily="Inter, system-ui, sans-serif"
+                  fontWeight={600}
+                  style={{ pointerEvents: "none", userSelect: "none" }}
+                >
+                  {node.frequency}
+                </text>
+                <text
+                  x={pos.x}
+                  y={pos.y}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fill={isActive ? "#fff" : "#333"}
+                  fontSize={fontSize}
+                  fontFamily="Inter, system-ui, sans-serif"
+                  fontWeight={isActive ? 600 : 400}
+                  style={{ pointerEvents: "none", userSelect: "none" }}
+                >
+                  {node.name}
+                </text>
               </g>
-            </Tooltip>
-          );
-        })}
-      </svg>
+            );
+          })}
+        </svg>
+      </Box>
 
-      {/* Evidence popover — shown when a node is clicked */}
+      {/* Evidence popover — shown when a node is clicked (locked) */}
       {popover && scope && (
         <EvidencePopover
           anchorEl={popover.anchorEl}
           toriTagId={popover.toriTagId}
           toriTagName={popover.toriTagName}
           scope={scope}
-          onClose={() => setPopover(null)}
-          onViewThread={(threadId, studentName) => {
+          onClose={() => { setPopover(null); setLockedNode(null); }}
+          onViewThread={(threadId, studentName, studentId, initialToriTag) => {
             setPopover(null);
-            onViewThread?.(threadId, studentName);
+            setLockedNode(null);
+            onViewThread?.(threadId, studentName, studentId, initialToriTag);
           }}
+          onStudentClick={onStudentClick ? (id, name) => {
+            setPopover(null);
+            setLockedNode(null);
+            onStudentClick(id, name);
+          } : undefined}
         />
       )}
     </Box>

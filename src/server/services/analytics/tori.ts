@@ -22,6 +22,7 @@ export interface TagCoverage {
 
 export interface CoOccurrence {
   tags: string[];
+  tagIds: string[];
   count: number;
 }
 
@@ -167,10 +168,14 @@ export async function getToriAnalysis(
       limit?: number
     ): CoOccurrence[] => {
       const sorted = [...counts.entries()]
-        .map(([key, count]) => ({
-          tags: key.split("|").map((id) => tagMap.get(id)?.name ?? id),
-          count,
-        }))
+        .map(([key, count]) => {
+          const ids = key.split("|");
+          return {
+            tags: ids.map((id) => tagMap.get(id)?.name ?? id),
+            tagIds: ids,
+            count,
+          };
+        })
         .sort((a, b) => b.count - a.count);
       return limit ? sorted.slice(0, limit) : sorted;
     };

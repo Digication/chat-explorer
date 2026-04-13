@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery } from "@apollo/client/react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -10,6 +10,7 @@ import Skeleton from "@mui/material/Skeleton";
 import Typography from "@mui/material/Typography";
 import { GET_OVERVIEW, GET_STUDENT_ENGAGEMENT } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
+import { useInsightsAnalytics } from "@/components/insights/InsightsAnalyticsContext";
 import StudentDrillDown, { type StudentItem } from "@/components/insights/StudentDrillDown";
 
 interface MetricDef {
@@ -68,11 +69,12 @@ const METRICS: MetricDef[] = [
 
 interface MetricsCardsProps {
   /** Called when a student is selected from the drill-down popover. */
-  onViewThread?: (threadId: string, studentName: string) => void;
+  onOpenStudent?: (studentId: string, studentName: string) => void;
 }
 
-export default function MetricsCards({ onViewThread }: MetricsCardsProps) {
+export default function MetricsCards({ onOpenStudent }: MetricsCardsProps) {
   const { scope } = useInsightsScope();
+  const { registerSummary } = useInsightsAnalytics();
   const [drillDown, setDrillDown] = useState<{
     anchorEl: HTMLElement;
     students: StudentItem[];
@@ -88,6 +90,20 @@ export default function MetricsCards({ onViewThread }: MetricsCardsProps) {
     variables: { scope },
     skip: !scope,
   });
+
+  // Register overview summary for AI Chat context
+  useEffect(() => {
+    const overview = data?.overview?.data;
+    if (overview) {
+      const parts = [
+        `${overview.threadCount ?? 0} threads`,
+        `${overview.participantCount ?? 0} participants`,
+        `${overview.commentCount ?? 0} comments`,
+        `mean ${Math.round(overview.wordCountStats?.mean ?? 0)} words`,
+      ];
+      registerSummary("Overview", parts.join(", "));
+    }
+  }, [data, registerSummary]);
 
   if (error) {
     return (
@@ -129,8 +145,8 @@ export default function MetricsCards({ onViewThread }: MetricsCardsProps) {
 
   /** Called when a student is selected in the drill-down. */
   const handleSelectStudent = (studentId: string, studentName: string) => {
-    if (onViewThread) {
-      onViewThread(studentId, studentName);
+    if (onOpenStudent) {
+      onOpenStudent(studentId, studentName);
     }
   };
 

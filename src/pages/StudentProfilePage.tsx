@@ -13,6 +13,8 @@ import {
   Alert,
   Button,
   Tooltip,
+  Tabs,
+  Tab,
 } from "@mui/material";
 import { GET_STUDENT_PROFILE } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
@@ -59,8 +61,22 @@ function Section({
   );
 }
 
-export default function StudentProfilePage() {
-  const { studentId } = useParams<{ studentId: string }>();
+interface StudentProfilePageProps {
+  /** When provided, uses this instead of route params. */
+  studentId?: string;
+  /** When true, hides breadcrumb and reduces padding for panel embedding. */
+  embedded?: boolean;
+  /** When provided (panel mode), called instead of opening local thread modal. */
+  onViewThread?: (threadId: string, studentName: string) => void;
+}
+
+export default function StudentProfilePage({
+  studentId: propStudentId,
+  embedded,
+  onViewThread: onViewThreadProp,
+}: StudentProfilePageProps = {}) {
+  const { studentId: routeStudentId } = useParams<{ studentId: string }>();
+  const studentId = propStudentId ?? routeStudentId;
   const { scope } = useInsightsScope();
   const { getDisplayName } = useUserSettings();
 
@@ -78,9 +94,13 @@ export default function StudentProfilePage() {
 
   const handleViewThread = useCallback(
     (threadId: string, studentName: string) => {
-      setOpenThread({ threadId, studentName });
+      if (onViewThreadProp) {
+        onViewThreadProp(threadId, studentName);
+      } else {
+        setOpenThread({ threadId, studentName });
+      }
     },
-    []
+    [onViewThreadProp]
   );
 
   const { data, loading, error, refetch } = useQuery<any>(
@@ -91,10 +111,14 @@ export default function StudentProfilePage() {
     }
   );
 
+  const wrapperSx = embedded
+    ? { py: 2, px: 1 }
+    : { maxWidth: 1000, mx: "auto", py: 4, px: 3 };
+
   // ── Loading state ──────────────────────────────────────────────
   if (loading || (!data && !error)) {
     return (
-      <Box sx={{ maxWidth: 1000, mx: "auto", py: 4, px: 3 }}>
+      <Box sx={wrapperSx}>
         <Skeleton variant="text" width={300} height={32} sx={{ mb: 2 }} />
         <Grid container spacing={2} sx={{ mb: 4 }}>
           {[0, 1, 2, 3].map((i) => (
@@ -112,7 +136,7 @@ export default function StudentProfilePage() {
   // ── Error state ────────────────────────────────────────────────
   if (error) {
     return (
-      <Box sx={{ maxWidth: 1000, mx: "auto", py: 4, px: 3 }}>
+      <Box sx={wrapperSx}>
         <Alert
           severity="error"
           action={
@@ -135,13 +159,15 @@ export default function StudentProfilePage() {
   // ── Empty state ────────────────────────────────────────────────
   if (profile.totalComments === 0) {
     return (
-      <Box sx={{ maxWidth: 1000, mx: "auto", py: 4, px: 3 }}>
-        <Breadcrumbs sx={{ mb: 3 }}>
-          <Link component={RouterLink} to="/insights" underline="hover">
-            Insights
-          </Link>
-          <Typography color="text.primary">Student Profile</Typography>
-        </Breadcrumbs>
+      <Box sx={wrapperSx}>
+        {!embedded && (
+          <Breadcrumbs sx={{ mb: 3 }}>
+            <Link component={RouterLink} to="/insights" underline="hover">
+              Insights
+            </Link>
+            <Typography color="text.primary">Student Profile</Typography>
+          </Breadcrumbs>
+        )}
         <Paper
           variant="outlined"
           sx={{ p: 6, textAlign: "center" }}
@@ -149,9 +175,11 @@ export default function StudentProfilePage() {
           <Typography color="text.secondary" sx={{ mb: 2 }}>
             No reflection data found for this student in the current scope.
           </Typography>
-          <Button component={RouterLink} to="/insights" variant="outlined">
-            Back to Insights
-          </Button>
+          {!embedded && (
+            <Button component={RouterLink} to="/insights" variant="outlined">
+              Back to Insights
+            </Button>
+          )}
         </Paper>
       </Box>
     );
@@ -172,17 +200,19 @@ export default function StudentProfilePage() {
   ).key;
 
   return (
-    <Box sx={{ display: "flex", p: 4 }}>
-      <Box sx={{ flex: 1, minWidth: 0, maxWidth: 1000, mx: "auto", py: 4, px: 2 }}>
-        {/* ── Breadcrumb ──────────────────────────────────────── */}
-        <Breadcrumbs sx={{ mb: 3 }}>
-          <Link component={RouterLink} to="/insights" underline="hover">
-            Insights
-          </Link>
-          <Typography color="text.primary">
-            Student Profile: {displayName}
-          </Typography>
-        </Breadcrumbs>
+    <Box sx={embedded ? { p: 1 } : { display: "flex", p: 4 }}>
+      <Box sx={embedded ? {} : { flex: 1, minWidth: 0, maxWidth: 1000, mx: "auto", py: 4, px: 2 }}>
+        {/* ── Breadcrumb (hidden when embedded in panel) ──────── */}
+        {!embedded && (
+          <Breadcrumbs sx={{ mb: 3 }}>
+            <Link component={RouterLink} to="/insights" underline="hover">
+              Insights
+            </Link>
+            <Typography color="text.primary">
+              Student Profile: {displayName}
+            </Typography>
+          </Breadcrumbs>
+        )}
 
         {/* ── Summary Cards ───────────────────────────────────── */}
         <Grid container spacing={2} sx={{ mb: 4 }}>
@@ -281,6 +311,13 @@ export default function StudentProfilePage() {
           )}
         </Section>
 
+        {/* ── TORI Tag Trends (Delta Heatmap, Sparklines, Slope) ── */}
+        {profile.perAssignmentToriTags?.length > 1 && (
+          <Section title="TORI Tag Trends">
+            <ToriTagTrends perAssignmentToriTags={profile.perAssignmentToriTags} />
+          </Section>
+        )}
+
         {/* ── Evidence Highlights ──────────────────────────────── */}
         <Section title="Notable Reflections">
           {profile.evidenceHighlights.length === 0 ? (
@@ -332,8 +369,8 @@ export default function StudentProfilePage() {
         </Section>
       </Box>
 
-      {/* ── Thread Panel (slide-in) ─────────────────────────────── */}
-      {openThread && (
+      {/* ── Thread Panel (slide-in) — only when not embedded ──── */}
+      {!embedded && openThread && (
         <>
           <Box
             onClick={() => setOpenThread(null)}
@@ -677,6 +714,382 @@ function ToriTagBars({
           </Button>
         </Box>
       )}
+    </Box>
+  );
+}
+
+// ── TORI Tag Trends (Delta Heatmap, Sparklines, Slope Chart) ─────
+
+interface AssignmentTagData {
+  assignmentId: string;
+  assignmentName: string;
+  date: string;
+  tags: { tagId: string; tagName: string; domain: string; count: number }[];
+}
+
+/** Combines Delta Heatmap, Sparklines, and Slope Chart in tabs. */
+function ToriTagTrends({
+  perAssignmentToriTags,
+}: {
+  perAssignmentToriTags: AssignmentTagData[];
+}) {
+  const [tab, setTab] = useState(0);
+
+  // Collect all unique tags across assignments, sorted by total count
+  const tagTotals = new Map<string, { tagName: string; domain: string; total: number }>();
+  for (const a of perAssignmentToriTags) {
+    for (const t of a.tags) {
+      const existing = tagTotals.get(t.tagId) ?? { tagName: t.tagName, domain: t.domain, total: 0 };
+      existing.total += t.count;
+      tagTotals.set(t.tagId, existing);
+    }
+  }
+  const allTags = [...tagTotals.entries()]
+    .sort((a, b) => b[1].total - a[1].total)
+    .slice(0, 10); // Top 10 tags
+
+  // Build matrix: tagId → assignment index → count
+  const matrix = new Map<string, number[]>();
+  for (const [tagId] of allTags) {
+    matrix.set(
+      tagId,
+      perAssignmentToriTags.map((a) => {
+        const found = a.tags.find((t) => t.tagId === tagId);
+        return found?.count ?? 0;
+      }),
+    );
+  }
+
+  return (
+    <Box>
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
+        <Tab label="Delta Heatmap" />
+        <Tab label="Sparklines" />
+        <Tab label="Slope Chart" />
+      </Tabs>
+
+      {tab === 0 && (
+        <DeltaHeatmap
+          allTags={allTags}
+          matrix={matrix}
+          assignments={perAssignmentToriTags}
+        />
+      )}
+      {tab === 1 && (
+        <ToriSparklines
+          allTags={allTags}
+          matrix={matrix}
+          assignments={perAssignmentToriTags}
+        />
+      )}
+      {tab === 2 && (
+        <SlopeChart
+          allTags={allTags}
+          matrix={matrix}
+          assignments={perAssignmentToriTags}
+        />
+      )}
+    </Box>
+  );
+}
+
+/** Delta Heatmap: tags on Y, assignments on X, color = period-to-period change. */
+function DeltaHeatmap({
+  allTags,
+  matrix,
+  assignments,
+}: {
+  allTags: [string, { tagName: string; domain: string; total: number }][];
+  matrix: Map<string, number[]>;
+  assignments: AssignmentTagData[];
+}) {
+  // For the first assignment, delta is 0 (no prior data)
+  const maxDelta = Math.max(
+    1,
+    ...allTags.flatMap(([tagId]) => {
+      const vals = matrix.get(tagId)!;
+      return vals.slice(1).map((v, i) => Math.abs(v - vals[i]));
+    }),
+  );
+
+  return (
+    <Box sx={{ overflowX: "auto" }}>
+      <table style={{ borderCollapse: "collapse", fontSize: 12 }}>
+        <thead>
+          <tr>
+            <th style={{ padding: "4px 8px", textAlign: "left", minWidth: 140 }} />
+            {assignments.map((a, i) => (
+              <th
+                key={a.assignmentId}
+                style={{
+                  padding: "4px 6px",
+                  fontWeight: 500,
+                  whiteSpace: "nowrap",
+                  textAlign: "center",
+                  fontSize: 10,
+                }}
+              >
+                {i === 0 ? a.assignmentName : `Δ → ${a.assignmentName}`}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {allTags.map(([tagId, { tagName }]) => {
+            const vals = matrix.get(tagId)!;
+            return (
+              <tr key={tagId}>
+                <td
+                  style={{
+                    padding: "4px 8px",
+                    fontWeight: 500,
+                    whiteSpace: "nowrap",
+                    maxWidth: 160,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {tagName}
+                </td>
+                {vals.map((v, i) => {
+                  if (i === 0) {
+                    // First column shows the baseline count
+                    return (
+                      <td
+                        key={i}
+                        style={{
+                          textAlign: "center",
+                          padding: 4,
+                          border: "1px solid rgba(0,0,0,0.06)",
+                          background: "#f5f5f5",
+                          color: "#666",
+                        }}
+                      >
+                        {v}
+                      </td>
+                    );
+                  }
+                  const delta = v - vals[i - 1];
+                  const intensity = Math.min(Math.abs(delta) / maxDelta, 1);
+                  // Green for increase, red for decrease, white for no change
+                  let bg = "#fff";
+                  let color = "#333";
+                  if (delta > 0) {
+                    const g = Math.round(200 + (100 - 200) * intensity);
+                    const rb = Math.round(240 - 100 * intensity);
+                    bg = `rgb(${rb},${g},${rb})`;
+                    if (intensity > 0.5) color = "#fff";
+                  } else if (delta < 0) {
+                    const r = Math.round(200 + (100 - 200) * intensity);
+                    const gb = Math.round(240 - 100 * intensity);
+                    bg = `rgb(${r},${gb},${gb})`;
+                    if (intensity > 0.5) color = "#fff";
+                  }
+                  return (
+                    <Tooltip
+                      key={i}
+                      title={`${tagName}: ${vals[i - 1]} → ${v} (${delta >= 0 ? "+" : ""}${delta})`}
+                      arrow
+                    >
+                      <td
+                        style={{
+                          textAlign: "center",
+                          padding: 4,
+                          border: "1px solid rgba(0,0,0,0.06)",
+                          background: bg,
+                          color,
+                          width: 48,
+                          height: 32,
+                        }}
+                      >
+                        {delta !== 0 ? (delta > 0 ? `+${delta}` : delta) : "—"}
+                      </td>
+                    </Tooltip>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </Box>
+  );
+}
+
+/** Mini sparkline charts, one per TORI tag, stacked vertically. */
+function ToriSparklines({
+  allTags,
+  matrix,
+  assignments,
+}: {
+  allTags: [string, { tagName: string; domain: string; total: number }][];
+  matrix: Map<string, number[]>;
+  assignments: AssignmentTagData[];
+}) {
+  const W = 200;
+  const H = 28;
+  const pad = 4;
+
+  return (
+    <Box>
+      {allTags.map(([tagId, { tagName, domain }]) => {
+        const vals = matrix.get(tagId)!;
+        const rowMax = Math.max(...vals, 1);
+        const barColor = DOMAIN_COLORS[domain] ?? "#757575";
+
+        const getX = (i: number) =>
+          vals.length === 1
+            ? W / 2
+            : (i / (vals.length - 1)) * (W - pad * 2) + pad;
+        const getY = (v: number) => H - pad - (v / rowMax) * (H - pad * 2);
+        const points = vals.map((v, i) => `${getX(i)},${getY(v)}`).join(" ");
+
+        return (
+          <Box
+            key={tagId}
+            sx={{ display: "flex", alignItems: "center", mb: 0.5 }}
+          >
+            <Typography
+              variant="caption"
+              sx={{
+                width: 160,
+                flexShrink: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                pr: 1,
+                fontSize: 11,
+              }}
+            >
+              {tagName}
+            </Typography>
+            <svg
+              width={W}
+              height={H}
+              viewBox={`0 0 ${W} ${H}`}
+              style={{ flexShrink: 0 }}
+            >
+              <polyline
+                points={points}
+                fill="none"
+                stroke={barColor}
+                strokeWidth={1.5}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+              />
+              {vals.map((v, i) => (
+                <Tooltip key={i} title={`${assignments[i].assignmentName}: ${v}`}>
+                  <circle
+                    cx={getX(i)}
+                    cy={getY(v)}
+                    r={2.5}
+                    fill={barColor}
+                    stroke="#fff"
+                    strokeWidth={0.5}
+                  />
+                </Tooltip>
+              ))}
+            </svg>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ ml: 1, flexShrink: 0, fontSize: 10 }}
+            >
+              total: {vals.reduce((a, b) => a + b, 0)}
+            </Typography>
+          </Box>
+        );
+      })}
+    </Box>
+  );
+}
+
+/** Slope chart: lines from first assignment to last for top-N tags. */
+function SlopeChart({
+  allTags,
+  matrix,
+  assignments,
+}: {
+  allTags: [string, { tagName: string; domain: string; total: number }][];
+  matrix: Map<string, number[]>;
+  assignments: AssignmentTagData[];
+}) {
+  const W = 400;
+  const H = 200;
+  const padLeft = 160;
+  const padRight = 160;
+  const padY = 24;
+
+  const firstAssignment = assignments[0];
+  const lastAssignment = assignments[assignments.length - 1];
+
+  // Get max value across first/last for scaling
+  const maxVal = Math.max(
+    1,
+    ...allTags.flatMap(([tagId]) => {
+      const vals = matrix.get(tagId)!;
+      return [vals[0], vals[vals.length - 1]];
+    }),
+  );
+
+  const getY = (v: number) =>
+    H - padY - (v / maxVal) * (H - padY * 2);
+
+  const x1 = padLeft;
+  const x2 = W - padRight;
+
+  return (
+    <Box sx={{ display: "flex", justifyContent: "center" }}>
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+        {/* Column headers */}
+        <text x={x1} y={14} textAnchor="middle" fontSize={10} fill="#666" fontWeight={600}>
+          {firstAssignment.assignmentName}
+        </text>
+        <text x={x2} y={14} textAnchor="middle" fontSize={10} fill="#666" fontWeight={600}>
+          {lastAssignment.assignmentName}
+        </text>
+
+        {/* Vertical guide lines */}
+        <line x1={x1} y1={padY} x2={x1} y2={H - padY} stroke="#eee" strokeWidth={1} />
+        <line x1={x2} y1={padY} x2={x2} y2={H - padY} stroke="#eee" strokeWidth={1} />
+
+        {/* Slope lines */}
+        {allTags.map(([tagId, { tagName, domain }]) => {
+          const vals = matrix.get(tagId)!;
+          const startVal = vals[0];
+          const endVal = vals[vals.length - 1];
+          const barColor = DOMAIN_COLORS[domain] ?? "#757575";
+          const y1 = getY(startVal);
+          const y2 = getY(endVal);
+
+          return (
+            <g key={tagId}>
+              <Tooltip title={`${tagName}: ${startVal} → ${endVal}`}>
+                <line
+                  x1={x1}
+                  y1={y1}
+                  x2={x2}
+                  y2={y2}
+                  stroke={barColor}
+                  strokeWidth={2}
+                  strokeOpacity={0.7}
+                />
+              </Tooltip>
+              {/* Left label */}
+              <text x={x1 - 6} y={y1 + 3} textAnchor="end" fontSize={9} fill="#555">
+                {tagName.length > 18 ? tagName.slice(0, 16) + "…" : tagName} ({startVal})
+              </text>
+              {/* Right label */}
+              <text x={x2 + 6} y={y2 + 3} textAnchor="start" fontSize={9} fill="#555">
+                {tagName.length > 18 ? tagName.slice(0, 16) + "…" : tagName} ({endVal})
+              </text>
+              {/* Dots */}
+              <circle cx={x1} cy={y1} r={3} fill={barColor} />
+              <circle cx={x2} cy={y2} r={3} fill={barColor} />
+            </g>
+          );
+        })}
+      </svg>
     </Box>
   );
 }

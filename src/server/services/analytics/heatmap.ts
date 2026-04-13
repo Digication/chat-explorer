@@ -31,6 +31,8 @@ export interface CellEvidence {
   text: string;
   threadId: string;
   threadName: string;
+  studentId: string | null;
+  studentName: string | null;
   timestamp: string | null;
 }
 
@@ -180,7 +182,8 @@ export async function getHeatmapCellEvidence(
   studentId?: string,
   toriTagId?: string,
   limit: number = 20,
-  offset: number = 0
+  offset: number = 0,
+  toriTagName?: string,
 ): Promise<CellEvidenceResult> {
   // Clamp limit to a sane range to prevent runaway queries.
   const safeLimit = Math.min(Math.max(limit, 1), 200);
@@ -233,6 +236,10 @@ export async function getHeatmapCellEvidence(
         "ctt.toriTagId = :toriTagId",
         { toriTagId }
       );
+    } else if (toriTagName) {
+      qb.innerJoin("c.toriTags", "ctt")
+        .innerJoin("ctt.toriTag", "tt")
+        .andWhere("tt.name = :toriTagName", { toriTagName });
     }
 
     if (studentId) {
@@ -254,11 +261,15 @@ export async function getHeatmapCellEvidence(
 
   // Page of items.
   const rows = await buildBaseQuery()
+    .leftJoin("c.student", "s")
     .select([
       'c.id AS "commentId"',
       'c.text AS "text"',
       'c.threadId AS "threadId"',
       't.name AS "threadName"',
+      'c.studentId AS "studentId"',
+      's."firstName" AS "studentFirstName"',
+      's."lastName" AS "studentLastName"',
       'c.timestamp AS "timestamp"',
     ])
     .orderBy("c.timestamp", "ASC", "NULLS LAST")
@@ -267,13 +278,22 @@ export async function getHeatmapCellEvidence(
     .offset(safeOffset)
     .getRawMany();
 
-  const items: CellEvidence[] = rows.map((r) => ({
-    commentId: r.commentId ?? r.commentid,
-    text: r.text,
-    threadId: r.threadId ?? r.threadid,
-    threadName: r.threadName ?? r.threadname,
-    timestamp: r.timestamp ? new Date(r.timestamp).toISOString() : null,
-  }));
+  const items: CellEvidence[] = rows.map((r) => {
+    const firstName = r.studentFirstName ?? r.studentfirstname;
+    const lastName = r.studentLastName ?? r.studentlastname;
+    const studentName = firstName && lastName
+      ? `${firstName} ${lastName}`
+      : firstName || lastName || null;
+    return {
+      commentId: r.commentId ?? r.commentid,
+      text: r.text,
+      threadId: r.threadId ?? r.threadid,
+      threadName: r.threadName ?? r.threadname,
+      studentId: r.studentId ?? r.studentid ?? null,
+      studentName,
+      timestamp: r.timestamp ? new Date(r.timestamp).toISOString() : null,
+    };
+  });
 
   return { items, totalCount };
 }

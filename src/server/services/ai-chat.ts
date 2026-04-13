@@ -134,12 +134,49 @@ export async function buildContext(session: ChatSession): Promise<string> {
     }
 
     case ChatScope.CROSS_COURSE: {
-      // All comments the user has access to (no specific filter — the
-      // GraphQL resolver should already have validated access).
-      // For now, we pull the same as COURSE if a courseId is set,
-      // otherwise return an empty context.
+      // All comments across all courses in the institution.
+      // If a courseId is set, delegate to COURSE scope for that single course.
       if (session.courseId) {
         return buildContext({ ...session, scope: ChatScope.COURSE } as ChatSession);
+      }
+
+      // Fetch ALL courses for the institution
+      if (session.institutionId) {
+        const courseRepo = AppDataSource.getRepository(Course);
+        const courses = await courseRepo.find({
+          where: { institutionId: session.institutionId },
+        });
+        const courseIds = courses.map((c) => c.id);
+
+        if (courseIds.length > 0) {
+          const assignmentRepo = AppDataSource.getRepository(Assignment);
+          const threadRepo = AppDataSource.getRepository(Thread);
+
+          const assignments = await assignmentRepo.find({
+            where: { courseId: In(courseIds) },
+          });
+          const assignmentIds = assignments.map((a) => a.id);
+
+          if (assignmentIds.length > 0) {
+            const threads = await threadRepo.find({
+              where: { assignmentId: In(assignmentIds) },
+            });
+            const threadIds = threads.map((t) => t.id);
+
+            if (threadIds.length > 0) {
+              const where: Record<string, unknown> = { threadId: In(threadIds) };
+              // Respect studentId filter for "this student — all courses" scope
+              if (session.studentId) {
+                where.studentId = session.studentId;
+              }
+              comments = await commentRepo.find({
+                where,
+                relations: ["thread", "student"],
+                order: { orderIndex: "ASC" },
+              });
+            }
+          }
+        }
       }
       scopeLabel = "cross-course";
       break;
@@ -245,6 +282,7 @@ export async function sendChatMessage(
   sessionId: string,
   userContent: string,
   userId: string,
+  analyticsContext?: string,
 ): Promise<ChatMessage> {
   const sessionRepo = AppDataSource.getRepository(ChatSession);
   const messageRepo = AppDataSource.getRepository(ChatMessage);
@@ -265,10 +303,14 @@ export async function sendChatMessage(
   // 3. Build data context from the database
   const contextData = await buildContext(session);
 
-  // 4. Build the system prompt
+  // 4. Build the system prompt (with optional analytics dashboard context)
+  let data = contextData;
+  if (analyticsContext) {
+    data = `The user is viewing an analytics dashboard showing:\n${analyticsContext}\n\nBelow is the detailed conversation data:\n${contextData}`;
+  }
   const systemPrompt = buildSystemPrompt({
     scope: session.scope,
-    data: contextData,
+    data,
     showPII: session.showPII,
   });
 

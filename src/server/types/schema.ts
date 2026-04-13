@@ -208,6 +208,7 @@ export const typeDefs = /* GraphQL */ `
 
   type CoOccurrence {
     tags: [String!]!
+    tagIds: [ID!]!
     count: Int!
   }
 
@@ -305,6 +306,8 @@ export const typeDefs = /* GraphQL */ `
     text: String!
     threadId: ID!
     threadName: String!
+    studentId: ID
+    studentName: String
     timestamp: String
   }
 
@@ -420,6 +423,20 @@ export const typeDefs = /* GraphQL */ `
     categoryDistribution: ReflectionCategoryDistribution!
   }
 
+  type AssignmentTagCount {
+    tagId: ID!
+    tagName: String!
+    domain: String!
+    count: Int!
+  }
+
+  type PerAssignmentToriTags {
+    assignmentId: ID!
+    assignmentName: String!
+    date: String!
+    tags: [AssignmentTagCount!]!
+  }
+
   type StudentProfileReport {
     studentId: ID!
     name: String!
@@ -431,6 +448,7 @@ export const typeDefs = /* GraphQL */ `
     overallCategoryDistribution: ReflectionCategoryDistribution!
     perAssignment: [PerAssignmentBreakdown!]!
     toriTagDistribution: [TagFrequency!]!
+    perAssignmentToriTags: [PerAssignmentToriTags!]!
     topToriTags: [String!]!
     evidenceHighlights: [EvidenceHighlight!]!
   }
@@ -533,6 +551,7 @@ export const typeDefs = /* GraphQL */ `
   type ChatSession {
     id: ID!
     userId: ID!
+    institutionId: ID!
     title: String
     scope: String
     courseId: ID
@@ -603,6 +622,38 @@ export const typeDefs = /* GraphQL */ `
     scope: AnalyticsScopeInput!
     studentId: ID
     toriTagId: ID
+    toriTagName: String
+    limit: Int
+    offset: Int
+  }
+
+  input CategoryEvidenceInput {
+    scope: AnalyticsScopeInput!
+    studentId: ID!
+    assignmentId: ID!
+    category: String!
+    limit: Int
+    offset: Int
+  }
+
+  type CategoryEvidenceItem {
+    commentId: ID!
+    text: String!
+    threadId: ID!
+    threadName: String!
+    category: String!
+    evidenceQuote: String
+    timestamp: String
+  }
+
+  type CategoryEvidenceResult {
+    items: [CategoryEvidenceItem!]!
+    totalCount: Int!
+  }
+
+  input MultiTagEvidenceInput {
+    scope: AnalyticsScopeInput!
+    toriTagIds: [ID!]!
     limit: Int
     offset: Int
   }
@@ -635,6 +686,8 @@ export const typeDefs = /* GraphQL */ `
     engagement(scope: AnalyticsScopeInput!): EngagementAnalysisResult!
     heatmap(input: HeatmapInput!): HeatmapResult!
     heatmapCellEvidence(input: CellEvidenceInput!): CellEvidenceResult!
+    categoryEvidence(input: CategoryEvidenceInput!): CategoryEvidenceResult!
+    multiTagEvidence(input: MultiTagEvidenceInput!): CellEvidenceResult!
     network(scope: AnalyticsScopeInput!): NetworkResult!
     instructionalInsights(scope: AnalyticsScopeInput!): InsightsResult!
     recommendations(scope: AnalyticsScopeInput!): RecommendationsResult!
@@ -646,7 +699,7 @@ export const typeDefs = /* GraphQL */ `
     thread(id: ID!): Thread
 
     # Chat
-    chatSessions(courseId: ID, assignmentId: ID): [ChatSession!]!
+    chatSessions(institutionId: ID!, courseId: ID, assignmentId: ID): [ChatSession!]!
     chatSession(id: ID!): ChatSession
 
     # Consent
@@ -670,10 +723,11 @@ export const typeDefs = /* GraphQL */ `
 
   type Mutation {
     # Chat
-    createChatSession(courseId: ID, assignmentId: ID, studentId: ID, scope: String, selectedToriTags: [String!], selectedCommentIds: [ID!], title: String): ChatSession!
-    sendChatMessage(sessionId: ID!, content: String!): ChatMessage!
+    createChatSession(institutionId: ID!, courseId: ID, assignmentId: ID, studentId: ID, scope: String, selectedToriTags: [String!], selectedCommentIds: [ID!], title: String): ChatSession!
+    sendChatMessage(sessionId: ID!, content: String!, analyticsContext: String): ChatMessage!
     deleteChatSession(id: ID!): Boolean!
     renameChatSession(id: ID!, title: String!): ChatSession!
+    updateChatSessionScope(id: ID!, scope: String!, studentId: ID, courseId: ID, assignmentId: ID): ChatSession!
 
     # Consent
     setStudentConsent(input: ConsentInput!): StudentConsent!

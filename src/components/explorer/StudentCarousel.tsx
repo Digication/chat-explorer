@@ -25,22 +25,19 @@ interface StudentCarouselProps {
   students: Student[];
   /** Currently selected student IDs. */
   selectedIds: string[];
-  /** Called when a single student is clicked (replaces selection). */
+  /** Called when a student is clicked (replaces selection). */
   onSelect: (id: string) => void;
-  /** Called when a student is added/removed from multi-select (shift+click). */
-  onToggle: (id: string) => void;
 }
 
 /**
  * Horizontal sliding carousel of student avatars for the bottom bar.
  * Shows ~5 students at a time with left/right arrows to scroll by 1.
- * Selected avatar is 40px, unselected is 24px.
+ * Selected avatar is 44px, unselected is 32px.
  */
 export default function StudentCarousel({
   students,
   selectedIds,
   onSelect,
-  onToggle,
 }: StudentCarouselProps) {
   const { getDisplayName } = useUserSettings();
   // The index of the first visible student
@@ -82,7 +79,7 @@ export default function StudentCarousel({
             return (
               <Box
                 key={s.studentId}
-                onClick={(e) => e.shiftKey ? onToggle(s.studentId) : onSelect(s.studentId)}
+                onClick={() => onSelect(s.studentId)}
                 sx={{
                   width: SLOT_WIDTH,
                   minWidth: SLOT_WIDTH,

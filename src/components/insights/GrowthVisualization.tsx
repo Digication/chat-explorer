@@ -1,6 +1,5 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useQuery } from "@apollo/client/react";
-import { useNavigate } from "react-router";
 import {
   Box,
   Typography,
@@ -21,6 +20,7 @@ import { GET_GROWTH } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
 import { useUserSettings } from "@/lib/UserSettingsContext";
 import { CATEGORY_CONFIG, CATEGORY_COLORS, CATEGORY_LABELS } from "@/lib/reflection-categories";
+import CategoryEvidencePopover from "./CategoryEvidencePopover";
 
 type ViewMode = "sparklines" | "matrix" | "delta";
 
@@ -30,17 +30,36 @@ const CATEGORY_ORDER: Record<string, number> = Object.fromEntries(
 );
 const MAX_ORDINAL = CATEGORY_CONFIG.length - 1;
 
-interface GrowthVisualizationProps {
-  onViewThread?: (threadId: string, studentName: string) => void;
+interface CellClickInfo {
+  anchorEl: HTMLElement;
+  studentId: string;
+  studentName: string;
+  assignmentId: string;
+  assignmentName: string;
+  category: string;
 }
 
-export default function GrowthVisualization({ onViewThread }: GrowthVisualizationProps) {
+interface GrowthVisualizationProps {
+  onOpenStudent?: (studentId: string, studentName: string) => void;
+  onViewThread?: (threadId: string, studentName: string, studentId?: string, initialToriTag?: string) => void;
+}
+
+export default function GrowthVisualization({ onOpenStudent, onViewThread }: GrowthVisualizationProps) {
   const { scope } = useInsightsScope();
   const { getDisplayName } = useUserSettings();
-  const navigate = useNavigate();
-  const [viewMode, setViewMode] = useState<ViewMode>("sparklines");
+  const [viewMode, setViewMode] = useState<ViewMode>("matrix");
   const [deltaA1, setDeltaA1] = useState<string>("");
   const [deltaA2, setDeltaA2] = useState<string>("");
+  const [cellPopover, setCellPopover] = useState<CellClickInfo | null>(null);
+
+  const handleCellClick = useCallback(
+    (e: React.MouseEvent<HTMLElement>, studentId: string, studentName: string, assignmentId: string, assignmentName: string, category: string) => {
+      setCellPopover({ anchorEl: e.currentTarget, studentId, studentName, assignmentId, assignmentName, category });
+    },
+    []
+  );
+
+  const handleClosePopover = useCallback(() => setCellPopover(null), []);
 
   const { data, loading, error } = useQuery<any>(GET_GROWTH, {
     variables: { scope },
@@ -105,20 +124,38 @@ export default function GrowthVisualization({ onViewThread }: GrowthVisualizatio
       </Box>
 
       {viewMode === "sparklines" && (
-        <SparklineView students={students} assignments={assignments} getDisplayName={getDisplayName} onNavigate={(id) => navigate(`/insights/student/${id}`)} />
+        <SparklineView students={students} assignments={assignments} getDisplayName={getDisplayName} onNavigate={(id, name) => onOpenStudent?.(id, name)} onCellClick={handleCellClick} />
       )}
       {viewMode === "matrix" && (
-        <MatrixView students={students} assignments={assignments} getDisplayName={getDisplayName} onNavigate={(id) => navigate(`/insights/student/${id}`)} />
+        <MatrixView students={students} assignments={assignments} getDisplayName={getDisplayName} onNavigate={(id, name) => onOpenStudent?.(id, name)} onCellClick={handleCellClick} />
       )}
       {viewMode === "delta" && (
         <DeltaView
           students={students}
           assignments={assignments}
           getDisplayName={getDisplayName}
+          onNavigate={(id, name) => onOpenStudent?.(id, name)}
+          onCellClick={handleCellClick}
           a1={deltaA1}
           a2={deltaA2}
           onA1Change={setDeltaA1}
           onA2Change={setDeltaA2}
+        />
+      )}
+
+      {/* Category evidence drill-down popover */}
+      {scope && cellPopover && (
+        <CategoryEvidencePopover
+          anchorEl={cellPopover.anchorEl}
+          studentId={cellPopover.studentId}
+          studentName={getDisplayName(cellPopover.studentName)}
+          assignmentId={cellPopover.assignmentId}
+          assignmentName={cellPopover.assignmentName}
+          category={cellPopover.category}
+          scope={scope}
+          onClose={handleClosePopover}
+          onViewThread={(threadId, name) => { onViewThread?.(threadId, name); handleClosePopover(); }}
+          onStudentClick={(studentId, studentName) => { onOpenStudent?.(studentId, studentName); handleClosePopover(); }}
         />
       )}
     </Box>
@@ -131,10 +168,11 @@ interface ViewProps {
   students: any[];
   assignments: { id: string; name: string; date: string }[];
   getDisplayName: (name: string) => string;
-  onNavigate?: (studentId: string) => void;
+  onNavigate?: (studentId: string, studentName: string) => void;
+  onCellClick?: (e: React.MouseEvent<HTMLElement>, studentId: string, studentName: string, assignmentId: string, assignmentName: string, category: string) => void;
 }
 
-function SparklineView({ students, assignments, getDisplayName, onNavigate }: ViewProps) {
+function SparklineView({ students, assignments, getDisplayName, onNavigate, onCellClick }: ViewProps) {
   const W = 200;
   const H = 48;
   const padding = 6;
@@ -183,7 +221,7 @@ function SparklineView({ students, assignments, getDisplayName, onNavigate }: Vi
             <tr key={s.studentId} style={{ borderBottom: "1px solid #eee" }}>
               <td
                 style={{ padding: "6px 8px", fontSize: "0.8rem", whiteSpace: "nowrap", cursor: "pointer", color: "#1976d2" }}
-                onClick={() => onNavigate?.(s.studentId)}
+                onClick={() => onNavigate?.(s.studentId, s.name)}
               >
                 {getDisplayName(s.name)}
               </td>
@@ -199,6 +237,8 @@ function SparklineView({ students, assignments, getDisplayName, onNavigate }: Vi
                           cy={H - padding - (ord / MAX_ORDINAL) * (H - padding * 2)}
                           r={3}
                           fill={CATEGORY_COLORS[p.category] ?? "#999"}
+                          style={{ cursor: "pointer" }}
+                          onClick={(e) => onCellClick?.(e as any, s.studentId, s.name, p.assignmentId, p.assignmentName, p.category)}
                         />
                       </Tooltip>
                     );
@@ -237,7 +277,7 @@ function SparklineView({ students, assignments, getDisplayName, onNavigate }: Vi
 
 // ── Matrix View ──────────────────────────────────────────────────────
 
-function MatrixView({ students, assignments, getDisplayName, onNavigate }: ViewProps) {
+function MatrixView({ students, assignments, getDisplayName, onNavigate, onCellClick }: ViewProps) {
   // Build lookup: studentId → assignmentId → category
   const lookup = useMemo(() => {
     const map = new Map<string, Map<string, string>>();
@@ -284,7 +324,7 @@ function MatrixView({ students, assignments, getDisplayName, onNavigate }: ViewP
             <tr key={s.studentId}>
               <td
                 style={{ padding: "4px 8px", whiteSpace: "nowrap", position: "sticky", left: 0, background: "#fff", zIndex: 1, cursor: "pointer", color: "#1976d2" }}
-                onClick={() => onNavigate?.(s.studentId)}
+                onClick={() => onNavigate?.(s.studentId, s.name)}
               >
                 {getDisplayName(s.name)}
               </td>
@@ -302,7 +342,9 @@ function MatrixView({ students, assignments, getDisplayName, onNavigate }: ViewP
                       textAlign: "center",
                       background: color ? `${color}22` : "#fafafa",
                       border: "1px solid #e0e0e0",
+                      cursor: category ? "pointer" : "default",
                     }}
+                    onClick={category ? (e) => onCellClick?.(e as any, s.studentId, s.name, a.id, a.name, category) : undefined}
                   >
                     {shortLabel ? (
                       <Tooltip title={`${a.name}: ${CATEGORY_LABELS[category!]}`}>
@@ -331,7 +373,7 @@ interface DeltaViewProps extends ViewProps {
   onA2Change: (id: string) => void;
 }
 
-function DeltaView({ students, assignments, getDisplayName, a1, a2, onA1Change, onA2Change }: DeltaViewProps) {
+function DeltaView({ students, assignments, getDisplayName, onNavigate, onCellClick, a1, a2, onA1Change, onA2Change }: DeltaViewProps) {
   // Default to first and last assignment
   const effectiveA1 = a1 || (assignments.length > 0 ? assignments[0].id : "");
   const effectiveA2 = a2 || (assignments.length > 1 ? assignments[assignments.length - 1].id : "");
@@ -405,17 +447,22 @@ function DeltaView({ students, assignments, getDisplayName, a1, a2, onA1Change, 
           <tbody>
             {deltas.map((d: any) => (
               <tr key={d.studentId} style={{ borderBottom: "1px solid #eee" }}>
-                <td style={{ padding: "6px 8px" }}>{getDisplayName(d.name)}</td>
+                <td
+                  onClick={() => onNavigate?.(d.studentId, d.name)}
+                  style={{ padding: "6px 8px", cursor: "pointer", color: "#1976d2" }}
+                >{getDisplayName(d.name)}</td>
                 <td style={{ padding: "6px 8px", textAlign: "center" }}>
                   <Chip
                     label={CATEGORY_CONFIG.find((c) => c.key === d.categoryBefore)?.shortLabel ?? d.categoryBefore}
                     size="small"
+                    onClick={(e) => onCellClick?.(e as any, d.studentId, d.name, effectiveA1, assignments.find((a) => a.id === effectiveA1)?.name ?? "", d.categoryBefore)}
                     sx={{
                       bgcolor: CATEGORY_COLORS[d.categoryBefore],
                       color: "#fff",
                       fontWeight: 600,
                       fontSize: "0.7rem",
                       height: 22,
+                      cursor: "pointer",
                     }}
                   />
                 </td>
@@ -423,12 +470,14 @@ function DeltaView({ students, assignments, getDisplayName, a1, a2, onA1Change, 
                   <Chip
                     label={CATEGORY_CONFIG.find((c) => c.key === d.categoryAfter)?.shortLabel ?? d.categoryAfter}
                     size="small"
+                    onClick={(e) => onCellClick?.(e as any, d.studentId, d.name, effectiveA2, assignments.find((a) => a.id === effectiveA2)?.name ?? "", d.categoryAfter)}
                     sx={{
                       bgcolor: CATEGORY_COLORS[d.categoryAfter],
                       color: "#fff",
                       fontWeight: 600,
                       fontSize: "0.7rem",
                       height: 22,
+                      cursor: "pointer",
                     }}
                   />
                 </td>

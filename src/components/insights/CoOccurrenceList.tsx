@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import { useQuery } from "@apollo/client/react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -13,13 +13,32 @@ import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
 import Typography from "@mui/material/Typography";
 import { GET_TORI_ANALYSIS } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
+import MultiTagEvidencePopover from "./MultiTagEvidencePopover";
 
 const DEFAULT_LIMIT = 15;
 
-export default function CoOccurrenceList() {
+interface CoOccurrenceListProps {
+  onViewThread?: (threadId: string, studentName: string, studentId?: string, initialToriTag?: string) => void;
+  onStudentClick?: (studentId: string, studentName: string) => void;
+}
+
+export default function CoOccurrenceList({ onViewThread, onStudentClick }: CoOccurrenceListProps) {
   const { scope } = useInsightsScope();
   const [showAll, setShowAll] = useState(false);
   const [mode, setMode] = useState<"pairs" | "triples">("pairs");
+  const [popover, setPopover] = useState<{
+    anchorEl: HTMLElement;
+    tagNames: string[];
+    tagIds: string[];
+  } | null>(null);
+
+  const handleRowClick = useCallback(
+    (e: React.MouseEvent<HTMLElement>, tagNames: string[], tagIds: string[]) => {
+      setPopover({ anchorEl: e.currentTarget, tagNames, tagIds });
+    },
+    []
+  );
+  const handleClosePopover = useCallback(() => setPopover(null), []);
 
   const { data, loading, error, refetch } = useQuery<any>(GET_TORI_ANALYSIS, {
     variables: { scope },
@@ -105,8 +124,13 @@ export default function CoOccurrenceList() {
       </Box>
 
       <List dense disablePadding>
-        {visible.map((item: { tags: string[]; count: number }, i: number) => (
-          <ListItem key={i} divider sx={{ py: 1 }}>
+        {visible.map((item: { tags: string[]; tagIds: string[]; count: number }, i: number) => (
+          <ListItem
+            key={i}
+            divider
+            sx={{ py: 1, cursor: "pointer", "&:hover": { bgcolor: "action.hover" } }}
+            onClick={(e) => handleRowClick(e, item.tags, item.tagIds)}
+          >
             <ListItemText
               primary={
                 <Box
@@ -140,6 +164,19 @@ export default function CoOccurrenceList() {
         >
           {showAll ? "Show less" : `Show more (${items.length - DEFAULT_LIMIT} remaining)`}
         </Button>
+      )}
+
+      {/* Multi-tag evidence popover */}
+      {scope && popover && (
+        <MultiTagEvidencePopover
+          anchorEl={popover.anchorEl}
+          tagNames={popover.tagNames}
+          tagIds={popover.tagIds}
+          scope={scope}
+          onClose={handleClosePopover}
+          onViewThread={onViewThread}
+          onStudentClick={onStudentClick}
+        />
       )}
     </Box>
   );

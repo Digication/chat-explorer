@@ -141,7 +141,7 @@ export default function ThreadView({
   };
 
   return (
-    <Box sx={{ p: 2 }}>
+    <Box sx={{ p: 2, maxWidth: 560, mx: "auto" }}>
       {filteredAssignments.map((assignment: any) => (
         <Box key={assignment.id} sx={{ mb: 3 }}>
           <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>

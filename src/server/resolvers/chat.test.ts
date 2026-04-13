@@ -38,6 +38,10 @@ vi.mock("./middleware/auth.js", () => ({
     if (!ctx.user) throw new Error("Not authenticated");
     return ctx.user;
   }),
+  requireInstitutionAccess: vi.fn((ctx: { user: unknown }, _institutionId: string) => {
+    if (!ctx.user) throw new Error("Not authenticated");
+    return ctx.user;
+  }),
 }));
 
 // ── Import under test ───────────────────────────────────────────────
@@ -64,7 +68,7 @@ beforeEach(() => {
 describe("chatResolvers.Query", () => {
   it("chatSessions requires auth", async () => {
     await expect(
-      chatResolvers.Query.chatSessions(null, {}, makeCtx()),
+      chatResolvers.Query.chatSessions(null, { institutionId: "inst-1" }, makeCtx()),
     ).rejects.toThrow("Not authenticated");
   });
 
@@ -73,12 +77,12 @@ describe("chatResolvers.Query", () => {
     sessionRepo.find.mockResolvedValue(sessions);
 
     const result = await chatResolvers.Query.chatSessions(
-      null, {}, makeCtx(defaultUser),
+      null, { institutionId: "inst-1" }, makeCtx(defaultUser),
     );
 
     expect(sessionRepo.find).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ userId: "user-1" }),
+        where: expect.objectContaining({ userId: "user-1", institutionId: "inst-1" }),
       }),
     );
     expect(result).toEqual(sessions);
@@ -87,12 +91,12 @@ describe("chatResolvers.Query", () => {
   it("chatSessions filters by courseId when provided", async () => {
     sessionRepo.find.mockResolvedValue([]);
     await chatResolvers.Query.chatSessions(
-      null, { courseId: "c-1" }, makeCtx(defaultUser),
+      null, { institutionId: "inst-1", courseId: "c-1" }, makeCtx(defaultUser),
     );
 
     expect(sessionRepo.find).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ userId: "user-1", courseId: "c-1" }),
+        where: expect.objectContaining({ userId: "user-1", institutionId: "inst-1", courseId: "c-1" }),
       }),
     );
   });
@@ -118,11 +122,12 @@ describe("chatResolvers.Mutation", () => {
   it("createChatSession creates with defaults", async () => {
     sessionRepo.save.mockImplementation((e: Record<string, unknown>) => Promise.resolve(e));
 
-    await chatResolvers.Mutation.createChatSession(null, {}, makeCtx(defaultUser));
+    await chatResolvers.Mutation.createChatSession(null, { institutionId: "inst-1" }, makeCtx(defaultUser));
 
     expect(sessionRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: "user-1",
+        institutionId: "inst-1",
         scope: ChatScope.SELECTION,
         title: "New Chat",
       }),
@@ -150,7 +155,7 @@ describe("chatResolvers.Mutation", () => {
       null, { sessionId: "s1", content: "hello" }, makeCtx(defaultUser),
     );
 
-    expect(mockSendChatMessage).toHaveBeenCalledWith("s1", "hello", "user-1");
+    expect(mockSendChatMessage).toHaveBeenCalledWith("s1", "hello", "user-1", undefined);
   });
 
   it("deleteChatSession removes session", async () => {

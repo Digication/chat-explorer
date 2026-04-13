@@ -18,8 +18,6 @@ interface BottomBarProps {
   selectedStudentIds: string[];
   /** Called when a single student is clicked (replaces selection). */
   onSelectStudent: (id: string) => void;
-  /** Called when a student is shift+clicked (add/remove from multi-select). */
-  onToggleStudent: (id: string) => void;
   /** Called to open the student list panel. */
   onOpenStudentList: () => void;
   /** Whether the student list panel is open. */
@@ -39,7 +37,6 @@ export default function BottomBar({
   students,
   selectedStudentIds,
   onSelectStudent,
-  onToggleStudent,
   onOpenStudentList,
   studentListOpen,
   onToggleAnalyze,
@@ -104,7 +101,6 @@ export default function BottomBar({
           students={students}
           selectedIds={selectedStudentIds}
           onSelect={onSelectStudent}
-          onToggle={onToggleStudent}
         />
 
         {/* Right zone: Analyze button — entire area clickable */}

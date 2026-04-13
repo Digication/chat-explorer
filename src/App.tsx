@@ -18,6 +18,8 @@ import AdminPage from "@/pages/AdminPage";
 import StudentProfilePage from "@/pages/StudentProfilePage";
 import CrossCourseComparisonPage from "@/pages/CrossCourseComparisonPage";
 import { InsightsScopeProvider } from "@/components/insights/ScopeSelector";
+import { InsightsAnalyticsProvider } from "@/components/insights/InsightsAnalyticsContext";
+import { FacultyPanelProvider } from "@/components/faculty-panel/FacultyPanelContext";
 
 function DashboardPage() {
   return (
@@ -122,7 +124,11 @@ export default function App() {
                   <ProtectedRoute>
                     <UserSettingsProvider>
                       <InsightsScopeProvider>
-                        <AppShell />
+                        <InsightsAnalyticsProvider>
+                          <FacultyPanelProvider>
+                            <AppShell />
+                          </FacultyPanelProvider>
+                        </InsightsAnalyticsProvider>
                       </InsightsScopeProvider>
                     </UserSettingsProvider>
                   </ProtectedRoute>

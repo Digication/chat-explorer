@@ -1,0 +1,263 @@
+import React, { createContext, useContext, useReducer, useCallback, useMemo } from "react";
+
+// ── Types ───────────────────────────────────────────────────────
+export type PanelTab = "student" | "thread" | "chat";
+
+interface HistoryEntry {
+  tab: PanelTab;
+  studentId?: string;
+  studentName?: string;
+  threadId?: string;
+  threadStudentId?: string;
+  threadStudentName?: string;
+  threadInitialToriTag?: string;
+}
+
+export interface PageContext {
+  page: string;
+  scopeKey: string; // serialized scope for comparison
+  studentId?: string;
+  studentName?: string;
+}
+
+export interface FacultyPanelState {
+  isOpen: boolean;
+  activeTab: PanelTab;
+
+  // Student Profile tab
+  studentId: string | null;
+  studentName: string | null;
+
+  // Thread tab
+  threadId: string | null;
+  threadStudentId: string | null;
+  threadStudentName: string | null;
+  threadInitialToriTag: string | null;
+
+  // Chat tab
+  activeChatSessionId: string | null;
+
+  // Navigation history (for back button)
+  history: HistoryEntry[];
+
+  // Context tracking for panel persistence
+  pageContext: PageContext | null;
+  contextChanged: boolean;
+  contextChangeLabel: string | null;
+}
+
+export interface FacultyPanelActions {
+  openStudentProfile: (studentId: string, studentName: string) => void;
+  openThread: (threadId: string, studentName: string, studentId?: string, initialToriTag?: string) => void;
+  openChat: () => void;
+  switchTab: (tab: PanelTab) => void;
+  goBack: () => void;
+  close: () => void;
+  setActiveChatSession: (sessionId: string | null) => void;
+  setPageContext: (ctx: PageContext) => void;
+  acknowledgeContextChange: () => void;
+}
+
+// ── Reducer ─────────────────────────────────────────────────────
+type Action =
+  | { type: "OPEN_STUDENT"; studentId: string; studentName: string }
+  | { type: "OPEN_THREAD"; threadId: string; studentName: string; studentId?: string; initialToriTag?: string }
+  | { type: "OPEN_CHAT" }
+  | { type: "SWITCH_TAB"; tab: PanelTab }
+  | { type: "GO_BACK" }
+  | { type: "CLOSE" }
+  | { type: "SET_CHAT_SESSION"; sessionId: string | null }
+  | { type: "SET_PAGE_CONTEXT"; ctx: PageContext }
+  | { type: "ACKNOWLEDGE_CONTEXT_CHANGE" };
+
+const initialState: FacultyPanelState = {
+  isOpen: false,
+  activeTab: "student",
+  studentId: null,
+  studentName: null,
+  threadId: null,
+  threadStudentId: null,
+  threadStudentName: null,
+  threadInitialToriTag: null,
+  activeChatSessionId: null,
+  history: [],
+  pageContext: null,
+  contextChanged: false,
+  contextChangeLabel: null,
+};
+
+/** Snapshot the current tab state so we can restore it on goBack. */
+function snapshotEntry(state: FacultyPanelState): HistoryEntry {
+  return {
+    tab: state.activeTab,
+    studentId: state.studentId ?? undefined,
+    studentName: state.studentName ?? undefined,
+    threadId: state.threadId ?? undefined,
+    threadStudentId: state.threadStudentId ?? undefined,
+    threadStudentName: state.threadStudentName ?? undefined,
+    threadInitialToriTag: state.threadInitialToriTag ?? undefined,
+  };
+}
+
+function reducer(state: FacultyPanelState, action: Action): FacultyPanelState {
+  switch (action.type) {
+    case "OPEN_STUDENT":
+      return {
+        ...state,
+        isOpen: true,
+        activeTab: "student",
+        studentId: action.studentId,
+        studentName: action.studentName,
+        // Push current state onto history only if panel is already open
+        history: state.isOpen ? [...state.history, snapshotEntry(state)] : [],
+      };
+
+    case "OPEN_THREAD":
+      return {
+        ...state,
+        isOpen: true,
+        activeTab: "thread",
+        threadId: action.threadId,
+        threadStudentId: action.studentId ?? null,
+        threadStudentName: action.studentName,
+        threadInitialToriTag: action.initialToriTag ?? null,
+        history: state.isOpen ? [...state.history, snapshotEntry(state)] : [],
+      };
+
+    case "OPEN_CHAT":
+      return {
+        ...state,
+        isOpen: true,
+        activeTab: "chat",
+        history: state.isOpen ? [...state.history, snapshotEntry(state)] : [],
+      };
+
+    case "SWITCH_TAB":
+      return { ...state, isOpen: true, activeTab: action.tab };
+
+    case "GO_BACK": {
+      if (state.history.length === 0) return state;
+      const prev = state.history[state.history.length - 1];
+      return {
+        ...state,
+        activeTab: prev.tab,
+        studentId: prev.studentId ?? null,
+        studentName: prev.studentName ?? null,
+        threadId: prev.threadId ?? null,
+        threadStudentId: prev.threadStudentId ?? null,
+        threadStudentName: prev.threadStudentName ?? null,
+        threadInitialToriTag: prev.threadInitialToriTag ?? null,
+        history: state.history.slice(0, -1),
+      };
+    }
+
+    case "CLOSE":
+      return {
+        ...state,
+        isOpen: false,
+        // Preserve tab state so reopening returns to the last viewed tab
+        history: [],
+      };
+
+    case "SET_CHAT_SESSION":
+      return { ...state, activeChatSessionId: action.sessionId };
+
+    case "SET_PAGE_CONTEXT": {
+      const prev = state.pageContext;
+      const next = action.ctx;
+      // Only flag context change if panel is open and context actually differs
+      const changed =
+        state.isOpen &&
+        prev !== null &&
+        (prev.scopeKey !== next.scopeKey || prev.page !== next.page);
+      return {
+        ...state,
+        pageContext: next,
+        contextChanged: changed,
+        contextChangeLabel: changed ? next.page : state.contextChangeLabel,
+      };
+    }
+
+    case "ACKNOWLEDGE_CONTEXT_CHANGE":
+      return { ...state, contextChanged: false, contextChangeLabel: null };
+
+    default:
+      return state;
+  }
+}
+
+// ── Context ─────────────────────────────────────────────────────
+const FacultyPanelContext = createContext<
+  (FacultyPanelState & FacultyPanelActions) | null
+>(null);
+
+export function FacultyPanelProvider({ children }: { children: React.ReactNode }) {
+  const [state, dispatch] = useReducer(reducer, initialState);
+
+  const openStudentProfile = useCallback(
+    (studentId: string, studentName: string) =>
+      dispatch({ type: "OPEN_STUDENT", studentId, studentName }),
+    [],
+  );
+
+  const openThread = useCallback(
+    (threadId: string, studentName: string, studentId?: string, initialToriTag?: string) =>
+      dispatch({ type: "OPEN_THREAD", threadId, studentName, studentId, initialToriTag }),
+    [],
+  );
+
+  const openChat = useCallback(() => dispatch({ type: "OPEN_CHAT" }), []);
+  const switchTab = useCallback(
+    (tab: PanelTab) => dispatch({ type: "SWITCH_TAB", tab }),
+    [],
+  );
+  const goBack = useCallback(() => dispatch({ type: "GO_BACK" }), []);
+  const close = useCallback(() => dispatch({ type: "CLOSE" }), []);
+
+  const setActiveChatSession = useCallback(
+    (sessionId: string | null) =>
+      dispatch({ type: "SET_CHAT_SESSION", sessionId }),
+    [],
+  );
+
+  const setPageContext = useCallback(
+    (ctx: PageContext) => dispatch({ type: "SET_PAGE_CONTEXT", ctx }),
+    [],
+  );
+
+  const acknowledgeContextChange = useCallback(
+    () => dispatch({ type: "ACKNOWLEDGE_CONTEXT_CHANGE" }),
+    [],
+  );
+
+  const value = useMemo(
+    () => ({
+      ...state,
+      openStudentProfile,
+      openThread,
+      openChat,
+      switchTab,
+      goBack,
+      close,
+      setActiveChatSession,
+      setPageContext,
+      acknowledgeContextChange,
+    }),
+    [state, openStudentProfile, openThread, openChat, switchTab, goBack, close, setActiveChatSession, setPageContext, acknowledgeContextChange],
+  );
+
+  return (
+    <FacultyPanelContext.Provider value={value}>
+      {children}
+    </FacultyPanelContext.Provider>
+  );
+}
+
+/** Hook to access FacultyPanel state and actions. */
+export function useFacultyPanel(): FacultyPanelState & FacultyPanelActions {
+  const ctx = useContext(FacultyPanelContext);
+  if (!ctx) {
+    throw new Error("useFacultyPanel must be used within a FacultyPanelProvider");
+  }
+  return ctx;
+}

@@ -14,6 +14,13 @@ import { useInsightsScope } from "@/components/insights/ScopeSelector";
 import EvidencePopover from "@/components/insights/EvidencePopover";
 import { useUserSettings } from "@/lib/UserSettingsContext";
 
+// ── Formatting helpers ────────────────────────────────────────────────────────
+
+/** Format a heatmap value for display: integers for RAW, 2 dp for scaled. */
+function fmtVal(v: number, scaling: string): string {
+  return scaling === "RAW" ? String(v) : v.toFixed(2);
+}
+
 // ── Color helpers ──────────────────────────────────────────────────────────────
 
 /** Interpolate between light yellow and deep blue based on 0-1 value. */
@@ -41,11 +48,13 @@ function Sparkline({
   values,
   labels,
   globalMax,
+  scaling = "RAW",
   onDotClick,
 }: {
   values: number[];
   labels: string[];
   globalMax: number;
+  scaling?: string;
   onDotClick?: (colIndex: number, event: React.MouseEvent<SVGElement>) => void;
 }) {
   // viewBox coordinates — SVG scales to fill whatever width the td gives it
@@ -107,7 +116,7 @@ function Sparkline({
               if (v > 0 && onDotClick) onDotClick(i, e);
             }}
           >
-            <title>{`${labels[i]}: ${v}`}</title>
+            <title>{`${labels[i]}: ${fmtVal(v, scaling)}`}</title>
             {/* Invisible wider hit area */}
             <circle cx={cx} cy={cy} r={10} fill="transparent" />
             <circle
@@ -130,16 +139,22 @@ function Sparkline({
 /** Tag list card for one student (used in small-multiples mode). */
 function StudentTagCard({
   name,
+  studentId,
   values,
   labels,
   colIds,
+  scaling = "RAW",
   onTagClick,
+  onStudentClick,
 }: {
   name: string;
+  studentId?: string;
   values: number[];
   labels: string[];
   colIds: string[];
+  scaling?: string;
   onTagClick?: (event: React.MouseEvent<HTMLElement>, toriTagId: string, toriTagName: string, count: number) => void;
+  onStudentClick?: (studentId: string, studentName: string) => void;
 }) {
   // Build tag array with original colId so we can reference it after sorting
   const tags = labels
@@ -155,7 +170,16 @@ function StudentTagCard({
           fontWeight={700}
           display="block"
           noWrap
-          sx={{ mb: 0.75, fontSize: 11 }}
+          sx={{
+            mb: 0.75,
+            fontSize: 11,
+            ...(onStudentClick && studentId
+              ? { cursor: "pointer", color: "primary.main", "&:hover": { textDecoration: "underline" } }
+              : {}),
+          }}
+          onClick={() => {
+            if (onStudentClick && studentId) onStudentClick(studentId, name);
+          }}
         >
           {name}
         </Typography>
@@ -199,7 +223,7 @@ function StudentTagCard({
                   flexShrink: 0,
                 }}
               >
-                {count}
+                {fmtVal(count, scaling)}
               </Typography>
             </Box>
           ))}
@@ -232,15 +256,16 @@ interface PopoverState {
 }
 
 interface HeatmapViewProps {
-  onViewThread?: (threadId: string, studentName: string) => void;
+  onViewThread?: (threadId: string, studentName: string, studentId?: string, initialToriTag?: string) => void;
+  onStudentClick?: (studentId: string, studentName: string) => void;
 }
 
-export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
+export default function HeatmapView({ onViewThread, onStudentClick }: HeatmapViewProps) {
   const { scope } = useInsightsScope();
   const { getDisplayName } = useUserSettings();
 
   const [mode, setMode] = useState<DisplayMode>("CLASSIC");
-  const [scaling, setScaling] = useState<"RAW" | "ROW" | "GLOBAL">("RAW");
+  const [scaling, setScaling] = useState<"RAW" | "ROW" | "GLOBAL">("ROW");
   const [popoverState, setPopoverState] = useState<PopoverState | null>(null);
 
   const { data, loading, error, refetch } = useQuery<any>(GET_HEATMAP, {
@@ -350,6 +375,37 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
         <Box>
           <table style={{ borderCollapse: "collapse", fontSize: 12, width: "100%" }}>
             <tbody>
+              {/* Summary row — aggregate across all students */}
+              {(() => {
+                const summaryValues = colOrder.map((ci) =>
+                  rowOrder.reduce((sum, ri) => sum + (matrix[ri]?.[ci] ?? 0), 0),
+                );
+                return (
+                  <tr style={{ background: "#f5f7fa", borderBottom: "2px solid #ccc" }}>
+                    <td
+                      style={{
+                        padding: "3px 12px 3px 0",
+                        fontWeight: 700,
+                        whiteSpace: "nowrap",
+                        width: 140,
+                        verticalAlign: "middle",
+                        fontSize: 11,
+                        color: "#1565c0",
+                      }}
+                    >
+                      All Students
+                    </td>
+                    <td style={{ padding: "2px 0", verticalAlign: "middle", width: "100%" }}>
+                      <Sparkline
+                        values={summaryValues}
+                        labels={colOrder.map((ci) => colLabels[ci])}
+                        globalMax={Math.max(...summaryValues, 1)}
+                        scaling={scaling}
+                      />
+                    </td>
+                  </tr>
+                );
+              })()}
               {rowOrder.map((ri) => {
                 const values = colOrder.map((ci) => matrix[ri]?.[ci] ?? 0);
                 return (
@@ -361,15 +417,30 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
                         whiteSpace: "nowrap",
                         width: 140,
                         verticalAlign: "middle",
+                        cursor: onStudentClick ? "pointer" : "default",
                       }}
+                      onClick={() => onStudentClick?.(rowIds[ri], rowLabels[ri])}
                     >
-                      {getDisplayName(rowLabels[ri])}
+                      <Typography
+                        component="span"
+                        variant="body2"
+                        sx={{
+                          fontSize: "inherit",
+                          fontWeight: "inherit",
+                          ...(onStudentClick
+                            ? { color: "primary.main", "&:hover": { textDecoration: "underline" } }
+                            : {}),
+                        }}
+                      >
+                        {getDisplayName(rowLabels[ri])}
+                      </Typography>
                     </td>
                     <td style={{ padding: "2px 0", verticalAlign: "middle", width: "100%" }}>
                       <Sparkline
                         values={values}
                         labels={colOrder.map((ci) => colLabels[ci])}
                         globalMax={maxVal}
+                        scaling={scaling}
                         onDotClick={(localColIdx, e) => {
                           const ci = colOrder[localColIdx];
                           // Anchor to the <td>, not the SVG circle
@@ -401,9 +472,12 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
             <StudentTagCard
               key={ri}
               name={getDisplayName(rowLabels[ri])}
+              studentId={rowIds[ri]}
               values={colOrder.map((ci) => matrix[ri]?.[ci] ?? 0)}
               labels={colOrder.map((ci) => colLabels[ci])}
               colIds={colOrder.map((ci) => colIds[ci])}
+              scaling={scaling}
+              onStudentClick={onStudentClick}
               onTagClick={(e, toriTagId, toriTagName, count) => {
                 setPopoverState({
                   anchorEl: e.currentTarget as HTMLElement,
@@ -462,9 +536,56 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
               </tr>
             </thead>
             <tbody>
+              {/* Summary row — aggregate across all students */}
+              {(() => {
+                const summaryValues = colOrder.map((ci) =>
+                  rowOrder.reduce((sum, ri) => sum + (matrix[ri]?.[ci] ?? 0), 0),
+                );
+                const summaryMax = Math.max(...summaryValues, 1);
+                return (
+                  <tr style={{ background: "#f5f7fa", borderBottom: "2px solid #ccc" }}>
+                    <td
+                      style={{
+                        position: "sticky",
+                        left: 0,
+                        background: "#f5f7fa",
+                        zIndex: 1,
+                        padding: "4px 8px",
+                        fontWeight: 700,
+                        whiteSpace: "nowrap",
+                        color: "#1565c0",
+                        fontSize: 11,
+                      }}
+                    >
+                      All Students
+                    </td>
+                    {colOrder.map((ci, idx) => {
+                      const total = summaryValues[idx];
+                      const t = summaryMax > 0 ? total / summaryMax : 0;
+                      return (
+                        <td
+                          key={ci}
+                          style={{
+                            width: 48,
+                            height: 32,
+                            textAlign: "center",
+                            padding: 2,
+                            border: "1px solid rgba(0,0,0,0.06)",
+                            background: cellColor(t),
+                            color: textColor(t),
+                            fontWeight: 700,
+                          }}
+                        >
+                          {total > 0 ? fmtVal(total, scaling) : null}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                );
+              })()}
               {rowOrder.map((ri) => (
                 <tr key={ri}>
-                  {/* Row label — sticky on the left */}
+                  {/* Row label — sticky on the left, clickable */}
                   <td
                     style={{
                       position: "sticky",
@@ -474,9 +595,23 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
                       padding: "4px 8px",
                       fontWeight: 500,
                       whiteSpace: "nowrap",
+                      cursor: onStudentClick ? "pointer" : "default",
                     }}
+                    onClick={() => onStudentClick?.(rowIds[ri], rowLabels[ri])}
                   >
-                    {getDisplayName(rowLabels[ri])}
+                    <Typography
+                      component="span"
+                      variant="body2"
+                      sx={{
+                        fontSize: "inherit",
+                        fontWeight: "inherit",
+                        ...(onStudentClick
+                          ? { color: "primary.main", "&:hover": { textDecoration: "underline" } }
+                          : {}),
+                      }}
+                    >
+                      {getDisplayName(rowLabels[ri])}
+                    </Typography>
                   </td>
                   {colOrder.map((ci) => {
                     const raw = matrix[ri]?.[ci] ?? 0;
@@ -485,7 +620,7 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
                     return (
                       <Tooltip
                         key={ci}
-                        title={`${getDisplayName(rowLabels[ri])} × ${colLabels[ci]}: ${raw}`}
+                        title={`${getDisplayName(rowLabels[ri])} × ${colLabels[ci]}: ${fmtVal(raw, scaling)}`}
                         arrow
                         enterDelay={0}
                         enterNextDelay={0}
@@ -514,7 +649,7 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
                             cursor: raw > 0 ? "pointer" : "default",
                           }}
                         >
-                          {raw > 0 ? raw : null}
+                          {raw > 0 ? fmtVal(raw, scaling) : null}
                         </td>
                       </Tooltip>
                     );
@@ -541,6 +676,10 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
             setPopoverState(null);
             onViewThread?.(threadId, studentName);
           }}
+          onStudentClick={onStudentClick ? (id, name) => {
+            setPopoverState(null);
+            onStudentClick(id, name);
+          } : undefined}
         />
       )}
     </Box>

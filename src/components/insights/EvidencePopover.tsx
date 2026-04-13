@@ -21,7 +21,8 @@ interface EvidencePopoverProps {
   count?: number;
   scope: { institutionId: string; courseId?: string; assignmentId?: string };
   onClose: () => void;
-  onViewThread: (threadId: string, studentName: string) => void;
+  onViewThread: (threadId: string, studentName: string, studentId?: string, initialToriTag?: string) => void;
+  onStudentClick?: (studentId: string, studentName: string) => void;
 }
 
 interface EvidenceItem {
@@ -29,6 +30,8 @@ interface EvidenceItem {
   text: string;
   threadId: string;
   threadName: string;
+  studentId: string | null;
+  studentName: string | null;
   timestamp: string | null;
 }
 
@@ -47,6 +50,7 @@ export default function EvidencePopover({
   scope,
   onClose,
   onViewThread,
+  onStudentClick,
 }: EvidencePopoverProps) {
   const { getDisplayName } = useUserSettings();
   const [accumulated, setAccumulated] = React.useState<EvidenceItem[]>([]);
@@ -63,7 +67,7 @@ export default function EvidencePopover({
     async (offset: number, append: boolean) => {
       const resp = await fetchEvidence({
         variables: {
-          input: { scope, studentId, toriTagId, limit: PAGE_SIZE, offset },
+          input: { scope, studentId, toriTagId, toriTagName: toriTagId ? undefined : toriTagName, limit: PAGE_SIZE, offset },
         },
       });
       const result = resp?.data?.heatmapCellEvidence;
@@ -81,7 +85,7 @@ export default function EvidencePopover({
         setAccumulated(result.items);
       }
     },
-    [fetchEvidence, scope, studentId, toriTagId]
+    [fetchEvidence, scope, studentId, toriTagId, toriTagName]
   );
 
   // Reset and fetch a fresh first page whenever the target cell changes.
@@ -117,19 +121,29 @@ export default function EvidencePopover({
       <Typography variant="subtitle2" fontWeight={700} gutterBottom>
         {toriTagName || (studentName ? getDisplayName(studentName) : null) || "Evidence"}
       </Typography>
-      <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
-        {[
-          studentName && toriTagName ? getDisplayName(studentName) : null,
-          // Prefer the live totalCount from the query over the upstream `count` prop,
-          // since `count` may be stale (e.g. from cached aggregate stats).
-          totalCount > 0
-            ? `${totalCount} mention${totalCount !== 1 ? "s" : ""}`
-            : count != null
-            ? `${count} mention${count !== 1 ? "s" : ""}`
-            : null,
-        ]
-          .filter(Boolean)
-          .join(" — ") || "Matching comments"}
+      <Typography variant="caption" color="text.secondary" display="block" component="div" sx={{ mb: 1.5 }}>
+        {studentName && toriTagName && (
+          <>
+            {onStudentClick && studentId ? (
+              <Typography
+                component="span"
+                variant="caption"
+                sx={{ cursor: "pointer", color: "primary.main", "&:hover": { textDecoration: "underline" } }}
+                onClick={() => { onStudentClick(studentId, studentName); onClose(); }}
+              >
+                {getDisplayName(studentName)}
+              </Typography>
+            ) : (
+              getDisplayName(studentName)
+            )}
+            {" — "}
+          </>
+        )}
+        {totalCount > 0
+          ? `${totalCount} mention${totalCount !== 1 ? "s" : ""}`
+          : count != null
+          ? `${count} mention${count !== 1 ? "s" : ""}`
+          : !studentName || !toriTagName ? "Matching comments" : null}
       </Typography>
 
       {/* Initial loading state — only when nothing is loaded yet. */}
@@ -169,6 +183,29 @@ export default function EvidencePopover({
                 borderColor: "primary.main",
               }}
             >
+              {/* Student name (shown when evidence spans multiple students) */}
+              {!studentId && item.studentName && (
+                <Typography
+                  variant="caption"
+                  fontWeight={600}
+                  sx={{
+                    mb: 0.5,
+                    display: "block",
+                    ...(onStudentClick && item.studentId
+                      ? { cursor: "pointer", color: "primary.main", "&:hover": { textDecoration: "underline" } }
+                      : { color: "text.secondary" }),
+                  }}
+                  onClick={() => {
+                    if (onStudentClick && item.studentId) {
+                      onStudentClick(item.studentId, item.studentName!);
+                      onClose();
+                    }
+                  }}
+                >
+                  {getDisplayName(item.studentName)}
+                </Typography>
+              )}
+
               {/* Truncated quote */}
               <Typography variant="body2" sx={{ mb: 0.5, lineHeight: 1.5 }}>
                 "{(() => { const t = decodeEntities(item.text); return t.length > 200 ? t.slice(0, 200) + "…" : t; })()}"
@@ -192,7 +229,7 @@ export default function EvidencePopover({
                 variant="caption"
                 sx={{ mt: 0.5, display: "inline-block" }}
                 onClick={() => {
-                  onViewThread(item.threadId, studentName || "Student");
+                  onViewThread(item.threadId, item.studentName || studentName || "Student", item.studentId ?? undefined, toriTagName);
                   onClose();
                 }}
               >

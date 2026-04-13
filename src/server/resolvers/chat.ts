@@ -3,19 +3,19 @@ import { AppDataSource } from "../data-source.js";
 import { ChatSession, ChatScope } from "../entities/ChatSession.js";
 import { ChatMessage, ChatMessageRole } from "../entities/ChatMessage.js";
 import type { GraphQLContext } from "../types/context.js";
-import { requireAuth } from "./middleware/auth.js";
+import { requireAuth, requireInstitutionAccess } from "./middleware/auth.js";
 import { sendChatMessage as sendChatMessageService } from "../services/ai-chat.js";
 
 export const chatResolvers = {
   Query: {
     chatSessions: async (
       _: unknown,
-      { courseId, assignmentId }: { courseId?: string; assignmentId?: string },
+      { institutionId, courseId, assignmentId }: { institutionId: string; courseId?: string; assignmentId?: string },
       ctx: GraphQLContext
     ) => {
-      const user = requireAuth(ctx);
+      const user = requireInstitutionAccess(ctx, institutionId);
       const repo = AppDataSource.getRepository(ChatSession);
-      const where: Record<string, unknown> = { userId: user.id };
+      const where: Record<string, unknown> = { userId: user.id, institutionId };
       if (courseId) where.courseId = courseId;
       if (assignmentId) where.assignmentId = assignmentId;
       return repo.find({ where, order: { updatedAt: "DESC" } });
@@ -34,6 +34,10 @@ export const chatResolvers = {
           extensions: { code: "NOT_FOUND" },
         });
       }
+      // Verify institutional access (skip for legacy sessions without institutionId)
+      if (session.institutionId) {
+        requireInstitutionAccess(ctx, session.institutionId);
+      }
       return session;
     },
   },
@@ -42,6 +46,7 @@ export const chatResolvers = {
     createChatSession: async (
       _: unknown,
       args: {
+        institutionId: string;
         courseId?: string;
         assignmentId?: string;
         studentId?: string;
@@ -52,10 +57,11 @@ export const chatResolvers = {
       },
       ctx: GraphQLContext
     ) => {
-      const user = requireAuth(ctx);
+      const user = requireInstitutionAccess(ctx, args.institutionId);
       const repo = AppDataSource.getRepository(ChatSession);
       const session = repo.create({
         userId: user.id,
+        institutionId: args.institutionId,
         courseId: args.courseId ?? null,
         assignmentId: args.assignmentId ?? null,
         studentId: args.studentId ?? null,
@@ -69,7 +75,7 @@ export const chatResolvers = {
 
     sendChatMessage: async (
       _: unknown,
-      { sessionId, content }: { sessionId: string; content: string },
+      { sessionId, content, analyticsContext }: { sessionId: string; content: string; analyticsContext?: string },
       ctx: GraphQLContext
     ) => {
       const user = requireAuth(ctx);
@@ -82,7 +88,7 @@ export const chatResolvers = {
       }
 
       // Use the AI chat service to handle message + LLM response
-      return sendChatMessageService(sessionId, content, user.id);
+      return sendChatMessageService(sessionId, content, user.id, analyticsContext);
     },
 
     deleteChatSession: async (
@@ -117,6 +123,54 @@ export const chatResolvers = {
       }
       session.title = title;
       return repo.save(session);
+    },
+
+    updateChatSessionScope: async (
+      _: unknown,
+      { id, scope, studentId, courseId, assignmentId }: {
+        id: string;
+        scope: string;
+        studentId?: string;
+        courseId?: string;
+        assignmentId?: string;
+      },
+      ctx: GraphQLContext
+    ) => {
+      const user = requireAuth(ctx);
+      const sessionRepo = AppDataSource.getRepository(ChatSession);
+      const session = await sessionRepo.findOne({ where: { id } });
+      if (!session || session.userId !== user.id) {
+        throw new GraphQLError("Chat session not found", {
+          extensions: { code: "NOT_FOUND" },
+        });
+      }
+      if (session.institutionId) {
+        requireInstitutionAccess(ctx, session.institutionId);
+      }
+
+      // Update scope fields
+      session.scope = scope as ChatScope;
+      session.studentId = studentId ?? null;
+      session.courseId = courseId ?? null;
+      session.assignmentId = assignmentId ?? null;
+      const updated = await sessionRepo.save(session);
+
+      // Create a SYSTEM message to mark the scope change
+      const msgRepo = AppDataSource.getRepository(ChatMessage);
+      const scopeLabels: Record<string, string> = {
+        SELECTION: studentId ? "This student" : "Selected comments",
+        COURSE: "This course",
+        CROSS_COURSE: "All courses",
+      };
+      const label = scopeLabels[scope] ?? scope;
+      const systemMsg = msgRepo.create({
+        sessionId: id,
+        role: ChatMessageRole.SYSTEM,
+        content: `Context changed to: ${label}. AI context refreshed.`,
+      });
+      await msgRepo.save(systemMsg);
+
+      return updated;
     },
   },
 

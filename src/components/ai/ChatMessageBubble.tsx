@@ -41,6 +41,20 @@ function formatTimestamp(dateStr: string): string {
  */
 export default function ChatMessageBubble({ message, isTyping }: ChatMessageBubbleProps) {
   const isUser = message.role === "USER";
+  const isSystem = message.role === "SYSTEM";
+
+  // SYSTEM messages render as centered dividers
+  if (isSystem) {
+    return (
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, my: 1.5, px: 2 }}>
+        <Box sx={{ flex: 1, height: "1px", bgcolor: "divider" }} />
+        <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
+          {message.content}
+        </Typography>
+        <Box sx={{ flex: 1, height: "1px", bgcolor: "divider" }} />
+      </Box>
+    );
+  }
 
   return (
     <Box
@@ -51,7 +65,7 @@ export default function ChatMessageBubble({ message, isTyping }: ChatMessageBubb
         px: 1,
       }}
     >
-      <Box sx={{ maxWidth: "min(80%, 600px)" }}>
+      <Box sx={{ maxWidth: "min(75%, 520px)" }}>
         {/* The bubble */}
         <Paper
           elevation={0}
@@ -59,12 +73,12 @@ export default function ChatMessageBubble({ message, isTyping }: ChatMessageBubb
             px: 2,
             py: 1,
             borderRadius: "12px",
-            // User: subtle blue tint with left accent. Assistant: white with full border.
-            bgcolor: isUser ? "#f0f7ff" : "#fff",
+            // User: white with blue left accent. Assistant: light gray, no border.
+            bgcolor: isUser ? "#fff" : "#f5f5f5",
             color: "text.primary",
             ...(isUser
               ? { borderLeft: "3px solid", borderColor: "primary.main" }
-              : { border: "1px solid", borderColor: "divider" }),
+              : {}),
             // Markdown content inside assistant bubbles
             "& p": { m: 0 },
             "& p + p": { mt: 1 },

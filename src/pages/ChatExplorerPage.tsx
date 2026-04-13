@@ -1,37 +1,30 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQuery } from "@apollo/client/react";
-import { Box, Typography, Skeleton, Fab, Slide } from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
+import { Box, Typography, Skeleton } from "@mui/material";
 import {
   GET_STUDENT_PROFILES,
   GET_ASSIGNMENT_THREADS,
 } from "@/lib/queries/explorer";
+import { GET_COURSES } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
+import { useFacultyPanel } from "@/components/faculty-panel/FacultyPanelContext";
 import ThreadView from "@/components/explorer/ThreadView";
 import BottomBar from "@/components/explorer/BottomBar";
 import ToriFilters from "@/components/explorer/ToriFilters";
 import StudentListPanel from "@/components/explorer/StudentListPanel";
-import AiChatPanel from "@/components/ai/AiChatPanel";
-
-/** Width of the collapsible AI panel. Capped at 50vw via CSS min(). */
-const AI_PANEL_WIDTH = "min(600px, 50vw)";
 
 /**
- * Chat Explorer page — split-screen layout.
+ * Chat Explorer page — thread viewer with bottom bar.
  *
- * Left panel: scope breadcrumb (shared with Insights), TORI filters,
- *             student conversation threads, bottom bar with student carousel.
- * Right panel: embedded AI Chat for discussing what you see on the left.
- *
- * Institution / course / assignment selection is shared with the Insights page
- * via the global InsightsScopeProvider in App.tsx — navigating between pages
- * preserves the selected context.
+ * The AI Chat panel has moved to the global Faculty Panel (AppShell).
+ * The "Analyze" button in the bottom bar opens the Faculty Panel's Chat tab.
  */
 export default function ChatExplorerPage() {
-  // ── Shared scope (persists across page navigation) ─────────────────
-  const { scope } = useInsightsScope();
+  // ── Shared scope (persists across page navigation) ──���──────────────
+  const { scope, setScope } = useInsightsScope();
   const courseId = scope?.courseId;
   const assignmentId = scope?.assignmentId;
+  const panel = useFacultyPanel();
 
   // ── Local state (specific to this page) ────────────────────────────
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
@@ -39,8 +32,6 @@ export default function ChatExplorerPage() {
   const [studentListOpen, setStudentListOpen] = useState(false);
   // TORI tags clicked in chat comments — passed as context to AI chat
   const [aiContextTags, setAiContextTags] = useState<string[]>([]);
-  // AI panel open by default on wide screens (>1024px)
-  const [aiPanelOpen, setAiPanelOpen] = useState(() => window.innerWidth > 1024);
 
   // Reset student selection and TORI filters whenever the course changes
   const prevCourseIdRef = useRef<string | undefined>(undefined);
@@ -70,21 +61,27 @@ export default function ChatExplorerPage() {
     );
   }, []);
 
-  /** Toggle a student in the multi-selection (add or remove). */
-  const handleToggleStudent = useCallback((id: string) => {
-    setSelectedStudentIds((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
-    );
-  }, []);
-
   // ── Queries ────────────────────────────────────────────────────────
 
-  // Student profiles for the selected scope
+  // Fetch available courses so we can auto-select the first one when no course is chosen
+  const { data: coursesData } = useQuery<any>(GET_COURSES, {
+    variables: { institutionId: scope?.institutionId },
+    skip: !scope?.institutionId || !!courseId,
+  });
+
+  // Auto-select the first course when none is selected (so threads can load)
+  useEffect(() => {
+    if (!courseId && scope?.institutionId && coursesData?.courses?.length > 0) {
+      setScope({ ...scope, courseId: coursesData.courses[0].id });
+    }
+  }, [courseId, scope, coursesData, setScope]);
+
+  // Student profiles for the selected scope (works at institution or course level)
   const { data: studentsData, loading: studentsLoading } = useQuery<any>(
     GET_STUDENT_PROFILES,
     {
       variables: { scope },
-      skip: !courseId,
+      skip: !scope?.institutionId,
     }
   );
   const studentProfiles =
@@ -96,6 +93,36 @@ export default function ChatExplorerPage() {
       setSelectedStudentIds([studentProfiles[0].studentId]);
     }
   }, [studentProfiles]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Notify panel of current page context for context-change detection
+  useEffect(() => {
+    if (scope) {
+      const scopeKey = [scope.institutionId, scope.courseId, scope.assignmentId]
+        .filter(Boolean)
+        .join("/");
+      const selectedStudent = studentProfiles.find(
+        (s: { studentId: string }) => s.studentId === selectedStudentIds[0]
+      );
+      panel.setPageContext({
+        page: "chat-explorer",
+        scopeKey,
+        studentId: selectedStudentIds[0],
+        studentName: selectedStudent?.name,
+      });
+    }
+  }, [scope, selectedStudentIds, panel.setPageContext]);
+
+  // Sync selected student with Faculty Panel's Student tab
+  useEffect(() => {
+    if (panel.isOpen && panel.activeTab === "student" && selectedStudentIds.length === 1) {
+      const student = studentProfiles.find(
+        (s: { studentId: string; name: string }) => s.studentId === selectedStudentIds[0]
+      );
+      if (student) {
+        panel.openStudentProfile(student.studentId, student.name);
+      }
+    }
+  }, [selectedStudentIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Thread data (for extracting available TORI tags and rendering threads)
   const { data: threadsData } = useQuery<any>(GET_ASSIGNMENT_THREADS, {
@@ -158,18 +185,6 @@ export default function ChatExplorerPage() {
     );
   }, []);
 
-  // Find the selected student(s) display name for AI context indicator
-  const selectedStudentName = useMemo(() => {
-    if (selectedStudentIds.length === 0) return undefined;
-    if (selectedStudentIds.length === 1) {
-      const student = studentProfiles.find(
-        (s: any) => s.studentId === selectedStudentIds[0]
-      );
-      return student?.name;
-    }
-    return `${selectedStudentIds.length} students`;
-  }, [selectedStudentIds, studentProfiles]);
-
   // ── Render ─────────────────────────────────────────────────────────
 
   return (
@@ -177,10 +192,7 @@ export default function ChatExplorerPage() {
       sx={{
         display: "flex",
         flexDirection: "column",
-        height: "100vh",
-        // Smooth transition when AI panel opens/closes
-        transition: "padding-right 0.3s ease",
-        pr: aiPanelOpen ? AI_PANEL_WIDTH : 0,
+        height: "100%",
       }}
     >
       {/* ── MAIN CONTENT: full-width thread viewer ──────────────── */}
@@ -212,20 +224,7 @@ export default function ChatExplorerPage() {
 
         {/* Thread view — takes full available width */}
         <Box sx={{ flex: 1, overflowY: "auto", pb: "80px", px: 3 }}>
-          {!courseId ? (
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                height: "100%",
-                minHeight: 300,
-                color: "text.secondary",
-              }}
-            >
-              <Typography>Select a course to get started.</Typography>
-            </Box>
-          ) : studentsLoading ? (
+          {studentsLoading ? (
             <Box>
               <Skeleton variant="rounded" height={60} sx={{ mb: 1 }} />
               <Skeleton variant="rounded" height={60} sx={{ mb: 1 }} />
@@ -234,7 +233,7 @@ export default function ChatExplorerPage() {
           ) : (
             <ThreadView
               studentIds={selectedStudentIds}
-              courseId={courseId}
+              courseId={courseId ?? null}
               assignmentId={assignmentId ?? null}
               activeToriFilters={toriFilters}
               onToriTagClick={handleToriTagClick}
@@ -248,80 +247,19 @@ export default function ChatExplorerPage() {
           onClose={() => setStudentListOpen(false)}
           students={studentProfiles}
           selectedIds={selectedStudentIds}
-          onToggle={handleToggleStudent}
+          onToggle={handleSelectStudent}
         />
       </Box>
-
-      {/* ── AI PANEL: slides in from the right, overlays content ── */}
-      <Slide direction="left" in={aiPanelOpen} mountOnEnter unmountOnExit>
-        <Box
-          sx={{
-            position: "fixed",
-            top: 52, // below GlobalHeader (HEADER_HEIGHT)
-            right: 0,
-            bottom: 60, // above the bottom bar
-            width: AI_PANEL_WIDTH,
-            zIndex: 1200,
-            bgcolor: "background.paper",
-            borderLeft: 1,
-            borderColor: "divider",
-            display: "flex",
-            flexDirection: "column",
-            boxShadow: 6,
-          }}
-        >
-          {/* Close button in the top-right corner of the panel */}
-          <Box
-            sx={{
-              position: "absolute",
-              top: 8,
-              right: 8,
-              zIndex: 1,
-            }}
-          >
-            <Fab
-              size="small"
-              onClick={() => setAiPanelOpen(false)}
-              aria-label="Close AI chat"
-              sx={{
-                width: 32,
-                height: 32,
-                minHeight: 32,
-                boxShadow: 1,
-              }}
-            >
-              <CloseIcon fontSize="small" />
-            </Fab>
-          </Box>
-          <AiChatPanel
-            open={aiPanelOpen}
-            onClose={() => setAiPanelOpen(false)}
-            courseId={courseId}
-            assignmentId={assignmentId}
-            studentId={selectedStudentIds.length === 1 ? selectedStudentIds[0] : undefined}
-            studentName={selectedStudentName}
-            selectedToriTags={
-              aiContextTags.length > 0
-                ? aiContextTags
-                : toriFilters.length > 0
-                  ? toriFilters
-                  : undefined
-            }
-            anchor="embedded"
-          />
-        </Box>
-      </Slide>
 
       {/* ── BOTTOM BAR: spans full width ───────────────────────── */}
       <BottomBar
         students={studentProfiles}
         selectedStudentIds={selectedStudentIds}
         onSelectStudent={handleSelectStudent}
-        onToggleStudent={handleToggleStudent}
         onOpenStudentList={() => setStudentListOpen(true)}
         studentListOpen={studentListOpen}
-        onToggleAnalyze={() => setAiPanelOpen((p) => !p)}
-        analyzeOpen={aiPanelOpen}
+        onToggleAnalyze={() => panel.openChat()}
+        analyzeOpen={panel.isOpen && panel.activeTab === "chat"}
       />
     </Box>
   );

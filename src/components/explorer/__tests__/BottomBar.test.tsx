@@ -21,7 +21,6 @@ describe("BottomBar", () => {
     students,
     selectedStudentIds: [],
     onSelectStudent: vi.fn(),
-    onToggleStudent: vi.fn(),
     onOpenStudentList: vi.fn(),
     studentListOpen: false,
     onToggleAnalyze: vi.fn(),
