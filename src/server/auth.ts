@@ -10,6 +10,10 @@ if (process.env.SENDGRID_API_KEY) {
 
 const FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || "noreply@digication.com";
 
+// Track pending invitations so the sendMagicLink callback can send
+// the right email template. Maps email → inviter name.
+const pendingInvitations = new Map<string, string>();
+
 export const auth = betterAuth({
   database: new pg.Pool({
     connectionString: process.env.DATABASE_URL,
@@ -35,24 +39,53 @@ export const auth = betterAuth({
           return;
         }
 
-        await sgMail.send({
-          to: email,
-          from: FROM_EMAIL,
-          subject: "Sign in to Chat Explorer",
-          html: `
-            <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
-              <h2 style="color: #333;">Chat Explorer</h2>
-              <p>Click the button below to sign in. This link expires in 1 hour.</p>
-              <a href="${url}" style="display: inline-block; padding: 12px 24px; background: #1976d2; color: #fff; text-decoration: none; border-radius: 4px; margin: 20px 0;">
-                Sign in
-              </a>
-              <p style="color: #999; font-size: 12px;">If you didn't request this, you can safely ignore this email.</p>
-            </div>
-          `,
-          trackingSettings: {
-            clickTracking: { enable: false, enableText: false },
-          },
-        });
+        const inviterName = pendingInvitations.get(email);
+        pendingInvitations.delete(email);
+
+        if (inviterName) {
+          // Invitation email for new users
+          await sgMail.send({
+            to: email,
+            from: FROM_EMAIL,
+            subject: "You are invited to Digication Chat Explorer",
+            html: `
+              <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+                <h2 style="color: #333;">Welcome to Digication Chat Explorer</h2>
+                <p>${inviterName} has invited you to Digication Chat Explorer, a private beta tool for exploring and analyzing student chat conversations with AI insights.</p>
+                <p>Click below to set up your account and get started.</p>
+                <a href="${url}" style="display: inline-block; padding: 12px 24px; background: #1976d2; color: #fff; text-decoration: none; border-radius: 4px; margin: 20px 0;">
+                  Get Started
+                </a>
+                <p style="color: #999; font-size: 12px;">If you weren't expecting this invitation, you can safely ignore this email. No account will be created.</p>
+                <p style="color: #555; margin-top: 24px;">Sincerely,<br/>Your Friends at Digication</p>
+              </div>
+            `,
+            trackingSettings: {
+              clickTracking: { enable: false, enableText: false },
+            },
+          });
+        } else {
+          // Regular sign-in email for returning users
+          await sgMail.send({
+            to: email,
+            from: FROM_EMAIL,
+            subject: "Your Digication Chat Explorer sign-in link",
+            html: `
+              <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+                <h2 style="color: #333;">Sign in to Digication Chat Explorer</h2>
+                <p>Here's your sign-in link.</p>
+                <a href="${url}" style="display: inline-block; padding: 12px 24px; background: #1976d2; color: #fff; text-decoration: none; border-radius: 4px; margin: 20px 0;">
+                  Sign in
+                </a>
+                <p style="color: #999; font-size: 12px;">If you didn't request this link, you can safely ignore this email. Your account is secure.</p>
+                <p style="color: #555; margin-top: 24px;">Sincerely,<br/>Your Friends at Digication</p>
+              </div>
+            `,
+            trackingSettings: {
+              clickTracking: { enable: false, enableText: false },
+            },
+          });
+        }
       },
     }),
   ],
@@ -105,16 +138,12 @@ export async function notifyAdminOfBlockedSignIn(
   await sgMail.send({
     to: adminEmail,
     from: FROM_EMAIL,
-    subject: `[Chat Explorer] Sign-in attempt from uninvited user`,
+    subject: `Digication Chat Explorer: New sign-in request from ${name}`,
     html: `
       <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
-        <h2 style="color: #333;">Uninvited Sign-in Attempt</h2>
-        <p>Someone tried to sign in to Chat Explorer but doesn't have an account:</p>
-        <ul>
-          <li><strong>Name:</strong> ${name}</li>
-          <li><strong>Email:</strong> ${email}</li>
-        </ul>
-        <p>If you'd like to invite this person, go to the Admin Console and use "Invite User."</p>
+        <h2 style="color: #333;">New Sign-in Request</h2>
+        <p><strong>${name}</strong> (${email}) tried to sign in to Digication Chat Explorer but doesn't have an account yet.</p>
+        <p>To invite them, open the Admin Console and use "Invite User."</p>
       </div>
     `,
     trackingSettings: {
@@ -135,6 +164,10 @@ export async function sendInvitationEmail(
   // The sendMagicLink callback above handles the actual email delivery.
   // We call the server-side API directly.
   try {
+    // Flag this email as an invitation so the sendMagicLink callback
+    // uses the invitation template instead of the regular sign-in one.
+    pendingInvitations.set(email, inviterName);
+
     const baseURL = process.env.BETTER_AUTH_URL || "http://localhost:4000";
     // APP_URL is the frontend origin (different from API in dev, same in production)
     const appURL = process.env.APP_URL || baseURL;
@@ -150,6 +183,7 @@ export async function sendInvitationEmail(
     });
     console.log(`[auth] Invitation magic link sent to ${email}`);
   } catch (err) {
+    pendingInvitations.delete(email);
     console.error(`[auth] Failed to send invitation to ${email}:`, err);
     throw err;
   }
