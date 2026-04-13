@@ -21,3 +21,9 @@
 - **Deploys:** Automatic on push to `main` of [Digication/chat-explorer](https://github.com/Digication/chat-explorer)
 - **Migrations:** Run automatically on server startup (`AppDataSource.runMigrations()` in `src/server/index.ts`). In production `synchronize: false` — schema changes MUST go through a migration file in `src/server/migrations/`.
 - **Full details:** See `docs/deployment.md` for env vars, architecture, decisions, troubleshooting, and the custom domain rollout plan. This is the source of truth for anything deployment-related.
+
+# Future Phases: Outcomes, Evidence & Conceptual Trees
+A planned feature set that extends Chat Explorer with narrative evidence, artifact analysis, conceptual trees, institutional outcomes, guided reflection, and student-facing views. This is a 7-phase roadmap covering new data models, AI-generated evidence narratives, document upload/analysis, and student authentication.
+
+- **Plans:** `.claude/plans/outcomes-implementation-plan.md` (high-level), `.claude/plans/outcomes-technical-spec.md` (detailed one-shot spec), `.claude/plans/outcomes-spec-critique.md` (audit)
+- **Prototypes:** `prototype-outcomes-hub.html`, `prototype-conceptual-tree.html`, `prototype-guided-reflection.html` — interactive HTML mockups from the 2026-04-12 brainstorm session demonstrating the concepts visually
