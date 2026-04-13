@@ -30,9 +30,10 @@ const COMMUNITY_FILLS = [
 ];
 
 /** Layout constants */
-const NODE_HEIGHT_MIN = 24;
-const NODE_HEIGHT_MAX = 36;
-const NODE_PAD_X = 12; // horizontal padding inside rect
+const NODE_HEIGHT_MIN = 22;
+const NODE_HEIGHT_MAX = 44;
+const NODE_PAD_X_MIN = 10; // horizontal padding inside rect (low frequency)
+const NODE_PAD_X_MAX = 20; // horizontal padding inside rect (high frequency)
 const NODE_PAD_Y = 8;  // vertical padding between nodes in collision
 const FONT = "12px Inter, system-ui, sans-serif";
 const MAX_VISIBLE_NODES = 30;
@@ -127,13 +128,14 @@ export default function ToriNetworkGraph({ onViewThread, onStudentClick }: ToriN
     // Measure text widths
     const textWidths = measureTextWidths(nodes);
 
-    // Build layout nodes with measured dimensions (height scales with frequency)
+    // Build layout nodes with measured dimensions (height AND width scale with frequency)
     const maxFreq = Math.max(...nodes.map((n) => n.frequency), 1);
     const layoutNodes: LayoutNode[] = nodes.map((n) => {
       const labelWidth = textWidths.get(n.id) ?? 60;
       const freqRatio = n.frequency / maxFreq;
       const boxHeight = NODE_HEIGHT_MIN + (NODE_HEIGHT_MAX - NODE_HEIGHT_MIN) * freqRatio;
-      return { ...n, labelWidth, boxWidth: labelWidth + NODE_PAD_X * 2, boxHeight };
+      const padX = NODE_PAD_X_MIN + (NODE_PAD_X_MAX - NODE_PAD_X_MIN) * freqRatio;
+      return { ...n, labelWidth, boxWidth: labelWidth + padX * 2, boxHeight };
     });
 
     // Filter edges to only include visible nodes
@@ -425,7 +427,8 @@ export default function ToriNetworkGraph({ onViewThread, onStudentClick }: ToriN
             const isConnected = !activeNode || connectedNodes?.has(node.id);
 
             // Font size scales with node height
-            const fontSize = 10 + (node.boxHeight - NODE_HEIGHT_MIN) / (NODE_HEIGHT_MAX - NODE_HEIGHT_MIN) * 3; // 10-13px
+            const freqScale = (node.boxHeight - NODE_HEIGHT_MIN) / (NODE_HEIGHT_MAX - NODE_HEIGHT_MIN);
+            const fontSize = 10 + freqScale * 4; // 10-14px
 
             return (
               <g

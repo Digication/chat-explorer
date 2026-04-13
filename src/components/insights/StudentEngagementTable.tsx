@@ -281,9 +281,9 @@ export default function StudentEngagementTable({ onOpenStudent, onViewThread }: 
           count={popover.commentCount}
           scope={scope}
           onClose={() => setPopover(null)}
-          onViewThread={(threadId, studentName) => {
+          onViewThread={(threadId, studentName, studentId, initialToriTag) => {
             setPopover(null);
-            onViewThread?.(threadId, studentName);
+            onViewThread?.(threadId, studentName, studentId, initialToriTag);
           }}
         />
       )}
