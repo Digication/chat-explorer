@@ -1005,6 +1005,24 @@ function ToriSparklines({
 }
 
 /** Slope chart: lines from first assignment to last for top-N tags. */
+/** Push label positions apart so none overlap. */
+function deOverlap(positions: { y: number; idx: number }[], minGap: number): number[] {
+  const sorted = [...positions].sort((a, b) => a.y - b.y);
+  const result = sorted.map((p) => p.y);
+  // Push overlapping labels down
+  for (let i = 1; i < result.length; i++) {
+    if (result[i] - result[i - 1] < minGap) {
+      result[i] = result[i - 1] + minGap;
+    }
+  }
+  // Re-map back to original order
+  const out = new Array<number>(positions.length);
+  for (let i = 0; i < sorted.length; i++) {
+    out[sorted[i].idx] = result[i];
+  }
+  return out;
+}
+
 function SlopeChart({
   allTags,
   matrix,
@@ -1014,16 +1032,20 @@ function SlopeChart({
   matrix: Map<string, number[]>;
   assignments: AssignmentTagData[];
 }) {
-  const W = 400;
-  const H = 200;
-  const padLeft = 160;
-  const padRight = 160;
-  const padY = 24;
+  const tagCount = allTags.length;
+  const labelGap = 18; // minimum vertical gap between labels
+  const padTop = 32;
+  const padBottom = 24;
+  // Extra space so de-overlapped labels don't get clipped at the bottom
+  const chartHeight = Math.max(tagCount * labelGap + labelGap, 140);
+  const H = padTop + chartHeight + padBottom;
+  const W = 480;
+  const padLeft = 12;
+  const padRight = 12;
 
   const firstAssignment = assignments[0];
   const lastAssignment = assignments[assignments.length - 1];
 
-  // Get max value across first/last for scaling
   const maxVal = Math.max(
     1,
     ...allTags.flatMap(([tagId]) => {
@@ -1033,59 +1055,93 @@ function SlopeChart({
   );
 
   const getY = (v: number) =>
-    H - padY - (v / maxVal) * (H - padY * 2);
+    padTop + chartHeight - (v / maxVal) * chartHeight;
 
-  const x1 = padLeft;
-  const x2 = W - padRight;
+  const x1 = padLeft + 8;
+  const x2 = W - padRight - 8;
+
+  // Compute raw Y positions for de-overlapping
+  const leftRaw = allTags.map(([tagId], idx) => ({
+    y: getY(matrix.get(tagId)![0]),
+    idx,
+  }));
+  const rightRaw = allTags.map(([tagId], idx) => ({
+    y: getY(matrix.get(tagId)![matrix.get(tagId)!.length - 1]),
+    idx,
+  }));
+  const leftY = deOverlap(leftRaw, labelGap);
+  const rightY = deOverlap(rightRaw, labelGap);
 
   return (
-    <Box sx={{ display: "flex", justifyContent: "center" }}>
-      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
-        {/* Column headers */}
-        <text x={x1} y={14} textAnchor="middle" fontSize={10} fill="#666" fontWeight={600}>
+    <Box>
+      {/* Assignment column headers above the chart */}
+      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5, px: 0.5 }}>
+        <Typography variant="caption" fontWeight={600} color="text.secondary" noWrap sx={{ maxWidth: "45%" }}>
           {firstAssignment.assignmentName}
-        </text>
-        <text x={x2} y={14} textAnchor="middle" fontSize={10} fill="#666" fontWeight={600}>
+        </Typography>
+        <Typography variant="caption" fontWeight={600} color="text.secondary" noWrap sx={{ maxWidth: "45%", textAlign: "right" }}>
           {lastAssignment.assignmentName}
-        </text>
+        </Typography>
+      </Box>
 
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
         {/* Vertical guide lines */}
-        <line x1={x1} y1={padY} x2={x1} y2={H - padY} stroke="#eee" strokeWidth={1} />
-        <line x1={x2} y1={padY} x2={x2} y2={H - padY} stroke="#eee" strokeWidth={1} />
+        <line x1={x1} y1={padTop} x2={x1} y2={padTop + chartHeight} stroke="#e0e0e0" strokeWidth={1} />
+        <line x1={x2} y1={padTop} x2={x2} y2={padTop + chartHeight} stroke="#e0e0e0" strokeWidth={1} />
 
-        {/* Slope lines */}
-        {allTags.map(([tagId, { tagName, domain }]) => {
+        {/* Slope lines — drawn first so labels sit on top */}
+        {allTags.map(([tagId, { domain }]) => {
+          const vals = matrix.get(tagId)!;
+          const barColor = DOMAIN_COLORS[domain] ?? "#757575";
+          return (
+            <line
+              key={`line-${tagId}`}
+              x1={x1}
+              y1={getY(vals[0])}
+              x2={x2}
+              y2={getY(vals[vals.length - 1])}
+              stroke={barColor}
+              strokeWidth={2}
+              strokeOpacity={0.5}
+            />
+          );
+        })}
+
+        {/* Labels + dots */}
+        {allTags.map(([tagId, { tagName, domain }], i) => {
           const vals = matrix.get(tagId)!;
           const startVal = vals[0];
           const endVal = vals[vals.length - 1];
           const barColor = DOMAIN_COLORS[domain] ?? "#757575";
-          const y1 = getY(startVal);
-          const y2 = getY(endVal);
+          const dataY1 = getY(startVal);
+          const dataY2 = getY(endVal);
+          const labelY1 = leftY[i];
+          const labelY2 = rightY[i];
+          const truncName = tagName.length > 16 ? tagName.slice(0, 14) + "…" : tagName;
 
           return (
             <g key={tagId}>
               <Tooltip title={`${tagName}: ${startVal} → ${endVal}`}>
-                <line
-                  x1={x1}
-                  y1={y1}
-                  x2={x2}
-                  y2={y2}
-                  stroke={barColor}
-                  strokeWidth={2}
-                  strokeOpacity={0.7}
-                />
+                <circle cx={x1} cy={dataY1} r={4} fill={barColor} />
               </Tooltip>
-              {/* Left label */}
-              <text x={x1 - 6} y={y1 + 3} textAnchor="end" fontSize={9} fill="#555">
-                {tagName.length > 18 ? tagName.slice(0, 16) + "…" : tagName} ({startVal})
+              <Tooltip title={`${tagName}: ${startVal} → ${endVal}`}>
+                <circle cx={x2} cy={dataY2} r={4} fill={barColor} />
+              </Tooltip>
+              {/* Left label — positioned to avoid overlap */}
+              <text x={x1 + 10} y={labelY1 + 4} fontSize={11} fill={barColor} fontWeight={500}>
+                {truncName} ({startVal})
               </text>
+              {/* Connector from label to dot if displaced */}
+              {Math.abs(labelY1 - dataY1) > 4 && (
+                <line x1={x1 + 6} y1={labelY1} x2={x1 + 2} y2={dataY1} stroke={barColor} strokeWidth={0.5} strokeOpacity={0.4} />
+              )}
               {/* Right label */}
-              <text x={x2 + 6} y={y2 + 3} textAnchor="start" fontSize={9} fill="#555">
-                {tagName.length > 18 ? tagName.slice(0, 16) + "…" : tagName} ({endVal})
+              <text x={x2 - 10} y={labelY2 + 4} textAnchor="end" fontSize={11} fill={barColor} fontWeight={500}>
+                ({endVal}) {truncName}
               </text>
-              {/* Dots */}
-              <circle cx={x1} cy={y1} r={3} fill={barColor} />
-              <circle cx={x2} cy={y2} r={3} fill={barColor} />
+              {Math.abs(labelY2 - dataY2) > 4 && (
+                <line x1={x2 - 6} y1={labelY2} x2={x2 - 2} y2={dataY2} stroke={barColor} strokeWidth={0.5} strokeOpacity={0.4} />
+              )}
             </g>
           );
         })}
