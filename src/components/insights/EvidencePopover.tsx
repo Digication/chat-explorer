@@ -21,7 +21,7 @@ interface EvidencePopoverProps {
   count?: number;
   scope: { institutionId: string; courseId?: string; assignmentId?: string };
   onClose: () => void;
-  onViewThread: (threadId: string, studentName: string) => void;
+  onViewThread: (threadId: string, studentName: string, studentId?: string, initialToriTag?: string) => void;
   onStudentClick?: (studentId: string, studentName: string) => void;
 }
 
@@ -67,7 +67,7 @@ export default function EvidencePopover({
     async (offset: number, append: boolean) => {
       const resp = await fetchEvidence({
         variables: {
-          input: { scope, studentId, toriTagId, limit: PAGE_SIZE, offset },
+          input: { scope, studentId, toriTagId, toriTagName: toriTagId ? undefined : toriTagName, limit: PAGE_SIZE, offset },
         },
       });
       const result = resp?.data?.heatmapCellEvidence;
@@ -85,7 +85,7 @@ export default function EvidencePopover({
         setAccumulated(result.items);
       }
     },
-    [fetchEvidence, scope, studentId, toriTagId]
+    [fetchEvidence, scope, studentId, toriTagId, toriTagName]
   );
 
   // Reset and fetch a fresh first page whenever the target cell changes.
@@ -219,7 +219,7 @@ export default function EvidencePopover({
                 variant="caption"
                 sx={{ mt: 0.5, display: "inline-block" }}
                 onClick={() => {
-                  onViewThread(item.threadId, item.studentName || studentName || "Student");
+                  onViewThread(item.threadId, item.studentName || studentName || "Student", item.studentId ?? undefined, toriTagName);
                   onClose();
                 }}
               >

@@ -256,7 +256,7 @@ interface PopoverState {
 }
 
 interface HeatmapViewProps {
-  onViewThread?: (threadId: string, studentName: string) => void;
+  onViewThread?: (threadId: string, studentName: string, studentId?: string, initialToriTag?: string) => void;
   onStudentClick?: (studentId: string, studentName: string) => void;
 }
 

@@ -18,7 +18,7 @@ import MultiTagEvidencePopover from "./MultiTagEvidencePopover";
 const DEFAULT_LIMIT = 15;
 
 interface CoOccurrenceListProps {
-  onViewThread?: (threadId: string, studentName: string) => void;
+  onViewThread?: (threadId: string, studentName: string, studentId?: string, initialToriTag?: string) => void;
   onStudentClick?: (studentId: string, studentName: string) => void;
 }
 

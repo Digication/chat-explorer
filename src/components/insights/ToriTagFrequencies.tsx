@@ -58,7 +58,7 @@ function groupByDomain(tags: TagFrequency[]): Map<string, TagFrequency[]> {
 }
 
 interface ToriTagFrequenciesProps {
-  onViewThread?: (threadId: string, studentName: string) => void;
+  onViewThread?: (threadId: string, studentName: string, studentId?: string, initialToriTag?: string) => void;
   onStudentClick?: (studentId: string, studentName: string) => void;
 }
 
@@ -268,9 +268,9 @@ export default function ToriTagFrequencies({ onViewThread, onStudentClick }: Tor
           count={popover.count}
           scope={scope}
           onClose={() => setPopover(null)}
-          onViewThread={(threadId, studentName) => {
+          onViewThread={(threadId, studentName, studentId, initialToriTag) => {
             setPopover(null);
-            onViewThread?.(threadId, studentName);
+            onViewThread?.(threadId, studentName, studentId, initialToriTag);
           }}
           onStudentClick={onStudentClick ? (id, name) => {
             setPopover(null);

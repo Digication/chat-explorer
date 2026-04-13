@@ -22,6 +22,7 @@ interface CategoryEvidencePopoverProps {
   scope: { institutionId: string; courseId?: string; assignmentId?: string };
   onClose: () => void;
   onViewThread: (threadId: string, studentName: string) => void;
+  onStudentClick?: (studentId: string, studentName: string) => void;
 }
 
 interface CategoryEvidenceItem {
@@ -44,6 +45,7 @@ export default function CategoryEvidencePopover({
   scope,
   onClose,
   onViewThread,
+  onStudentClick,
 }: CategoryEvidencePopoverProps) {
   const [accumulated, setAccumulated] = React.useState<CategoryEvidenceItem[]>([]);
   const [totalCount, setTotalCount] = React.useState(0);
@@ -99,9 +101,24 @@ export default function CategoryEvidencePopover({
         {categoryLabel}
       </Typography>
       <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
-        {[studentName, assignmentName, totalCount > 0 ? `${totalCount} comment${totalCount !== 1 ? "s" : ""}` : null]
-          .filter(Boolean)
-          .join(" — ")}
+        {onStudentClick ? (
+          <>
+            <Typography
+              component="span"
+              variant="caption"
+              sx={{ cursor: "pointer", color: "primary.main", "&:hover": { textDecoration: "underline" } }}
+              onClick={() => { onStudentClick(studentId, studentName); onClose(); }}
+            >
+              {studentName}
+            </Typography>
+            {" — "}{assignmentName}
+            {totalCount > 0 && ` — ${totalCount} comment${totalCount !== 1 ? "s" : ""}`}
+          </>
+        ) : (
+          [studentName, assignmentName, totalCount > 0 ? `${totalCount} comment${totalCount !== 1 ? "s" : ""}` : null]
+            .filter(Boolean)
+            .join(" — ")
+        )}
       </Typography>
 
       {loading && evidence.length === 0 && (

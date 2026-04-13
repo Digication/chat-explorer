@@ -91,6 +91,7 @@ export const analyticsResolvers = {
           scope: ScopeInput;
           studentId?: string;
           toriTagId?: string;
+          toriTagName?: string;
           limit?: number;
           offset?: number;
         };
@@ -103,7 +104,8 @@ export const analyticsResolvers = {
         input.studentId,
         input.toriTagId,
         input.limit,
-        input.offset
+        input.offset,
+        input.toriTagName,
       );
     },
 

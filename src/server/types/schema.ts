@@ -622,6 +622,7 @@ export const typeDefs = /* GraphQL */ `
     scope: AnalyticsScopeInput!
     studentId: ID
     toriTagId: ID
+    toriTagName: String
     limit: Int
     offset: Int
   }

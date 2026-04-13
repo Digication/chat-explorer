@@ -182,7 +182,8 @@ export async function getHeatmapCellEvidence(
   studentId?: string,
   toriTagId?: string,
   limit: number = 20,
-  offset: number = 0
+  offset: number = 0,
+  toriTagName?: string,
 ): Promise<CellEvidenceResult> {
   // Clamp limit to a sane range to prevent runaway queries.
   const safeLimit = Math.min(Math.max(limit, 1), 200);
@@ -235,6 +236,10 @@ export async function getHeatmapCellEvidence(
         "ctt.toriTagId = :toriTagId",
         { toriTagId }
       );
+    } else if (toriTagName) {
+      qb.innerJoin("c.toriTags", "ctt")
+        .innerJoin("ctt.toriTag", "tt")
+        .andWhere("tt.name = :toriTagName", { toriTagName });
     }
 
     if (studentId) {

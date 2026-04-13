@@ -41,7 +41,7 @@ interface CellClickInfo {
 
 interface GrowthVisualizationProps {
   onOpenStudent?: (studentId: string, studentName: string) => void;
-  onViewThread?: (threadId: string, studentName: string) => void;
+  onViewThread?: (threadId: string, studentName: string, studentId?: string, initialToriTag?: string) => void;
 }
 
 export default function GrowthVisualization({ onOpenStudent, onViewThread }: GrowthVisualizationProps) {
@@ -155,6 +155,7 @@ export default function GrowthVisualization({ onOpenStudent, onViewThread }: Gro
           scope={scope}
           onClose={handleClosePopover}
           onViewThread={(threadId, name) => { onViewThread?.(threadId, name); handleClosePopover(); }}
+          onStudentClick={(studentId, studentName) => { onOpenStudent?.(studentId, studentName); handleClosePopover(); }}
         />
       )}
     </Box>

@@ -57,8 +57,8 @@ export default function InsightsPage() {
 
   // Thread/evidence clicks → open Thread in Faculty Panel
   const handleOpenThread = useCallback(
-    (threadId: string, studentName: string) => {
-      panel.openThread(threadId, studentName);
+    (threadId: string, studentName: string, studentId?: string, initialToriTag?: string) => {
+      panel.openThread(threadId, studentName, studentId, initialToriTag);
     },
     [panel.openThread],
   );
@@ -88,7 +88,7 @@ export default function InsightsPage() {
 
         {/* Network graph */}
         <Section id="network" title="TORI Network">
-          <ToriNetworkGraph onViewThread={handleOpenThread} />
+          <ToriNetworkGraph onViewThread={handleOpenThread} onStudentClick={handleOpenStudent} />
         </Section>
 
         {/* Reflection depth bands */}

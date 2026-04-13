@@ -48,7 +48,7 @@ interface Props {
   /** Called when a student name is clicked — opens Student Profile in panel. */
   onOpenStudent?: (studentId: string, studentName: string) => void;
   /** Called when a thread is selected from the evidence popover. */
-  onViewThread?: (threadId: string, studentName: string) => void;
+  onViewThread?: (threadId: string, studentName: string, studentId?: string, initialToriTag?: string) => void;
 }
 
 interface StudentPopoverState {
@@ -56,6 +56,13 @@ interface StudentPopoverState {
   studentId: string;
   studentName: string;
   commentCount: number;
+}
+
+interface TagPopoverState {
+  anchorEl: HTMLElement;
+  toriTagName: string;
+  studentId: string;
+  studentName: string;
 }
 
 export default function StudentEngagementTable({ onOpenStudent, onViewThread }: Props) {
@@ -66,6 +73,7 @@ export default function StudentEngagementTable({ onOpenStudent, onViewThread }: 
   const [sortKey, setSortKey] = useState<SortKey>("modalCategory");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [popover, setPopover] = useState<StudentPopoverState | null>(null);
+  const [tagPopover, setTagPopover] = useState<TagPopoverState | null>(null);
 
   const { data, loading, error, refetch } = useQuery<any>(
     GET_STUDENT_ENGAGEMENT,
@@ -244,7 +252,17 @@ export default function StudentEngagementTable({ onOpenStudent, onViewThread }: 
                       label={tag}
                       size="small"
                       variant="outlined"
-                      sx={{ fontSize: "0.7rem" }}
+                      clickable
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTagPopover({
+                          anchorEl: e.currentTarget,
+                          toriTagName: tag,
+                          studentId: student.studentId,
+                          studentName: student.name,
+                        });
+                      }}
+                      sx={{ fontSize: "0.7rem", cursor: "pointer" }}
                     />
                   ))}
                 </Box>
@@ -266,6 +284,26 @@ export default function StudentEngagementTable({ onOpenStudent, onViewThread }: 
           onViewThread={(threadId, studentName) => {
             setPopover(null);
             onViewThread?.(threadId, studentName);
+          }}
+        />
+      )}
+
+      {/* Evidence popover — shown when a TORI tag chip is clicked */}
+      {tagPopover && scope && (
+        <EvidencePopover
+          anchorEl={tagPopover.anchorEl}
+          studentId={tagPopover.studentId}
+          studentName={tagPopover.studentName}
+          toriTagName={tagPopover.toriTagName}
+          scope={scope}
+          onClose={() => setTagPopover(null)}
+          onViewThread={(threadId, studentName, studentId, initialToriTag) => {
+            setTagPopover(null);
+            onViewThread?.(threadId, studentName, studentId, initialToriTag);
+          }}
+          onStudentClick={(studentId, studentName) => {
+            setTagPopover(null);
+            onOpenStudent?.(studentId, studentName);
           }}
         />
       )}

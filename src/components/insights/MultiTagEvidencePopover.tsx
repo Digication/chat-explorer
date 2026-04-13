@@ -19,7 +19,7 @@ interface MultiTagEvidencePopoverProps {
   tagIds: string[];
   scope: { institutionId: string; courseId?: string; assignmentId?: string };
   onClose: () => void;
-  onViewThread?: (threadId: string, studentName: string) => void;
+  onViewThread?: (threadId: string, studentName: string, studentId?: string, initialToriTag?: string) => void;
   onStudentClick?: (studentId: string, studentName: string) => void;
 }
 
@@ -161,7 +161,7 @@ export default function MultiTagEvidencePopover({
                   component="button"
                   variant="caption"
                   sx={{ mt: 0.5, display: "inline-block" }}
-                  onClick={() => { onViewThread(item.threadId, item.studentName || "Student"); onClose(); }}
+                  onClick={() => { onViewThread(item.threadId, item.studentName || "Student", item.studentId ?? undefined, tagNames[0]); onClose(); }}
                 >
                   View full conversation →
                 </Link>

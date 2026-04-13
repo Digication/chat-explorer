@@ -30,7 +30,8 @@ const COMMUNITY_FILLS = [
 ];
 
 /** Layout constants */
-const NODE_HEIGHT = 28;
+const NODE_HEIGHT_MIN = 24;
+const NODE_HEIGHT_MAX = 36;
 const NODE_PAD_X = 12; // horizontal padding inside rect
 const NODE_PAD_Y = 8;  // vertical padding between nodes in collision
 const FONT = "12px Inter, system-ui, sans-serif";
@@ -55,6 +56,7 @@ interface EdgeData {
 interface LayoutNode extends NodeData {
   labelWidth: number; // measured text width
   boxWidth: number;   // labelWidth + padding
+  boxHeight: number;  // scaled by frequency
 }
 
 interface PopoverState {
@@ -64,7 +66,8 @@ interface PopoverState {
 }
 
 interface ToriNetworkGraphProps {
-  onViewThread?: (threadId: string, studentName: string) => void;
+  onViewThread?: (threadId: string, studentName: string, studentId?: string, initialToriTag?: string) => void;
+  onStudentClick?: (studentId: string, studentName: string) => void;
 }
 
 /** Measure text width using an off-screen canvas. */
@@ -90,7 +93,7 @@ function getConnectedNodes(nodeId: string, edges: EdgeData[]): Set<string> {
   return connected;
 }
 
-export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps) {
+export default function ToriNetworkGraph({ onViewThread, onStudentClick }: ToriNetworkGraphProps) {
   const { scope } = useInsightsScope();
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [lockedNode, setLockedNode] = useState<string | null>(null);
@@ -124,10 +127,13 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
     // Measure text widths
     const textWidths = measureTextWidths(nodes);
 
-    // Build layout nodes with measured dimensions
+    // Build layout nodes with measured dimensions (height scales with frequency)
+    const maxFreq = Math.max(...nodes.map((n) => n.frequency), 1);
     const layoutNodes: LayoutNode[] = nodes.map((n) => {
       const labelWidth = textWidths.get(n.id) ?? 60;
-      return { ...n, labelWidth, boxWidth: labelWidth + NODE_PAD_X * 2 };
+      const freqRatio = n.frequency / maxFreq;
+      const boxHeight = NODE_HEIGHT_MIN + (NODE_HEIGHT_MAX - NODE_HEIGHT_MIN) * freqRatio;
+      return { ...n, labelWidth, boxWidth: labelWidth + NODE_PAD_X * 2, boxHeight };
     });
 
     // Filter edges to only include visible nodes
@@ -201,10 +207,11 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
 
           const halfW_i = layoutNodes[i].boxWidth / 2 + NODE_PAD_Y;
           const halfW_j = layoutNodes[j].boxWidth / 2 + NODE_PAD_Y;
-          const halfH = NODE_HEIGHT / 2 + NODE_PAD_Y;
+          const halfH_i = layoutNodes[i].boxHeight / 2 + NODE_PAD_Y;
+          const halfH_j = layoutNodes[j].boxHeight / 2 + NODE_PAD_Y;
 
           const overlapX = (halfW_i + halfW_j) - Math.abs(dx);
-          const overlapY = (halfH + halfH) - Math.abs(dy);
+          const overlapY = (halfH_i + halfH_j) - Math.abs(dy);
 
           if (overlapX > 0 && overlapY > 0) {
             // Resolve along the axis with smallest overlap
@@ -232,7 +239,7 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
       for (let i = 0; i < layoutNodes.length; i++) {
         const halfW = layoutNodes[i].boxWidth / 2;
         pos[i].x = Math.max(halfW + 4, pos[i].x);
-        pos[i].y = Math.max(NODE_HEIGHT / 2 + 4, pos[i].y);
+        pos[i].y = Math.max(layoutNodes[i].boxHeight / 2 + 4, pos[i].y);
       }
       // Resolve overlaps
       let hadOverlap = false;
@@ -242,9 +249,10 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
           const dy = pos[i].y - pos[j].y;
           const halfW_i = layoutNodes[i].boxWidth / 2 + NODE_PAD_Y;
           const halfW_j = layoutNodes[j].boxWidth / 2 + NODE_PAD_Y;
-          const halfH = NODE_HEIGHT / 2 + NODE_PAD_Y;
+          const halfH_i = layoutNodes[i].boxHeight / 2 + NODE_PAD_Y;
+          const halfH_j = layoutNodes[j].boxHeight / 2 + NODE_PAD_Y;
           const overlapX = (halfW_i + halfW_j) - Math.abs(dx);
-          const overlapY = (halfH + halfH) - Math.abs(dy);
+          const overlapY = (halfH_i + halfH_j) - Math.abs(dy);
           if (overlapX > 0 && overlapY > 0) {
             hadOverlap = true;
             if (overlapX < overlapY) {
@@ -267,9 +275,9 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
     for (let i = 0; i < layoutNodes.length; i++) {
       const halfW = layoutNodes[i].boxWidth / 2;
       pos[i].x = Math.max(halfW + 4, pos[i].x);
-      pos[i].y = Math.max(NODE_HEIGHT / 2 + 4, pos[i].y);
+      pos[i].y = Math.max(layoutNodes[i].boxHeight / 2 + 4, pos[i].y);
       finalW = Math.max(finalW, pos[i].x + halfW + 8);
-      finalH = Math.max(finalH, pos[i].y + NODE_HEIGHT / 2 + 8);
+      finalH = Math.max(finalH, pos[i].y + layoutNodes[i].boxHeight / 2 + 8);
     }
 
     const positions: Record<string, { x: number; y: number }> = {};
@@ -316,7 +324,7 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
     const scaleY = rect.height / layout.H;
     anchorRef.current.style.position = "fixed";
     anchorRef.current.style.left = `${rect.left + svgPos.x * scaleX}px`;
-    anchorRef.current.style.top = `${rect.top + svgPos.y * scaleY + (NODE_HEIGHT / 2) * scaleY}px`;
+    anchorRef.current.style.top = `${rect.top + svgPos.y * scaleY + (node.boxHeight / 2) * scaleY}px`;
     setPopover({ anchorEl: anchorRef.current, toriTagId: node.id, toriTagName: node.name });
   }, [lockedNode, layout]);
 
@@ -368,7 +376,7 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
         Hover to highlight connections. Click a tag to lock and view evidence.
       </Typography>
 
-      <Box sx={{ overflowX: "auto", overflowY: "auto", maxHeight: 600 }}>
+      <Box sx={{ overflowX: "auto" }}>
         <svg
           width="100%"
           viewBox={`0 0 ${W} ${H}`}
@@ -416,9 +424,8 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
             const isActive = activeNode === node.id;
             const isConnected = !activeNode || connectedNodes?.has(node.id);
 
-            // Font size scales slightly with frequency
-            const maxFreq = Math.max(...nodes.map((n) => n.frequency), 1);
-            const fontSize = 11 + (node.frequency / maxFreq) * 2; // 11-13px
+            // Font size scales with node height
+            const fontSize = 10 + (node.boxHeight - NODE_HEIGHT_MIN) / (NODE_HEIGHT_MAX - NODE_HEIGHT_MIN) * 3; // 10-13px
 
             return (
               <g
@@ -431,15 +438,29 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
               >
                 <rect
                   x={pos.x - node.boxWidth / 2}
-                  y={pos.y - NODE_HEIGHT / 2}
+                  y={pos.y - node.boxHeight / 2}
                   width={node.boxWidth}
-                  height={NODE_HEIGHT}
+                  height={node.boxHeight}
                   rx={6}
                   ry={6}
                   fill={isActive ? strokeColor : fillColor}
                   stroke={strokeColor}
                   strokeWidth={isActive ? 2 : 1}
                 />
+                {/* Frequency count badge */}
+                <text
+                  x={pos.x + node.boxWidth / 2 - 4}
+                  y={pos.y - node.boxHeight / 2 + 4}
+                  textAnchor="end"
+                  dominantBaseline="hanging"
+                  fill={isActive ? "rgba(255,255,255,0.7)" : "rgba(0,0,0,0.35)"}
+                  fontSize={9}
+                  fontFamily="Inter, system-ui, sans-serif"
+                  fontWeight={600}
+                  style={{ pointerEvents: "none", userSelect: "none" }}
+                >
+                  {node.frequency}
+                </text>
                 <text
                   x={pos.x}
                   y={pos.y}
@@ -467,11 +488,16 @@ export default function ToriNetworkGraph({ onViewThread }: ToriNetworkGraphProps
           toriTagName={popover.toriTagName}
           scope={scope}
           onClose={() => { setPopover(null); setLockedNode(null); }}
-          onViewThread={(threadId, studentName) => {
+          onViewThread={(threadId, studentName, studentId, initialToriTag) => {
             setPopover(null);
             setLockedNode(null);
-            onViewThread?.(threadId, studentName);
+            onViewThread?.(threadId, studentName, studentId, initialToriTag);
           }}
+          onStudentClick={onStudentClick ? (id, name) => {
+            setPopover(null);
+            setLockedNode(null);
+            onStudentClick(id, name);
+          } : undefined}
         />
       )}
     </Box>
