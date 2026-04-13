@@ -9,11 +9,15 @@ export const GET_USERS = gql`
       name
       email
       role
+      emailVerified
+      deactivated
       institutionId
       institution {
         id
         name
       }
+      invitedAt
+      lastInvitedAt
     }
   }
 `;
@@ -76,6 +80,24 @@ export const INVITE_USER = gql`
       email
       role
       institutionId
+    }
+  }
+`;
+
+export const RESEND_INVITATION = gql`
+  mutation ResendInvitation($userId: ID!) {
+    resendInvitation(userId: $userId) {
+      id
+      lastInvitedAt
+    }
+  }
+`;
+
+export const SET_USER_DEACTIVATED = gql`
+  mutation SetUserDeactivated($userId: ID!, $deactivated: Boolean!) {
+    setUserDeactivated(userId: $userId, deactivated: $deactivated) {
+      id
+      deactivated
     }
   }
 `;

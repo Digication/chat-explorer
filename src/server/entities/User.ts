@@ -43,6 +43,15 @@ export class User {
   @Column({ type: "varchar", nullable: true })
   institutionId!: string | null;
 
+  @Column({ type: "boolean", default: false })
+  deactivated!: boolean;
+
+  @Column({ type: "timestamptz", nullable: true })
+  invitedAt!: Date | null;
+
+  @Column({ type: "timestamptz", nullable: true })
+  lastInvitedAt!: Date | null;
+
   @Column({ type: "varchar", nullable: true })
   preferredLlmProvider!: string | null;
 

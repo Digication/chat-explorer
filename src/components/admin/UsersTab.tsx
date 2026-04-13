@@ -21,11 +21,16 @@ import {
 import SearchIcon from "@mui/icons-material/Search";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import PersonAddOutlinedIcon from "@mui/icons-material/PersonAddOutlined";
+import SendOutlinedIcon from "@mui/icons-material/SendOutlined";
+import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import { useQuery, useMutation } from "@apollo/client/react";
 import {
   GET_USERS,
   GET_INSTITUTIONS,
   ASSIGN_ROLE,
+  RESEND_INVITATION,
+  SET_USER_DEACTIVATED,
 } from "@/lib/queries/admin";
 import { useAuth } from "@/lib/AuthProvider";
 import InviteUserDialog from "./InviteUserDialog";
@@ -36,11 +41,15 @@ interface UserRow {
   name: string;
   email: string;
   role: string;
+  emailVerified: boolean;
+  deactivated: boolean;
   institutionId: string | null;
   institution: { id: string; name: string } | null;
+  invitedAt: string | null;
+  lastInvitedAt: string | null;
 }
 
-type SortKey = "name" | "email" | "role" | "institution";
+type SortKey = "name" | "email" | "role" | "institution" | "status";
 type SortDir = "asc" | "desc";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -88,6 +97,15 @@ export default function UsersTab() {
     onCompleted: () => refetch(),
   });
 
+  const [resendInvitation, { loading: resending }] = useMutation(
+    RESEND_INVITATION,
+    { onCompleted: () => refetch() }
+  );
+
+  const [setUserDeactivated] = useMutation(SET_USER_DEACTIVATED, {
+    onCompleted: () => refetch(),
+  });
+
   const handleSort = (key: SortKey) => {
     if (key === sortKey) {
       setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -117,6 +135,12 @@ export default function UsersTab() {
             b.institution?.name || ""
           );
           break;
+        case "status": {
+          const aStatus = a.emailVerified ? 1 : 0;
+          const bStatus = b.emailVerified ? 1 : 0;
+          cmp = aStatus - bStatus;
+          break;
+        }
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
@@ -252,7 +276,16 @@ export default function UsersTab() {
                   Institution
                 </TableSortLabel>
               </TableCell>
-              {isDigicationAdmin && <TableCell>Actions</TableCell>}
+              <TableCell>
+                <TableSortLabel
+                  active={sortKey === "status"}
+                  direction={sortKey === "status" ? sortDir : "asc"}
+                  onClick={() => handleSort("status")}
+                >
+                  Status
+                </TableSortLabel>
+              </TableCell>
+              <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -293,8 +326,90 @@ export default function UsersTab() {
                     </Typography>
                   )}
                 </TableCell>
-                {isDigicationAdmin && (
-                  <TableCell>
+                <TableCell>
+                  {u.deactivated ? (
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "error.main", fontWeight: 500 }}
+                      component="span"
+                    >
+                      Deactivated
+                    </Typography>
+                  ) : u.emailVerified ? (
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "success.main", fontWeight: 500 }}
+                      component="span"
+                    >
+                      Active
+                    </Typography>
+                  ) : (
+                    <Tooltip
+                      title={
+                        u.lastInvitedAt &&
+                        !isNaN(new Date(u.lastInvitedAt).getTime())
+                          ? `Last invited ${new Date(u.lastInvitedAt).toLocaleDateString()}`
+                          : "Invitation pending"
+                      }
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{ color: "warning.main", fontWeight: 500 }}
+                        component="span"
+                      >
+                        Pending
+                      </Typography>
+                    </Tooltip>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {!u.emailVerified && !u.deactivated && (
+                    <Tooltip title="Resend invitation email">
+                      <IconButton
+                        size="small"
+                        disabled={resending}
+                        onClick={() =>
+                          resendInvitation({ variables: { userId: u.id } })
+                        }
+                      >
+                        <SendOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  {u.id !== user?.id && (
+                    <Tooltip
+                      title={
+                        u.deactivated
+                          ? "Reactivate account"
+                          : "Deactivate account"
+                      }
+                    >
+                      <IconButton
+                        size="small"
+                        onClick={() =>
+                          setUserDeactivated({
+                            variables: {
+                              userId: u.id,
+                              deactivated: !u.deactivated,
+                            },
+                          })
+                        }
+                      >
+                        {u.deactivated ? (
+                          <CheckCircleOutlineIcon
+                            fontSize="small"
+                            color="success"
+                          />
+                        ) : (
+                          <BlockOutlinedIcon
+                            fontSize="small"
+                            color="error"
+                          />
+                        )}
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                  {isDigicationAdmin && (
                     <Tooltip title="Change institution">
                       <IconButton
                         size="small"
@@ -303,8 +418,8 @@ export default function UsersTab() {
                         <EditOutlinedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-                  </TableCell>
-                )}
+                  )}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

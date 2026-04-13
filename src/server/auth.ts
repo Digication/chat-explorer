@@ -27,6 +27,7 @@ export const auth = betterAuth({
   plugins: [
     magicLink({
       disableSignUp: true, // Only existing users can request magic links
+      expiresIn: 3600, // 1 hour (in seconds)
       sendMagicLink: async ({ email, url }) => {
         if (!process.env.SENDGRID_API_KEY) {
           // Dev mode — log the magic link to console
@@ -41,7 +42,7 @@ export const auth = betterAuth({
           html: `
             <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
               <h2 style="color: #333;">Chat Explorer</h2>
-              <p>Click the button below to sign in. This link expires in 5 minutes.</p>
+              <p>Click the button below to sign in. This link expires in 1 hour.</p>
               <a href="${url}" style="display: inline-block; padding: 12px 24px; background: #1976d2; color: #fff; text-decoration: none; border-radius: 4px; margin: 20px 0;">
                 Sign in
               </a>
@@ -60,8 +61,9 @@ export const auth = betterAuth({
   },
   trustedOrigins: [
     process.env.BETTER_AUTH_URL || "http://localhost:4000",
+    process.env.APP_URL,
     "https://chat-explorer.localhost",
-  ],
+  ].filter(Boolean) as string[],
   advanced: {
     // Chrome treats localhost as a "secure context" even over HTTP,
     // so Secure cookies work. We need SameSite=None so the cookie
@@ -127,9 +129,18 @@ export async function sendInvitationEmail(
   // The sendMagicLink callback above handles the actual email delivery.
   // We call the server-side API directly.
   try {
+    const baseURL = process.env.BETTER_AUTH_URL || "http://localhost:4000";
+    // APP_URL is the frontend origin (different from API in dev, same in production)
+    const appURL = process.env.APP_URL || baseURL;
     await auth.api.signInMagicLink({
-      body: { email },
-      headers: new Headers(),
+      body: {
+        email,
+        callbackURL: appURL,
+        errorCallbackURL: `${appURL}/login`,
+      },
+      headers: new Headers({
+        origin: baseURL,
+      }),
     });
     console.log(`[auth] Invitation magic link sent to ${email}`);
   } catch (err) {

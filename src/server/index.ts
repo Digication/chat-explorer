@@ -188,6 +188,12 @@ const yoga = createYoga({
         const fullUser = await userRepo.findOne({
           where: { id: session.user.id },
         });
+
+        // Deactivated users are treated as unauthenticated
+        if (fullUser?.deactivated) {
+          return { user: null };
+        }
+
         return {
           user: {
             ...session.user,

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router";
 import { ThemeProvider, CssBaseline } from "@mui/material";
 import { ApolloProvider } from "@apollo/client/react";
 import { lightTheme } from "@/lib/theme";
@@ -52,6 +52,7 @@ function NotFoundPage() {
  */
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -69,7 +70,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    // Preserve query params (e.g. ?error=EXPIRED_TOKEN from magic links)
+    const target = `/login${location.search}`;
+    return <Navigate to={target} replace />;
   }
 
   return <>{children}</>;

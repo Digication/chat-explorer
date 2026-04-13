@@ -22,6 +22,8 @@ import { Initial1775574106489 } from "./migrations/1775574106489-Initial.js";
 import { AddBetterAuthTables1775574200000 } from "./migrations/1775574200000-AddBetterAuthTables.js";
 import { AddReflectionClassification1775574300000 } from "./migrations/1775574300000-AddReflectionClassification.js";
 import { AddInstitutionIdToChatSession1775574400000 } from "./migrations/1775574400000-AddInstitutionIdToChatSession.js";
+import { AddInvitationTracking1775574500000 } from "./migrations/1775574500000-AddInvitationTracking.js";
+import { AddUserDeactivated1775574600000 } from "./migrations/1775574600000-AddUserDeactivated.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -55,5 +57,7 @@ export const AppDataSource = new DataSource({
     AddBetterAuthTables1775574200000,
     AddReflectionClassification1775574300000,
     AddInstitutionIdToChatSession1775574400000,
+    AddInvitationTracking1775574500000,
+    AddUserDeactivated1775574600000,
   ],
 });

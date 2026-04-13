@@ -152,8 +152,12 @@ export const typeDefs = /* GraphQL */ `
     name: String!
     email: String!
     role: UserRole!
+    emailVerified: Boolean!
+    deactivated: Boolean!
     institutionId: ID
     institution: Institution
+    invitedAt: String
+    lastInvitedAt: String
   }
 
   type CourseAccessRecord {
@@ -743,6 +747,8 @@ export const typeDefs = /* GraphQL */ `
 
     # Admin
     inviteUser(email: String!, name: String!, institutionId: ID!, role: UserRole!): User!
+    resendInvitation(userId: ID!): User!
+    setUserDeactivated(userId: ID!, deactivated: Boolean!): User!
     assignRole(userId: ID!, role: UserRole!): User!
     grantCourseAccess(userId: ID!, courseId: ID!, accessLevel: AccessLevel!): CourseAccessRecord!
     revokeCourseAccess(userId: ID!, courseId: ID!): Boolean!

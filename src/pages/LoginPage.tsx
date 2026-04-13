@@ -32,11 +32,17 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, isLoading, navigate]);
 
-  // Check URL for blocked sign-in error from OAuth callback
+  // Check URL for error params from OAuth callback or expired magic link
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const errorParam = params.get("error");
-    if (errorParam) {
+    if (!errorParam) return;
+
+    if (errorParam === "EXPIRED_TOKEN") {
+      setError(
+        "Your sign-in link has expired. Enter your email below and we'll send you a new one."
+      );
+    } else {
       setError(
         "No account found for this email. Contact your administrator to get an invitation."
       );
@@ -165,7 +171,7 @@ export default function LoginPage() {
 
         {magicLinkSent ? (
           <Alert severity="success" sx={{ textAlign: "left" }}>
-            Check your email for a sign-in link. It expires in 5 minutes.
+            Check your email for a sign-in link. It expires in 1 hour.
           </Alert>
         ) : (
           <Box>

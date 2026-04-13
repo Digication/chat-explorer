@@ -126,6 +126,7 @@ export const adminResolvers = {
       // Create the user record. better-auth uses text IDs, so generate
       // a random one matching its format (nanoid-style).
       const id = crypto.randomUUID();
+      const now = new Date();
       const newUser = userRepo.create({
         id,
         email,
@@ -133,6 +134,8 @@ export const adminResolvers = {
         role,
         institutionId,
         emailVerified: false,
+        invitedAt: now,
+        lastInvitedAt: now,
         image: null,
         preferredLlmProvider: null,
         preferredLlmModel: null,
@@ -148,6 +151,101 @@ export const adminResolvers = {
       }
 
       return newUser;
+    },
+
+    resendInvitation: async (
+      _: unknown,
+      { userId }: { userId: string },
+      ctx: GraphQLContext
+    ) => {
+      const currentUser = requireRole(ctx, [
+        UserRole.INSTITUTION_ADMIN,
+        UserRole.DIGICATION_ADMIN,
+      ]);
+
+      const repo = AppDataSource.getRepository(User);
+      const targetUser = await repo.findOne({ where: { id: userId } });
+      if (!targetUser) {
+        throw new GraphQLError("User not found", {
+          extensions: { code: "NOT_FOUND" },
+        });
+      }
+
+      if (targetUser.emailVerified) {
+        throw new GraphQLError(
+          "This user has already accepted their invitation",
+          { extensions: { code: "BAD_REQUEST" } }
+        );
+      }
+
+      // Institution admins can only resend for their own institution
+      if (
+        currentUser.role === UserRole.INSTITUTION_ADMIN &&
+        targetUser.institutionId !== currentUser.institutionId
+      ) {
+        throw new GraphQLError(
+          "Cannot resend invitations for users outside your institution",
+          { extensions: { code: "FORBIDDEN" } }
+        );
+      }
+
+      await sendInvitationEmail(targetUser.email, currentUser.name);
+
+      targetUser.lastInvitedAt = new Date();
+      await repo.save(targetUser);
+
+      return targetUser;
+    },
+
+    setUserDeactivated: async (
+      _: unknown,
+      { userId, deactivated }: { userId: string; deactivated: boolean },
+      ctx: GraphQLContext
+    ) => {
+      const currentUser = requireRole(ctx, [
+        UserRole.INSTITUTION_ADMIN,
+        UserRole.DIGICATION_ADMIN,
+      ]);
+
+      const repo = AppDataSource.getRepository(User);
+      const targetUser = await repo.findOne({ where: { id: userId } });
+      if (!targetUser) {
+        throw new GraphQLError("User not found", {
+          extensions: { code: "NOT_FOUND" },
+        });
+      }
+
+      // Prevent deactivating yourself
+      if (targetUser.id === currentUser.id) {
+        throw new GraphQLError("You cannot deactivate your own account", {
+          extensions: { code: "BAD_REQUEST" },
+        });
+      }
+
+      // Institution admins can only manage their own institution's users
+      if (
+        currentUser.role === UserRole.INSTITUTION_ADMIN &&
+        targetUser.institutionId !== currentUser.institutionId
+      ) {
+        throw new GraphQLError(
+          "Cannot modify users outside your institution",
+          { extensions: { code: "FORBIDDEN" } }
+        );
+      }
+
+      // Institution admins cannot deactivate digication_admin users
+      if (
+        currentUser.role === UserRole.INSTITUTION_ADMIN &&
+        targetUser.role === UserRole.DIGICATION_ADMIN
+      ) {
+        throw new GraphQLError(
+          "Cannot deactivate a Digication admin",
+          { extensions: { code: "FORBIDDEN" } }
+        );
+      }
+
+      targetUser.deactivated = deactivated;
+      return repo.save(targetUser);
     },
 
     assignRole: async (
