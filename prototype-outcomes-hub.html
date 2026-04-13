@@ -1,0 +1,1592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Outcomes Hub — Concept Prototype</title>
+<style>
+  /* === Chat Explorer Design Tokens === */
+  :root {
+    --header-bg: #26282b;
+    --sidebar-bg: #191a1b;
+    --sidebar-text: #e0e0e0;
+    --content-bg: #f5f7fa;
+    --paper: #ffffff;
+    --text-primary: #333333;
+    --text-secondary: #666666;
+    --primary: #1976d2;
+    --primary-light: #e3f2fd;
+
+    /* Reflection categories */
+    --descriptive-writing: #9e9e9e;
+    --descriptive-reflection: #42a5f5;
+    --dialogic-reflection: #ab47bc;
+    --critical-reflection: #ffa726;
+
+    /* TORI domains */
+    --cognitive: #0288D1;
+    --emotional: #c62828;
+    --social: #2e7d32;
+    --personal: #7b1fa2;
+    --cultural: #e65100;
+    --life: #00695c;
+
+    /* Outcome colors (new) */
+    --outcome-critical-thinking: #2196F3;
+    --outcome-communication: #4CAF50;
+    --outcome-quantitative: #FF9800;
+    --outcome-ethical: #9C27B0;
+    --outcome-teamwork: #00BCD4;
+    --outcome-design: #F44336;
+    --outcome-clinical: #E91E63;
+
+    --border: #e0e0e0;
+    --radius: 2px;
+    --spacing: 5px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: var(--text-primary);
+    background: var(--content-bg);
+    line-height: 1.5;
+  }
+
+  /* === Header === */
+  .header {
+    height: 52px;
+    background: var(--header-bg);
+    color: white;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1300;
+    gap: 16px;
+  }
+  .header-logo { font-size: 15px; font-weight: 600; letter-spacing: 0.3px; }
+  .header-sep { color: #555; }
+  .header-section { font-size: 14px; color: #bbb; }
+  .header-section.active { color: white; }
+
+  /* === Sidebar === */
+  .sidebar {
+    width: 60px;
+    background: var(--sidebar-bg);
+    position: fixed;
+    top: 52px;
+    left: 0;
+    bottom: 0;
+    transition: width 0.2s ease;
+    overflow: hidden;
+    z-index: 1200;
+  }
+  .sidebar:hover { width: 280px; }
+  .sidebar-nav { padding: 8px 0; }
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 18px;
+    color: var(--sidebar-text);
+    cursor: pointer;
+    white-space: nowrap;
+    font-size: 14px;
+    border-left: 3px solid transparent;
+    transition: all 0.15s;
+  }
+  .sidebar-item:hover { background: rgba(255,255,255,0.05); }
+  .sidebar-item.active {
+    border-left-color: var(--primary);
+    background: rgba(25, 118, 210, 0.08);
+    color: white;
+  }
+  .sidebar-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  /* === Main Content === */
+  .main {
+    margin-left: 60px;
+    margin-top: 52px;
+    padding: 20px;
+    max-width: 1260px;
+  }
+
+  /* === Page Header === */
+  .page-header {
+    margin-bottom: 24px;
+  }
+  .page-title {
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .page-subtitle {
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+
+  /* === Tabs === */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+    gap: 0;
+  }
+  .tab {
+    padding: 10px 20px;
+    font-size: 14px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    font-weight: 500;
+  }
+  .tab:hover { color: var(--text-primary); }
+  .tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+  }
+
+  /* === Cards === */
+  .card {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .card-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  .card-subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+  }
+
+  /* === Metric Cards Row === */
+  .metrics-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .metric-card {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .metric-card:hover { border-color: var(--primary); }
+  .metric-value {
+    font-size: 28px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+  .metric-label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+  }
+  .metric-trend {
+    font-size: 12px;
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .trend-up { color: #2e7d32; }
+  .trend-down { color: #c62828; }
+  .trend-steady { color: var(--text-secondary); }
+
+  /* === Outcome Cards === */
+  .outcomes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .outcome-card {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .outcome-card:hover {
+    border-color: var(--primary);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .outcome-card-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .outcome-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 4px;
+  }
+  .outcome-name {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .outcome-source {
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: var(--content-bg);
+    padding: 2px 8px;
+    border-radius: 10px;
+    display: inline-block;
+    margin-top: 4px;
+  }
+  .outcome-evidence-bar {
+    height: 6px;
+    background: #eee;
+    border-radius: 3px;
+    margin: 12px 0 8px;
+    overflow: hidden;
+  }
+  .outcome-evidence-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s ease;
+  }
+  .outcome-stats {
+    display: flex;
+    gap: 20px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+  .outcome-stat-value { font-weight: 600; color: var(--text-primary); }
+
+  /* === Signature / Topology View === */
+  .signature-container {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .signature-panel {
+    flex: 1;
+    min-width: 300px;
+  }
+
+  /* Radar chart via SVG */
+  .radar-wrap {
+    display: flex;
+    justify-content: center;
+    margin: 12px 0;
+  }
+
+  /* === Evidence Stream === */
+  .evidence-list { list-style: none; }
+  .evidence-item {
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  .evidence-item:last-child { border-bottom: none; }
+  .evidence-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+    font-weight: 500;
+  }
+  .evidence-quote {
+    font-size: 13px;
+    color: var(--text-secondary);
+    font-style: italic;
+  }
+  .evidence-meta {
+    font-size: 12px;
+    color: #999;
+    margin-top: 4px;
+  }
+
+  /* === River / Growth Viz === */
+  .river-container {
+    position: relative;
+    margin: 16px 0;
+  }
+  .river-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+  }
+
+  /* === Weather Report === */
+  .weather-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+  }
+  .weather-card {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    text-align: center;
+  }
+  .weather-icon {
+    font-size: 40px;
+    margin-bottom: 8px;
+  }
+  .weather-headline {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .weather-detail {
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  /* === Discipline Space === */
+  .discipline-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .discipline-logo {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: white;
+    font-weight: 700;
+  }
+  .discipline-name { font-size: 18px; font-weight: 600; }
+  .discipline-meta { font-size: 13px; color: var(--text-secondary); }
+
+  /* === Stacked bar === */
+  .stacked-bar {
+    display: flex;
+    height: 28px;
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 8px 0;
+  }
+  .stacked-segment {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: white;
+    font-weight: 500;
+    transition: flex 0.6s ease;
+  }
+
+  /* === Mapping Table === */
+  .mapping-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .mapping-table th {
+    text-align: left;
+    padding: 8px 12px;
+    background: var(--content-bg);
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .mapping-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f0f0f0;
+    vertical-align: top;
+  }
+  .tag-chip {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin: 1px 2px;
+    background: var(--primary-light);
+    color: var(--primary);
+  }
+  .signal-chip {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin: 1px 2px;
+    background: #f3e5f5;
+    color: #7b1fa2;
+  }
+
+  /* === Toggle for concept views === */
+  .concept-nav {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+  .concept-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--paper);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .concept-btn:hover { border-color: var(--primary); color: var(--primary); }
+  .concept-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+
+  .hidden { display: none; }
+
+  /* === Fingerprint comparison === */
+  .fingerprint-compare {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  .fingerprint-col {
+    flex: 1;
+    min-width: 280px;
+  }
+  .fingerprint-label {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .bar-label {
+    font-size: 12px;
+    width: 120px;
+    flex-shrink: 0;
+    text-align: right;
+    color: var(--text-secondary);
+  }
+  .bar-track {
+    flex: 1;
+    height: 14px;
+    background: #f0f0f0;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.6s ease;
+  }
+  .bar-value {
+    font-size: 11px;
+    width: 30px;
+    color: var(--text-secondary);
+  }
+
+  /* === Section dividers === */
+  .section-label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    margin: 24px 0 12px;
+  }
+
+  /* === Info callout === */
+  .callout {
+    background: var(--primary-light);
+    border-left: 3px solid var(--primary);
+    padding: 12px 16px;
+    font-size: 13px;
+    margin-bottom: 20px;
+    border-radius: 0 2px 2px 0;
+  }
+  .callout strong { color: var(--primary); }
+
+  /* === Annotation / concept label === */
+  .concept-label {
+    position: absolute;
+    top: -10px;
+    right: 12px;
+    background: #fff3e0;
+    color: #e65100;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    letter-spacing: 0.3px;
+  }
+
+  /* === Cohort timeline === */
+  .timeline-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .timeline-label {
+    font-size: 12px;
+    width: 100px;
+    text-align: right;
+    flex-shrink: 0;
+    color: var(--text-secondary);
+  }
+  .timeline-cells {
+    display: flex;
+    gap: 2px;
+    flex: 1;
+  }
+  .timeline-cell {
+    flex: 1;
+    height: 24px;
+    border-radius: 2px;
+    transition: background 0.3s;
+    cursor: pointer;
+    position: relative;
+  }
+  .timeline-cell:hover { opacity: 0.8; }
+  .timeline-semester-labels {
+    display: flex;
+    gap: 2px;
+    flex: 1;
+    margin-left: 108px;
+  }
+  .timeline-semester-labels span {
+    flex: 1;
+    font-size: 11px;
+    color: #999;
+    text-align: center;
+  }
+
+  /* === Evidence streams panel === */
+  .evidence-stream {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #f5f5f5;
+  }
+  .evidence-stream:last-child { border-bottom: none; }
+  .stream-source {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .stream-tori { background: #e3f2fd; color: #0288D1; }
+  .stream-rubric { background: #fce4ec; color: #c62828; }
+  .stream-portfolio { background: #e8f5e9; color: #2e7d32; }
+  .stream-faculty { background: #f3e5f5; color: #7b1fa2; }
+  .stream-text { font-size: 13px; color: var(--text-secondary); flex: 1; }
+  .stream-strength {
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <span class="header-logo">Chat Explorer</span>
+  <span class="header-sep">›</span>
+  <span class="header-section">State University</span>
+  <span class="header-sep">›</span>
+  <span class="header-section active">Outcomes Hub</span>
+</div>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <nav class="sidebar-nav">
+    <div class="sidebar-item">
+      <span class="sidebar-icon">📊</span> <span>Insights</span>
+    </div>
+    <div class="sidebar-item">
+      <span class="sidebar-icon">💬</span> <span>Chat Explorer</span>
+    </div>
+    <div class="sidebar-item active">
+      <span class="sidebar-icon">🎯</span> <span>Outcomes Hub</span>
+    </div>
+    <div class="sidebar-item">
+      <span class="sidebar-icon">📈</span> <span>Growth Tracker</span>
+    </div>
+    <div class="sidebar-item">
+      <span class="sidebar-icon">📁</span> <span>Reports</span>
+    </div>
+    <div class="sidebar-item">
+      <span class="sidebar-icon">⬆️</span> <span>Upload</span>
+    </div>
+    <div class="sidebar-item">
+      <span class="sidebar-icon">⚙️</span> <span>Settings</span>
+    </div>
+  </nav>
+</div>
+
+<!-- Main Content -->
+<div class="main">
+
+  <!-- Concept Navigation -->
+  <div class="page-header">
+    <div class="page-title">Concept Prototypes</div>
+    <div class="page-subtitle">Explore each concept — click to switch between views</div>
+  </div>
+
+  <div class="concept-nav">
+    <button class="concept-btn active" onclick="showConcept('hub')">1. Outcomes Hub</button>
+    <button class="concept-btn" onclick="showConcept('mapping')">2. Outcome Mapping</button>
+    <button class="concept-btn" onclick="showConcept('topology')">3. Topological Profiles</button>
+    <button class="concept-btn" onclick="showConcept('discipline')">4. Discipline Space</button>
+    <button class="concept-btn" onclick="showConcept('growth')">5. Growth Over Time</button>
+    <button class="concept-btn" onclick="showConcept('weather')">6. Simplified View</button>
+    <button class="concept-btn" onclick="showConcept('fingerprints')">7. Cohort Fingerprints</button>
+    <button class="concept-btn" onclick="showConcept('evidence')">8. Evidence Report</button>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- CONCEPT 1: Outcomes Hub Overview             -->
+  <!-- ============================================ -->
+  <div id="concept-hub" class="concept-view">
+    <div class="callout">
+      <strong>Concept:</strong> The Outcomes Hub is a top-level destination — not inside Tori's Insights page.
+      It's the institution's space for defining, tracking, and reporting on their learning outcomes.
+      Tori data flows in as one evidence source among many.
+    </div>
+
+    <div class="tabs">
+      <div class="tab active">All Outcomes</div>
+      <div class="tab">General Education</div>
+      <div class="tab">Engineering (ABET)</div>
+      <div class="tab">Nursing (ACEN)</div>
+      <div class="tab">Custom</div>
+    </div>
+
+    <!-- Summary Metrics -->
+    <div class="metrics-row">
+      <div class="metric-card">
+        <div class="metric-value">14</div>
+        <div class="metric-label">Active Outcomes</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value">847</div>
+        <div class="metric-label">Students Tracked</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value">3</div>
+        <div class="metric-label">Frameworks</div>
+        <div class="metric-trend trend-steady">Gen Ed · ABET · Custom</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value">68%</div>
+        <div class="metric-label">Showing Growth</div>
+        <div class="metric-trend trend-up">↑ 5% from last year</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value">4</div>
+        <div class="metric-label">Evidence Sources</div>
+        <div class="metric-trend trend-steady">Tori · Rubric · Portfolio · Faculty</div>
+      </div>
+    </div>
+
+    <!-- Outcome Cards -->
+    <div class="section-label">General Education Outcomes</div>
+    <div class="outcomes-grid">
+      <div class="outcome-card">
+        <div class="outcome-card-header">
+          <div class="outcome-dot" style="background: var(--outcome-critical-thinking)"></div>
+          <div>
+            <div class="outcome-name">Critical Thinking</div>
+            <div class="outcome-source">Gen Ed Framework</div>
+          </div>
+        </div>
+        <div class="outcome-evidence-bar">
+          <div class="outcome-evidence-fill" style="width: 78%; background: var(--outcome-critical-thinking)"></div>
+        </div>
+        <div class="outcome-stats">
+          <span><span class="outcome-stat-value">312</span> students</span>
+          <span><span class="outcome-stat-value">78%</span> evidence coverage</span>
+          <span class="trend-up">↑ growing</span>
+        </div>
+      </div>
+
+      <div class="outcome-card">
+        <div class="outcome-card-header">
+          <div class="outcome-dot" style="background: var(--outcome-communication)"></div>
+          <div>
+            <div class="outcome-name">Written Communication</div>
+            <div class="outcome-source">Gen Ed Framework</div>
+          </div>
+        </div>
+        <div class="outcome-evidence-bar">
+          <div class="outcome-evidence-fill" style="width: 85%; background: var(--outcome-communication)"></div>
+        </div>
+        <div class="outcome-stats">
+          <span><span class="outcome-stat-value">312</span> students</span>
+          <span><span class="outcome-stat-value">85%</span> evidence coverage</span>
+          <span class="trend-up">↑ growing</span>
+        </div>
+      </div>
+
+      <div class="outcome-card">
+        <div class="outcome-card-header">
+          <div class="outcome-dot" style="background: var(--outcome-quantitative)"></div>
+          <div>
+            <div class="outcome-name">Quantitative Reasoning</div>
+            <div class="outcome-source">Gen Ed Framework</div>
+          </div>
+        </div>
+        <div class="outcome-evidence-bar">
+          <div class="outcome-evidence-fill" style="width: 45%; background: var(--outcome-quantitative)"></div>
+        </div>
+        <div class="outcome-stats">
+          <span><span class="outcome-stat-value">189</span> students</span>
+          <span><span class="outcome-stat-value">45%</span> evidence coverage</span>
+          <span class="trend-steady" style="color: var(--text-secondary)">→ steady</span>
+        </div>
+      </div>
+
+      <div class="outcome-card">
+        <div class="outcome-card-header">
+          <div class="outcome-dot" style="background: var(--outcome-ethical)"></div>
+          <div>
+            <div class="outcome-name">Ethical Reasoning</div>
+            <div class="outcome-source">Gen Ed Framework</div>
+          </div>
+        </div>
+        <div class="outcome-evidence-bar">
+          <div class="outcome-evidence-fill" style="width: 62%; background: var(--outcome-ethical)"></div>
+        </div>
+        <div class="outcome-stats">
+          <span><span class="outcome-stat-value">312</span> students</span>
+          <span><span class="outcome-stat-value">62%</span> evidence coverage</span>
+          <span class="trend-up">↑ growing</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-label">Engineering Program (ABET)</div>
+    <div class="outcomes-grid">
+      <div class="outcome-card">
+        <span class="concept-label">ABET Criterion 3</span>
+        <div class="outcome-card-header">
+          <div class="outcome-dot" style="background: var(--outcome-design)"></div>
+          <div>
+            <div class="outcome-name">Engineering Design</div>
+            <div class="outcome-source">ABET · SO 2</div>
+          </div>
+        </div>
+        <div class="outcome-evidence-bar">
+          <div class="outcome-evidence-fill" style="width: 71%; background: var(--outcome-design)"></div>
+        </div>
+        <div class="outcome-stats">
+          <span><span class="outcome-stat-value">84</span> students</span>
+          <span><span class="outcome-stat-value">71%</span> evidence coverage</span>
+          <span class="trend-up">↑ growing</span>
+        </div>
+      </div>
+
+      <div class="outcome-card">
+        <span class="concept-label">ABET Criterion 3</span>
+        <div class="outcome-card-header">
+          <div class="outcome-dot" style="background: var(--outcome-teamwork)"></div>
+          <div>
+            <div class="outcome-name">Teamwork</div>
+            <div class="outcome-source">ABET · SO 5</div>
+          </div>
+        </div>
+        <div class="outcome-evidence-bar">
+          <div class="outcome-evidence-fill" style="width: 58%; background: var(--outcome-teamwork)"></div>
+        </div>
+        <div class="outcome-stats">
+          <span><span class="outcome-stat-value">84</span> students</span>
+          <span><span class="outcome-stat-value">58%</span> evidence coverage</span>
+          <span class="trend-steady" style="color: var(--text-secondary)">→ steady</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- CONCEPT 2: Outcome Mapping                   -->
+  <!-- ============================================ -->
+  <div id="concept-mapping" class="concept-view hidden">
+    <div class="callout">
+      <strong>Concept:</strong> Institutions map their outcomes to signal clusters — not rubric scores.
+      This is the admin view where they define what "Critical Thinking" means in terms of the available evidence signals.
+      We provide templates for common frameworks, and they can customize.
+    </div>
+
+    <div class="card">
+      <div class="card-title">Outcome Definition: Critical Thinking</div>
+      <div class="card-subtitle">
+        Define which signals constitute evidence for this outcome. Students don't need to show all signals —
+        the system builds an evidence profile from whatever is present.
+      </div>
+
+      <table class="mapping-table">
+        <thead>
+          <tr>
+            <th style="width: 160px;">Evidence Source</th>
+            <th style="width: 200px;">Signal Type</th>
+            <th>Indicators</th>
+            <th style="width: 80px;">Weight</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td rowspan="3"><strong>Tori Analysis</strong><br><span style="font-size: 11px; color: #999;">Auto-detected from student conversations</span></td>
+            <td>Reflection Depth</td>
+            <td>
+              <span class="tag-chip">Dialogic Reflection</span>
+              <span class="tag-chip">Critical Reflection</span>
+            </td>
+            <td>High</td>
+          </tr>
+          <tr>
+            <td>TORI Tags</td>
+            <td>
+              <span class="tag-chip">Analysis</span>
+              <span class="tag-chip">Evaluation</span>
+              <span class="tag-chip">Synthesis</span>
+              <span class="tag-chip">Metacognition</span>
+              <span class="tag-chip">Problem-Solving</span>
+            </td>
+            <td>Medium</td>
+          </tr>
+          <tr>
+            <td>Text Signals</td>
+            <td>
+              <span class="signal-chip">Logical connectors</span>
+              <span class="signal-chip">Evidence language</span>
+              <span class="signal-chip">Question density</span>
+              <span class="signal-chip">Hedging markers</span>
+            </td>
+            <td>Low</td>
+          </tr>
+          <tr>
+            <td><strong>Rubric Scores</strong><br><span style="font-size: 11px; color: #999;">Faculty-assessed, imported</span></td>
+            <td>Direct Assessment</td>
+            <td>
+              <span class="tag-chip">Critical Thinking Rubric ≥ 3</span>
+            </td>
+            <td>High</td>
+          </tr>
+          <tr>
+            <td><strong>Portfolio</strong><br><span style="font-size: 11px; color: #999;">Student artifact evidence</span></td>
+            <td>Artifact Tags</td>
+            <td>
+              <span class="tag-chip">Research paper</span>
+              <span class="tag-chip">Case analysis</span>
+              <span class="tag-chip">Argumentative essay</span>
+            </td>
+            <td>Medium</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Available Templates</div>
+      <div class="card-subtitle">Start from a pre-built mapping and customize for your institution</div>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <div class="metric-card" style="flex: 1; min-width: 200px;">
+          <div style="font-size: 14px; font-weight: 600;">AAC&U VALUE Rubrics</div>
+          <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">16 outcomes pre-mapped to Tori signals</div>
+          <div style="font-size: 12px; color: var(--primary); margin-top: 8px; cursor: pointer;">Use template →</div>
+        </div>
+        <div class="metric-card" style="flex: 1; min-width: 200px;">
+          <div style="font-size: 14px; font-weight: 600;">ABET Criterion 3</div>
+          <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">7 student outcomes for engineering</div>
+          <div style="font-size: 12px; color: var(--primary); margin-top: 8px; cursor: pointer;">Use template →</div>
+        </div>
+        <div class="metric-card" style="flex: 1; min-width: 200px;">
+          <div style="font-size: 14px; font-weight: 600;">ACEN Standards</div>
+          <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Nursing program outcomes</div>
+          <div style="font-size: 12px; color: var(--primary); margin-top: 8px; cursor: pointer;">Use template →</div>
+        </div>
+        <div class="metric-card" style="flex: 1; min-width: 200px;">
+          <div style="font-size: 14px; font-weight: 600;">Blank Canvas</div>
+          <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Build your own from scratch</div>
+          <div style="font-size: 12px; color: var(--primary); margin-top: 8px; cursor: pointer;">Start fresh →</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- CONCEPT 3: Topological Profiles              -->
+  <!-- ============================================ -->
+  <div id="concept-topology" class="concept-view hidden">
+    <div class="callout">
+      <strong>Concept:</strong> Instead of a single score, each outcome has a <em>signature shape</em> — a multi-dimensional profile
+      of what that outcome looks like in practice. Two students can both demonstrate "Critical Thinking"
+      through very different shapes. The profile shows where they overlap with the signature and where they diverge.
+    </div>
+
+    <div class="card">
+      <div class="card-title">Critical Thinking — Outcome Signature</div>
+      <div class="card-subtitle">
+        The blue shape is the "signature" of Critical Thinking derived from high-performing students.
+        The orange shape is an individual student's profile. Overlap = evidence; difference = uniqueness, not deficiency.
+      </div>
+
+      <div class="signature-container">
+        <div class="signature-panel">
+          <div class="radar-wrap">
+            <svg width="300" height="300" viewBox="0 0 300 300">
+              <!-- Grid rings -->
+              <circle cx="150" cy="150" r="120" fill="none" stroke="#eee" stroke-width="1"/>
+              <circle cx="150" cy="150" r="90" fill="none" stroke="#eee" stroke-width="1"/>
+              <circle cx="150" cy="150" r="60" fill="none" stroke="#eee" stroke-width="1"/>
+              <circle cx="150" cy="150" r="30" fill="none" stroke="#eee" stroke-width="1"/>
+
+              <!-- Axis lines -->
+              <line x1="150" y1="30" x2="150" y2="270" stroke="#eee" stroke-width="0.5"/>
+              <line x1="38" y1="85" x2="262" y2="215" stroke="#eee" stroke-width="0.5"/>
+              <line x1="38" y1="215" x2="262" y2="85" stroke="#eee" stroke-width="0.5"/>
+              <line x1="30" y1="150" x2="270" y2="150" stroke="#eee" stroke-width="0.5"/>
+
+              <!-- Labels -->
+              <text x="150" y="20" text-anchor="middle" font-size="10" fill="#666">Analysis</text>
+              <text x="275" y="85" text-anchor="start" font-size="10" fill="#666">Evaluation</text>
+              <text x="275" y="218" text-anchor="start" font-size="10" fill="#666">Synthesis</text>
+              <text x="150" y="288" text-anchor="middle" font-size="10" fill="#666">Metacognition</text>
+              <text x="25" y="218" text-anchor="end" font-size="10" fill="#666">Evidence Use</text>
+              <text x="25" y="85" text-anchor="end" font-size="10" fill="#666">Questioning</text>
+
+              <!-- Signature shape (blue) -->
+              <polygon points="150,42 246,93 246,207 150,258 54,207 54,93"
+                fill="rgba(25,118,210,0.1)" stroke="#1976d2" stroke-width="2"/>
+
+              <!-- Student shape (orange) -->
+              <polygon points="150,54 234,105 210,222 150,246 78,195 90,93"
+                fill="rgba(255,167,38,0.15)" stroke="#ffa726" stroke-width="2"/>
+
+              <!-- Data points -->
+              <circle cx="150" cy="42" r="4" fill="#1976d2"/>
+              <circle cx="246" cy="93" r="4" fill="#1976d2"/>
+              <circle cx="246" cy="207" r="4" fill="#1976d2"/>
+              <circle cx="150" cy="258" r="4" fill="#1976d2"/>
+              <circle cx="54" cy="207" r="4" fill="#1976d2"/>
+              <circle cx="54" cy="93" r="4" fill="#1976d2"/>
+
+              <circle cx="150" cy="54" r="4" fill="#ffa726"/>
+              <circle cx="234" cy="105" r="4" fill="#ffa726"/>
+              <circle cx="210" cy="222" r="4" fill="#ffa726"/>
+              <circle cx="150" cy="246" r="4" fill="#ffa726"/>
+              <circle cx="78" cy="195" r="4" fill="#ffa726"/>
+              <circle cx="90" cy="93" r="4" fill="#ffa726"/>
+            </svg>
+          </div>
+          <div style="display: flex; justify-content: center; gap: 24px; font-size: 12px;">
+            <span><span style="display: inline-block; width: 12px; height: 12px; background: rgba(25,118,210,0.3); border: 2px solid #1976d2; border-radius: 2px; vertical-align: middle; margin-right: 4px;"></span> CT Signature</span>
+            <span><span style="display: inline-block; width: 12px; height: 12px; background: rgba(255,167,38,0.3); border: 2px solid #ffa726; border-radius: 2px; vertical-align: middle; margin-right: 4px;"></span> Maya Rodriguez</span>
+          </div>
+        </div>
+
+        <div class="signature-panel">
+          <div class="section-label">Profile Interpretation</div>
+          <div style="font-size: 13px; line-height: 1.8; color: var(--text-secondary);">
+            <p style="margin-bottom: 12px;">
+              <strong style="color: var(--text-primary);">Maya</strong> shows strong critical thinking through a different path than the typical signature.
+              Her profile emphasizes <strong style="color: var(--text-primary);">Synthesis</strong> and <strong style="color: var(--text-primary);">Metacognition</strong> —
+              she connects ideas across domains and reflects on her own reasoning processes.
+            </p>
+            <p style="margin-bottom: 12px;">
+              Her <strong style="color: var(--text-primary);">Questioning</strong> and <strong style="color: var(--text-primary);">Evidence Use</strong> are
+              lower than the signature, which doesn't mean deficiency — it means she approaches critical thinking
+              through <em>integration</em> rather than <em>interrogation</em>.
+            </p>
+            <p>
+              <strong style="color: var(--text-primary);">Overlap with CT signature:</strong> 72%<br>
+              <strong style="color: var(--text-primary);">Unique emphasis:</strong> Cross-domain synthesis (top 10% of cohort)
+            </p>
+          </div>
+
+          <div class="section-label" style="margin-top: 20px;">What the accreditor sees</div>
+          <div style="font-size: 13px; color: var(--text-secondary);">
+            "Student demonstrates critical thinking with 72% alignment to institutional signature,
+            with particular strength in synthesis and metacognitive awareness."
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- CONCEPT 4: Discipline-Specific Space         -->
+  <!-- ============================================ -->
+  <div id="concept-discipline" class="concept-view hidden">
+    <div class="callout">
+      <strong>Concept:</strong> Discipline-specific outcomes get their own space that speaks the program's language.
+      This is NOT a Tori view — it's the Engineering Program's view. Tori evidence is one stream that flows in,
+      alongside rubric scores, portfolio artifacts, and faculty assessments. The program owns the framing.
+    </div>
+
+    <div class="card">
+      <div class="discipline-header">
+        <div class="discipline-logo" style="background: #b71c1c;">E</div>
+        <div>
+          <div class="discipline-name">Mechanical Engineering — ABET Self-Study</div>
+          <div class="discipline-meta">ABET Criterion 3 · Student Outcomes 1–7 · Accreditation cycle: 2024–2030</div>
+        </div>
+      </div>
+
+      <div class="section-label">Student Outcome 1: Problem Analysis</div>
+      <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">
+        "An ability to identify, formulate, and solve complex engineering problems by applying principles
+        of engineering, science, and mathematics."
+      </div>
+
+      <!-- Evidence Streams -->
+      <div style="margin-bottom: 20px;">
+        <div style="font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px;">EVIDENCE STREAMS</div>
+        <div class="evidence-stream">
+          <span class="stream-source stream-rubric">Rubric</span>
+          <span class="stream-text">Senior Design rubric (Problem Formulation criterion) — 84% of students scored Proficient or above</span>
+          <span class="stream-strength trend-up" style="color: #2e7d32;">Strong</span>
+        </div>
+        <div class="evidence-stream">
+          <span class="stream-source stream-tori">Tori</span>
+          <span class="stream-text">Cognitive-Analytical domain coverage: 91% of students. Problem-Solving tag in 76% of conversations.</span>
+          <span class="stream-strength trend-up" style="color: #2e7d32;">Strong</span>
+        </div>
+        <div class="evidence-stream">
+          <span class="stream-source stream-portfolio">Portfolio</span>
+          <span class="stream-text">23 of 28 capstone portfolios include problem analysis artifacts with faculty annotations</span>
+          <span class="stream-strength trend-up" style="color: #2e7d32;">Strong</span>
+        </div>
+        <div class="evidence-stream">
+          <span class="stream-source stream-faculty">Faculty</span>
+          <span class="stream-text">Dr. Chen: "Students in ME450 showed improved problem decomposition this year"</span>
+          <span class="stream-strength" style="color: var(--text-secondary);">Anecdotal</span>
+        </div>
+      </div>
+
+      <!-- Combined Evidence Bar -->
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        <span style="font-size: 12px; color: var(--text-secondary); width: 120px;">Combined evidence:</span>
+        <div class="stacked-bar" style="flex: 1;">
+          <div class="stacked-segment" style="flex: 35; background: #2e7d32;">Rubric</div>
+          <div class="stacked-segment" style="flex: 30; background: #0288D1;">Tori</div>
+          <div class="stacked-segment" style="flex: 25; background: #4CAF50;">Portfolio</div>
+          <div class="stacked-segment" style="flex: 10; background: #7b1fa2;">Faculty</div>
+        </div>
+      </div>
+      <div style="font-size: 12px; color: var(--text-secondary); text-align: right;">
+        Overall: <strong style="color: #2e7d32;">Strong evidence of achievement</strong>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-label" style="margin-top: 0;">Student Outcome 5: Teamwork</div>
+      <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;">
+        "An ability to function effectively on a team whose members together provide leadership,
+        create a collaborative and inclusive environment, establish goals, plan tasks, and meet objectives."
+      </div>
+
+      <div style="margin-bottom: 20px;">
+        <div style="font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px;">EVIDENCE STREAMS</div>
+        <div class="evidence-stream">
+          <span class="stream-source stream-rubric">Rubric</span>
+          <span class="stream-text">Team peer evaluation — 71% rated "Effective" or above. 29% at "Developing."</span>
+          <span class="stream-strength" style="color: #e65100;">Moderate</span>
+        </div>
+        <div class="evidence-stream">
+          <span class="stream-source stream-tori">Tori</span>
+          <span class="stream-text">Social-Interpersonal domain: 52% coverage. Collaboration tag appears in only 38% of conversations.</span>
+          <span class="stream-strength" style="color: #e65100;">Moderate</span>
+        </div>
+        <div class="evidence-stream">
+          <span class="stream-source stream-portfolio">Portfolio</span>
+          <span class="stream-text">Only 12 of 28 portfolios include team reflection artifacts</span>
+          <span class="stream-strength trend-down" style="color: #c62828;">Weak</span>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        <span style="font-size: 12px; color: var(--text-secondary); width: 120px;">Combined evidence:</span>
+        <div class="stacked-bar" style="flex: 1;">
+          <div class="stacked-segment" style="flex: 40; background: #e65100;">Rubric</div>
+          <div class="stacked-segment" style="flex: 30; background: #e65100; opacity: 0.7;">Tori</div>
+          <div class="stacked-segment" style="flex: 30; background: #c62828;">Portfolio</div>
+        </div>
+      </div>
+      <div style="font-size: 12px; color: var(--text-secondary); text-align: right;">
+        Overall: <strong style="color: #e65100;">Action needed — gaps in teamwork evidence</strong>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- CONCEPT 5: Growth Over Time                  -->
+  <!-- ============================================ -->
+  <div id="concept-growth" class="concept-view hidden">
+    <div class="callout">
+      <strong>Concept:</strong> Longitudinal growth visualized at multiple levels — individual, cohort, program.
+      The "river" view shows flow and change over time. Color = depth of engagement.
+      Width = volume. No numbers needed to read the story.
+    </div>
+
+    <div class="card">
+      <div class="card-title">Program Growth — Critical Thinking (4-Year View)</div>
+      <div class="card-subtitle">Each row is a student cohort. Color intensity shows the strength of Critical Thinking evidence over semesters.</div>
+
+      <div class="timeline-semester-labels">
+        <span>Fall '22</span><span>Spr '23</span><span>Fall '23</span><span>Spr '24</span><span>Fall '24</span><span>Spr '25</span><span>Fall '25</span><span>Spr '26</span>
+      </div>
+
+      <div class="timeline-row">
+        <span class="timeline-label">Class of 2026</span>
+        <div class="timeline-cells">
+          <div class="timeline-cell" style="background: #bbdefb;" title="Emerging"></div>
+          <div class="timeline-cell" style="background: #90caf9;" title="Developing"></div>
+          <div class="timeline-cell" style="background: #64b5f6;" title="Developing"></div>
+          <div class="timeline-cell" style="background: #42a5f5;" title="Competent"></div>
+          <div class="timeline-cell" style="background: #2196f3;" title="Competent"></div>
+          <div class="timeline-cell" style="background: #1e88e5;" title="Proficient"></div>
+          <div class="timeline-cell" style="background: #1976d2;" title="Proficient"></div>
+          <div class="timeline-cell" style="background: #1565c0;" title="Advanced"></div>
+        </div>
+      </div>
+      <div class="timeline-row">
+        <span class="timeline-label">Class of 2027</span>
+        <div class="timeline-cells">
+          <div class="timeline-cell" style="background: #e3f2fd;"></div>
+          <div class="timeline-cell" style="background: #bbdefb;"></div>
+          <div class="timeline-cell" style="background: #90caf9;"></div>
+          <div class="timeline-cell" style="background: #90caf9;"></div>
+          <div class="timeline-cell" style="background: #64b5f6;"></div>
+          <div class="timeline-cell" style="background: #42a5f5;"></div>
+          <div class="timeline-cell" style="background: #42a5f5;"></div>
+          <div class="timeline-cell" style="background: #2196f3;"></div>
+        </div>
+      </div>
+      <div class="timeline-row">
+        <span class="timeline-label">Class of 2028</span>
+        <div class="timeline-cells">
+          <div class="timeline-cell" style="background: #f5f5f5;"></div>
+          <div class="timeline-cell" style="background: #f5f5f5;"></div>
+          <div class="timeline-cell" style="background: #e3f2fd;"></div>
+          <div class="timeline-cell" style="background: #bbdefb;"></div>
+          <div class="timeline-cell" style="background: #90caf9;"></div>
+          <div class="timeline-cell" style="background: #64b5f6;"></div>
+          <div class="timeline-cell" style="background: #64b5f6;"></div>
+          <div class="timeline-cell" style="background: #42a5f5;"></div>
+        </div>
+      </div>
+      <div class="timeline-row">
+        <span class="timeline-label">Class of 2029</span>
+        <div class="timeline-cells">
+          <div class="timeline-cell" style="background: #f5f5f5;"></div>
+          <div class="timeline-cell" style="background: #f5f5f5;"></div>
+          <div class="timeline-cell" style="background: #f5f5f5;"></div>
+          <div class="timeline-cell" style="background: #f5f5f5;"></div>
+          <div class="timeline-cell" style="background: #e3f2fd;"></div>
+          <div class="timeline-cell" style="background: #bbdefb;"></div>
+          <div class="timeline-cell" style="background: #90caf9;"></div>
+          <div class="timeline-cell" style="background: #90caf9;"></div>
+        </div>
+      </div>
+
+      <div style="margin-top: 16px; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary);">
+        <span>Weaker</span>
+        <div style="display: flex; gap: 1px;">
+          <div style="width: 20px; height: 12px; background: #e3f2fd; border-radius: 1px;"></div>
+          <div style="width: 20px; height: 12px; background: #bbdefb; border-radius: 1px;"></div>
+          <div style="width: 20px; height: 12px; background: #90caf9; border-radius: 1px;"></div>
+          <div style="width: 20px; height: 12px; background: #64b5f6; border-radius: 1px;"></div>
+          <div style="width: 20px; height: 12px; background: #42a5f5; border-radius: 1px;"></div>
+          <div style="width: 20px; height: 12px; background: #2196f3; border-radius: 1px;"></div>
+          <div style="width: 20px; height: 12px; background: #1976d2; border-radius: 1px;"></div>
+          <div style="width: 20px; height: 12px; background: #1565c0; border-radius: 1px;"></div>
+        </div>
+        <span>Stronger</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Individual Growth — River View</div>
+      <div class="card-subtitle">An alluvial/river visualization showing how a student's outcome profile shifts over time.
+        Each "stream" is a different dimension of the outcome. Wider = more evidence. Color = depth category.</div>
+
+      <svg width="100%" height="200" viewBox="0 0 800 200" preserveAspectRatio="xMidYMid meet">
+        <!-- Time axis -->
+        <text x="80" y="195" font-size="11" fill="#999" text-anchor="middle">Year 1</text>
+        <text x="280" y="195" font-size="11" fill="#999" text-anchor="middle">Year 2</text>
+        <text x="480" y="195" font-size="11" fill="#999" text-anchor="middle">Year 3</text>
+        <text x="680" y="195" font-size="11" fill="#999" text-anchor="middle">Year 4</text>
+
+        <!-- Analysis stream (starts thin, grows) -->
+        <path d="M30,100 C130,100 180,85 280,80 C380,75 430,55 480,45 C580,35 630,30 730,25"
+              fill="none" stroke="#0288D1" stroke-width="8" opacity="0.6" stroke-linecap="round"/>
+        <path d="M30,100 C130,102 180,105 280,110 C380,112 430,100 480,95 C580,88 630,80 730,75"
+              fill="none" stroke="#0288D1" stroke-width="8" opacity="0.3" stroke-linecap="round"/>
+
+        <!-- Metacognition stream (emerges later) -->
+        <path d="M30,120 C130,120 180,118 280,115 C380,110 430,95 480,85 C580,75 630,68 730,55"
+              fill="none" stroke="#ab47bc" stroke-width="6" opacity="0.5" stroke-linecap="round"/>
+
+        <!-- Synthesis stream (grows in year 3-4) -->
+        <path d="M30,140 C130,140 180,138 280,135 C380,130 430,115 480,110 C580,95 630,85 730,78"
+              fill="none" stroke="#ffa726" stroke-width="5" opacity="0.5" stroke-linecap="round"/>
+
+        <!-- Evidence use (thinner, steady) -->
+        <path d="M30,155 C130,155 180,152 280,150 C380,148 430,142 480,138 C580,132 630,128 730,120"
+              fill="none" stroke="#42a5f5" stroke-width="4" opacity="0.4" stroke-linecap="round"/>
+
+        <!-- Labels -->
+        <text x="745" y="30" font-size="10" fill="#0288D1">Analysis</text>
+        <text x="745" y="60" font-size="10" fill="#ab47bc">Metacognition</text>
+        <text x="745" y="82" font-size="10" fill="#ffa726">Synthesis</text>
+        <text x="745" y="124" font-size="10" fill="#42a5f5">Evidence Use</text>
+      </svg>
+
+      <div style="font-size: 13px; color: var(--text-secondary); margin-top: 8px;">
+        <strong style="color: var(--text-primary);">Maya Rodriguez</strong> — The streams rising and thickening over time
+        tell a story of deepening critical thinking. Notice how Metacognition (purple) barely exists in Year 1 but
+        becomes a major stream by Year 4 — she developed self-awareness about her own reasoning process.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- CONCEPT 6: Simplified "Weather Report"       -->
+  <!-- ============================================ -->
+  <div id="concept-weather" class="concept-view hidden">
+    <div class="callout">
+      <strong>Concept:</strong> The "Weather Report" — a radically simplified view for administrators and accreditors
+      who don't want to interpret charts. Three states: Growing, Steady, Needs Attention.
+      One sentence each. Drill down only if you want to.
+    </div>
+
+    <div class="card">
+      <div class="card-title">Program Health — Engineering (Spring 2026)</div>
+      <div class="card-subtitle">At-a-glance view of how students are doing across all outcomes. Click any card for the full picture.</div>
+
+      <div class="weather-grid">
+        <div class="weather-card" style="border-left: 4px solid #2e7d32;">
+          <div class="weather-icon">☀️</div>
+          <div class="weather-headline" style="color: #2e7d32;">Problem Analysis</div>
+          <div class="weather-detail">84% of seniors demonstrate proficiency. <strong>Up 7%</strong> from last cycle.</div>
+        </div>
+
+        <div class="weather-card" style="border-left: 4px solid #2e7d32;">
+          <div class="weather-icon">☀️</div>
+          <div class="weather-headline" style="color: #2e7d32;">Critical Thinking</div>
+          <div class="weather-detail">Strong evidence across 3 sources. Students deepen noticeably from Year 2 onward.</div>
+        </div>
+
+        <div class="weather-card" style="border-left: 4px solid #e65100;">
+          <div class="weather-icon">⛅</div>
+          <div class="weather-headline" style="color: #e65100;">Teamwork</div>
+          <div class="weather-detail">Mixed signals — rubrics show 71% competent but portfolio evidence is thin. <strong>Watch this one.</strong></div>
+        </div>
+
+        <div class="weather-card" style="border-left: 4px solid #2e7d32;">
+          <div class="weather-icon">☀️</div>
+          <div class="weather-headline" style="color: #2e7d32;">Communication</div>
+          <div class="weather-detail">Strongest outcome. 89% show growth in written reflection. Tori data is rich here.</div>
+        </div>
+
+        <div class="weather-card" style="border-left: 4px solid #e65100;">
+          <div class="weather-icon">⛅</div>
+          <div class="weather-headline" style="color: #e65100;">Ethical Reasoning</div>
+          <div class="weather-detail">Evidence exists but is concentrated in one course (ENGR 380). Need broader coverage.</div>
+        </div>
+
+        <div class="weather-card" style="border-left: 4px solid #c62828;">
+          <div class="weather-icon">🌧️</div>
+          <div class="weather-headline" style="color: #c62828;">Lifelong Learning</div>
+          <div class="weather-detail">Weakest outcome. Only 38% show self-directed learning indicators. <strong>Action plan needed.</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">What a Dean Sees</div>
+      <div style="font-size: 14px; line-height: 1.8; color: var(--text-secondary);">
+        <p style="margin-bottom: 12px;">
+          This view is designed to answer one question in under 10 seconds:
+          <strong style="color: var(--text-primary);">"Are our students meeting our outcomes, and where do we need to act?"</strong>
+        </p>
+        <p style="margin-bottom: 12px;">
+          No charts. No statistics. Sun, clouds, rain.
+          Every card is one sentence of substance — not "3.2 out of 4" but
+          "84% of seniors demonstrate proficiency, up 7% from last cycle."
+        </p>
+        <p>
+          The person who needs the full heatmap can click through. The person who needs to
+          report to the board can screenshot this page.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- CONCEPT 7: Cohort Fingerprints               -->
+  <!-- ============================================ -->
+  <div id="concept-fingerprints" class="concept-view hidden">
+    <div class="callout">
+      <strong>Concept:</strong> Each cohort develops a "fingerprint" — the characteristic shape of their learning profile.
+      Overlay two fingerprints to see how cohorts differ, or compare year-over-year to track program evolution.
+    </div>
+
+    <div class="card">
+      <div class="card-title">Cohort Comparison: Engineering Class of 2025 vs. 2026</div>
+      <div class="card-subtitle">Side-by-side fingerprints across outcome dimensions. Look for shape differences, not just levels.</div>
+
+      <div class="fingerprint-compare">
+        <div class="fingerprint-col">
+          <div class="fingerprint-label">
+            <div style="width: 12px; height: 12px; background: #1976d2; border-radius: 2px;"></div>
+            Class of 2025 (graduated)
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Problem Analysis</span>
+            <div class="bar-track"><div class="bar-fill" style="width: 82%; background: #1976d2;"></div></div>
+            <span class="bar-value">82%</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Critical Thinking</span>
+            <div class="bar-track"><div class="bar-fill" style="width: 75%; background: #1976d2;"></div></div>
+            <span class="bar-value">75%</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Communication</span>
+            <div class="bar-track"><div class="bar-fill" style="width: 70%; background: #1976d2;"></div></div>
+            <span class="bar-value">70%</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Teamwork</span>
+            <div class="bar-track"><div class="bar-fill" style="width: 68%; background: #1976d2;"></div></div>
+            <span class="bar-value">68%</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Ethics</span>
+            <div class="bar-track"><div class="bar-fill" style="width: 55%; background: #1976d2;"></div></div>
+            <span class="bar-value">55%</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Lifelong Learning</span>
+            <div class="bar-track"><div class="bar-fill" style="width: 42%; background: #1976d2;"></div></div>
+            <span class="bar-value">42%</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Design</span>
+            <div class="bar-track"><div class="bar-fill" style="width: 78%; background: #1976d2;"></div></div>
+            <span class="bar-value">78%</span>
+          </div>
+        </div>
+
+        <div class="fingerprint-col">
+          <div class="fingerprint-label">
+            <div style="width: 12px; height: 12px; background: #ffa726; border-radius: 2px;"></div>
+            Class of 2026 (current seniors)
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Problem Analysis</span>
+            <div class="bar-track"><div class="bar-fill" style="width: 84%; background: #ffa726;"></div></div>
+            <span class="bar-value">84%</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Critical Thinking</span>
+            <div class="bar-track"><div class="bar-fill" style="width: 78%; background: #ffa726;"></div></div>
+            <span class="bar-value">78%</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Communication</span>
+            <div class="bar-track"><div class="bar-fill" style="width: 89%; background: #ffa726;"></div></div>
+            <span class="bar-value">89%</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Teamwork</span>
+            <div class="bar-track"><div class="bar-fill" style="width: 58%; background: #ffa726;"></div></div>
+            <span class="bar-value">58%</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Ethics</span>
+            <div class="bar-track"><div class="bar-fill" style="width: 62%; background: #ffa726;"></div></div>
+            <span class="bar-value">62%</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Lifelong Learning</span>
+            <div class="bar-track"><div class="bar-fill" style="width: 38%; background: #ffa726;"></div></div>
+            <span class="bar-value">38%</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-label">Design</span>
+            <div class="bar-track"><div class="bar-fill" style="width: 71%; background: #ffa726;"></div></div>
+            <span class="bar-value">71%</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top: 20px; padding: 16px; background: #f5f7fa; border-radius: 2px; font-size: 13px; color: var(--text-secondary);">
+        <strong style="color: var(--text-primary);">Key differences:</strong>
+        The Class of 2026 shows a dramatically different <em>shape</em> — much stronger in Communication (+19 points)
+        but weaker in Teamwork (-10 points) and Design (-7 points). This isn't just "better or worse" — it's a
+        different kind of cohort. They may be benefiting from Tori-integrated reflective writing assignments
+        (introduced Fall 2024) while the reduced in-person collaboration post-COVID may be affecting team dynamics.
+        <br><br>
+        <strong style="color: var(--text-primary);">Both cohorts share a weakness</strong> in Lifelong Learning —
+        this is a program-level issue, not a cohort effect.
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================ -->
+  <!-- CONCEPT 8: Evidence Report                   -->
+  <!-- ============================================ -->
+  <div id="concept-evidence" class="concept-view hidden">
+    <div class="callout">
+      <strong>Concept:</strong> The narrative evidence report — what actually goes to the accreditor.
+      Not a spreadsheet of scores, but a compelling, data-backed narrative with real student evidence.
+      Generated from everything in the system.
+    </div>
+
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div class="card-title" style="margin-bottom: 0;">Accreditation Evidence Report</div>
+        <div style="display: flex; gap: 8px;">
+          <button style="padding: 6px 14px; font-size: 12px; border: 1px solid var(--border); border-radius: 2px; background: white; cursor: pointer; font-family: inherit;">Export PDF</button>
+          <button style="padding: 6px 14px; font-size: 12px; border: 1px solid var(--primary); border-radius: 2px; background: var(--primary); color: white; cursor: pointer; font-family: inherit;">Generate Report</button>
+        </div>
+      </div>
+
+      <div style="border: 1px solid var(--border); border-radius: 2px; padding: 24px; background: #fafafa;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <div style="font-size: 18px; font-weight: 600;">Student Outcome Assessment Report</div>
+          <div style="font-size: 14px; color: var(--text-secondary);">Mechanical Engineering Program · ABET Criterion 3, Outcome 1</div>
+          <div style="font-size: 13px; color: var(--text-secondary);">Assessment Period: Fall 2024 – Spring 2026</div>
+        </div>
+
+        <div style="font-size: 13px; line-height: 1.8; color: var(--text-primary);">
+          <p style="margin-bottom: 16px;">
+            <strong>Outcome 1 — Problem Analysis:</strong> "An ability to identify, formulate, and solve complex
+            engineering problems by applying principles of engineering, science, and mathematics."
+          </p>
+
+          <p style="margin-bottom: 16px;">
+            <strong>Finding:</strong> 84% of graduating seniors (71 of 84 students) demonstrate proficiency
+            in problem analysis, exceeding our threshold of 70%. This represents a 7-point improvement
+            from the previous assessment cycle (77% in 2022–2024).
+          </p>
+
+          <p style="margin-bottom: 12px; font-weight: 600;">Evidence Sources:</p>
+
+          <p style="margin-bottom: 12px; padding-left: 16px;">
+            <strong>1. Direct Assessment (Rubric):</strong> In the Senior Design capstone (ME 495),
+            the Problem Formulation criterion of the course rubric showed 84% of students at
+            "Proficient" or "Advanced" levels. N=84.
+          </p>
+
+          <p style="margin-bottom: 12px; padding-left: 16px;">
+            <strong>2. Reflective Practice Analysis (Tori):</strong> AI-assisted analysis of 2,847
+            student reflective comments across 6 courses revealed that 91% of engineering students
+            engaged with Cognitive-Analytical learning dimensions. The Problem-Solving indicator appeared
+            in 76% of student conversations, with 62% of those reaching Dialogic or Critical
+            reflection depth — suggesting not just application but genuine metacognitive engagement
+            with problem-solving processes.
+          </p>
+
+          <p style="margin-bottom: 12px; padding-left: 16px;">
+            <strong>3. Portfolio Evidence:</strong> 23 of 28 sampled capstone portfolios (82%)
+            included problem analysis artifacts with faculty annotations confirming outcome achievement.
+          </p>
+
+          <p style="margin-bottom: 12px; padding-left: 16px;">
+            <strong>4. Longitudinal Growth:</strong> Tracking students from their first engineering
+            course to capstone, we observe consistent deepening of analytical engagement.
+            The cohort's "Problem Analysis signature" — a multi-dimensional profile of how students
+            approach problems — shows progressive complexity: first-year students rely primarily on
+            procedural approaches, while seniors demonstrate evaluation, synthesis, and metacognitive
+            monitoring of their problem-solving strategies.
+          </p>
+
+          <p style="margin-bottom: 16px; padding-left: 16px;">
+            <em>Student example:</em> "I realized my initial model was oversimplified — I was treating
+            the thermal load as uniform when the actual distribution follows a gradient that changes
+            with the boundary conditions. Going back to re-derive the equations with the actual
+            boundary conditions gave me a completely different result, and that's when I understood
+            why the simulation wasn't matching our experimental data." — ME 495 student, Spring 2026
+          </p>
+
+          <p style="margin-bottom: 16px;">
+            <strong>Growth Trajectory:</strong> The Class of 2026 showed stronger growth than the
+            Class of 2025, with evidence of deepening particularly between Years 2 and 3, coinciding
+            with the introduction of reflective practice components in ME 300 and ME 350.
+          </p>
+
+          <p>
+            <strong>Action Items:</strong> While overall achievement is strong, 16% of students
+            (13 individuals) did not reach proficiency. Analysis of their Tori profiles suggests
+            these students engaged primarily at the Descriptive level — describing procedures
+            without analyzing why they work. The department will pilot targeted metacognitive
+            scaffolding in ME 300 (Fall 2026) to address this gap earlier in the curriculum.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function showConcept(id) {
+  // Hide all
+  document.querySelectorAll('.concept-view').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('.concept-btn').forEach(el => el.classList.remove('active'));
+
+  // Show selected
+  document.getElementById('concept-' + id).classList.remove('hidden');
+  event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>
