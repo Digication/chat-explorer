@@ -1,6 +1,9 @@
-# Insights Critique — 2026-04-12 — Implementation Plan
+# Insights Critique — 2026-04-12 — Implementation Plan (Revised)
 
-Phased implementation for the 17 items from the Round 2 critique. Phases are ordered by dependency and risk — quick wins first, then building blocks, then complex features.
+Phased implementation for the 17 items from the Round 2 critique. Incorporates all findings from the critique review. Each phase includes backend prerequisites, exact files/changes, unit tests, and browser verification steps. Phases are independently deployable.
+
+**Deferred to future work:**
+- Clickable student names in AI Chat free-text responses (requires NLP entity detection + student ID matching — fundamentally different from structured data click handlers)
 
 ---
 
@@ -10,65 +13,99 @@ Items: #1, #2, #4, #11
 
 ### 7.1 Decimal Precision (Item #1)
 
-**Problem:** When heatmap scaling is ROW or GLOBAL, `applyScaling()` in the backend divides counts by the row/global max, producing long floats (e.g., `3/7 = 0.42857...`). These are rendered directly in cells and tooltips.
-
-**Root cause:** `src/server/services/analytics/heatmap.ts` lines 146-166 — `applyScaling()` returns unrounded floats. Frontend renders them as-is.
+**Root cause:** `applyScaling()` in `src/server/services/analytics/heatmap.ts` (lines 146-166) divides counts by row/global max, producing unrounded floats (e.g., `3/7 = 0.42857...`). Frontend renders them as-is.
 
 **Files to change:**
 - `src/components/insights/HeatmapView.tsx`
-  - Classic mode cell (line 547): `{raw > 0 ? raw : null}` → format with 2 decimal places when scaling is not RAW
-  - Classic mode tooltip (line 518): `${raw}` → same formatting
-  - Sparkline mode values/tooltips (line ~378): Same treatment
-  - Small Multiples count (line ~202): Same treatment
+  - Add helper at top of file:
+    ```typescript
+    const fmt = (v: number, s: string) => s === "RAW" ? String(v) : v.toFixed(2);
+    ```
+  - Classic mode cell (line 547): `{raw > 0 ? raw : null}` → `{raw > 0 ? fmt(raw, scaling) : null}`
+  - Classic mode tooltip (line 518): `${raw}` → `${fmt(raw, scaling)}`
+  - Sparkline mode: Check if tooltips display raw values — apply same formatting
+  - Small Multiples mode (line 202): `{count}` — apply same formatting if `scaling !== "RAW"`
+  - Pass `scaling` prop down to any sub-components that display values
 
-**Pattern:** Create a helper `formatHeatmapValue(value: number, scaling: string): string` — returns integers as-is for RAW, `.toFixed(2)` for ROW/GLOBAL. Use it everywhere a matrix value is displayed.
+**Unit tests (`src/components/insights/__tests__/HeatmapView.test.tsx` — new file):**
+- Render Classic mode with ROW scaling → cell values show max 2 decimal places
+- Render Classic mode with RAW scaling → cell values are integers
+- Render Classic mode with GLOBAL scaling → cell values show max 2 decimal places
+- Tooltip text uses same formatting
 
-**Risk: LOW** — Display-only change.
+**Browser verification:**
+- Insights → Heatmap → switch to Row scaling → verify all cell values have ≤ 2 decimal places
+- Switch to Global scaling → same check
+- Switch to Raw → values are integers
+- Repeat for Sparkline and Small Multiples modes
 
 ---
 
 ### 7.2 All-Student Summary Row for Classic (Item #2)
 
-**Problem:** Sparkline mode has an "All Students" summary row but Classic mode does not.
-
 **Files to change:**
 - `src/components/insights/HeatmapView.tsx`
-  - Classic mode (lines 453-557): Add a summary row at the top or bottom of the table.
-  - Reuse the aggregation logic from Sparkline mode (lines 354-356): Sum each column across all rows.
-  - Style the summary row distinctly (match Sparkline's #f5f7fa background, #1565c0 text from line 371).
+  - Classic mode (lines 453-557): Add summary row at top of `<tbody>`.
+  - Reuse aggregation logic from Sparkline mode (lines 354-356):
+    ```typescript
+    const summaryValues = colOrder.map((ci) =>
+      rowOrder.reduce((sum, ri) => sum + (matrix[ri]?.[ci] ?? 0), 0),
+    );
+    ```
+  - Style: Match Sparkline's `#f5f7fa` background, `#1565c0` text, `fontWeight: 700` (line 371).
+  - Label: "All Students" in sticky left column.
+  - Summary row cells should NOT be clickable (no single student to drill into).
 
-**Risk: LOW** — Additive, no existing behavior changes.
+**Unit tests:**
+- `HeatmapView.test.tsx`: Classic mode renders "All Students" row with correct column sums
+- `HeatmapView.test.tsx`: Summary row cells are not clickable
+
+**Browser verification:**
+- Insights → Heatmap → Classic → verify "All Students" row at top
+- Verify totals match manual addition of column values
+- Verify summary row is visually distinct (blue text, gray background)
 
 ---
 
 ### 7.3 Fix "View Full Conversation" in Student Panel (Item #4)
 
-**Problem:** Clicking "View full conversation" in Notable Reflections does nothing.
+**Root cause:** `StudentProfilePage.tsx` line 354 calls `handleViewThread(threadId, name)` which sets local `openThread` state (line 92-97). When rendered inside the Faculty Panel (`embedded` prop), the local modal renders but may not work correctly because the component is already inside the panel.
 
-**Files to check:**
-- `src/pages/StudentProfilePage.tsx` (lines 354-357): `handleViewThread(ev.threadId, profile.name)` is called.
-  - Line 377-381: Sets `openThread = { threadId, studentName }` state.
-  - Verify the ThreadPanel modal actually renders with this state.
-  - **When rendered inside the Faculty Panel (embedded):** The component may use `useParams()` for studentId but receive it as a prop. Check if the thread opening mechanism works differently when embedded vs. standalone.
-  - **Fix path:** When inside the Faculty Panel, use `panel.openThread(threadId, studentName)` instead of local modal state.
+**Fix approach:** When `embedded` is true, use `panel.openThread()` instead of local modal state.
 
-**Risk: LOW** — Bug fix with clear cause.
+**Files to change:**
+- `src/pages/StudentProfilePage.tsx`
+  - Accept `onViewThread?: (threadId: string, studentName: string) => void` prop
+  - In `handleViewThread`: if `onViewThread` prop exists, call it instead of setting local state
+  - Remove local ThreadPanel modal when embedded (it's redundant — panel handles it)
+
+- `src/components/faculty-panel/FacultyPanel.tsx`
+  - Pass `onViewThread={panel.openThread}` to `StudentProfilePage` when rendering Student tab
+
+**Unit tests:**
+- `StudentProfilePage.test.tsx`: When `onViewThread` prop provided, clicking "View full conversation" calls it with correct `threadId` and `studentName`
+- `StudentProfilePage.test.tsx`: When `onViewThread` prop NOT provided (standalone), clicking opens local modal
+
+**Browser verification:**
+- Insights → click student name → Student tab opens → scroll to Notable Reflections → click "View full conversation" → Thread tab opens with correct conversation
+- Verify back button returns to Student tab
 
 ---
 
 ### 7.4 Verify Student Panel Growth Diagrams (Item #11)
 
-**Action:** Audit `StudentProfilePage.tsx` against the Phase 4 plan:
+**Audit against Phase 4 plan:**
 - ReflectionTrajectory (sparkline across assignments) — **exists** (lines 391-525)
 - CategoryDonut (depth category breakdown) — **exists** (lines 528-627)
 - ToriTagBars (tag distribution) — **exists** (lines 630-700+)
-- ToriTagTrends (per-assignment TORI trends) — **exists conditionally** (lines 308-311)
-- **Delta Heatmap** — planned in Phase 4, verify presence
-- **Slope Chart** — planned in Phase 4, verify presence
+- ToriTagTrends (per-assignment trends) — **exists conditionally** (lines 308-311)
+- Delta Heatmap — **check if present**, add if missing
+- Slope Chart — **check if present**, add if missing
 
-If any are missing, add them in this phase.
+**Action:** Read `StudentProfilePage.tsx` and compare against the Phase 4 plan's TORI visualization list. If Delta Heatmap or Slope Chart are missing, implement them following the existing visualization patterns.
 
-**Risk: LOW** — Audit + possible additions.
+**Browser verification:**
+- Student panel → scroll through all sections → verify all planned visualizations render with data
 
 ---
 
@@ -76,73 +113,114 @@ If any are missing, add them in this phase.
 
 Items: #3, #5, #6
 
+**Prerequisite — Backend: Verify evidence query returns student info:**
+Before starting frontend work, check if `GET_HEATMAP_CELL_EVIDENCE` and TORI tag evidence queries return `studentId` and student name on each evidence item. If not, add:
+- `studentId` field to evidence item type in `src/server/types/schema.ts`
+- `studentName` field (or nested `student { name }` relation) in the resolver
+- Update `EvidencePopover.tsx`'s query to request these fields
+
+**Backend test:** Evidence query returns `studentId` and `studentName` for each item.
+
 ### 8.1 Clickable Student Names Everywhere (Item #3)
 
-**Core pattern:** Every student name → `panel.openStudentProfile(studentId, studentName)`.
+**Core pattern:** Every student name component gets an `onStudentClick?: (studentId: string, name: string) => void` callback. Wired to `panel.openStudentProfile()` from the page level.
 
-**Files to change (by location):**
+**Files to change (by component):**
 
-1. **Reflection Heatmap row labels** — `HeatmapView.tsx`
-   - Classic mode (line ~500): Student name in sticky left column → wrap in clickable `<Typography>` with `onClick` → `onStudentClick(studentId, name)`
+1. **HeatmapView.tsx** — Student name in row labels
+   - Classic mode (line 509): Wrap `getDisplayName(rowLabels[ri])` in a `<Typography component="button">` with `onClick={() => onStudentClick?.(rowIds[ri], rowLabels[ri])}` and `cursor: pointer` styling
    - Sparkline mode (line ~365): Same pattern for row labels
    - Small Multiples mode (line ~435): Card headers with student name → clickable
-   - **Prop needed:** Add `onStudentClick?: (studentId: string, name: string) => void` prop to `HeatmapView`
+   - Add `onStudentClick` to component props
 
-2. **Cell-click modal/popover** — `EvidencePopover.tsx`
-   - When showing evidence for a cell, include the student name at the top
-   - Make the student name clickable → opens student panel
-   - **Prop needed:** Add `onStudentClick` callback
+2. **EvidencePopover.tsx** — Student name in evidence list
+   - Add `onStudentClick` to props interface
+   - Render student name as clickable link at top of popover (when `studentName` is present)
+   - When showing tag drill-down evidence (multiple students), render student name per evidence item group and make each clickable
+   - Close popover when student name is clicked (user is navigating away)
 
-3. **Thread viewer header** — `ThreadView.tsx`
-   - Student name at top of thread → clickable
-   - When inside Faculty Panel, clicking navigates to Student tab within the same panel
+3. **ThreadView.tsx** — Student name in thread header
+   - The student name display at the top of the thread should be clickable
+   - Add `onStudentClick` prop; wire to the student name element
+   - When inside Faculty Panel: clicking calls `panel.openStudentProfile()`, which pushes onto history stack. Back button returns to thread. **Verify `FacultyPanelContext` history stack handles Thread → Student → back-to-Thread navigation.**
 
-4. **Within Faculty Panel** — `FacultyPanel.tsx`
-   - Thread tab: student name clickable → `panel.openStudentProfile()`
-   - AI Chat tab: if student names appear in messages, make them interactive (stretch goal)
+4. **ThreadPanel.tsx** — Pass `onStudentClick` through to ThreadView
 
-**Wiring:** `InsightsPage.tsx` passes `onStudentClick` that calls `panel.openStudentProfile()`.
+5. **FacultyPanel.tsx** — Wire callbacks
+   - Thread tab: Pass `onStudentClick={(id, name) => panel.openStudentProfile(id, name)}` to ThreadPanel
+   - This pushes Student onto the history stack; back button returns to Thread
 
-**Risk: MODERATE** — Many touchpoints, but same pattern everywhere.
+6. **InsightsPage.tsx** — Wire `onStudentClick` to all child components
+   - Pass `onStudentClick={handleOpenStudent}` (already defined) to: `HeatmapView`, `ToriTagFrequencies`, `GrowthVisualization`, `DepthBands`
+   - Some of these may already have `onOpenStudent` — unify naming
+
+**Unit tests:**
+- `HeatmapView.test.tsx`: Click student name in Classic mode → `onStudentClick` called with correct `studentId` and name
+- `HeatmapView.test.tsx`: Click student name in Sparkline mode → same
+- `HeatmapView.test.tsx`: Click student name in Small Multiples mode → same
+- `EvidencePopover.test.tsx`: Student name rendered and clickable when `onStudentClick` provided
+- `FacultyPanelContext.test.tsx`: History stack supports Thread → Student → back-to-Thread navigation
+
+**Browser verification:**
+- Insights → Heatmap Classic → click student name → Faculty Panel opens to Student tab
+- Insights → Heatmap → click cell → popover → click student name → Faculty Panel opens
+- Faculty Panel → Thread tab → click student name in header → navigates to Student tab
+- Faculty Panel → Student tab → click back → returns to Thread tab
 
 ---
 
 ### 8.2 TORI Tag Drill-Down with Student Names (Item #5)
 
-**Problem:** Tag drill-down shows mentions but not which student said them.
+**Prerequisite:** Backend evidence query must return student info (see Phase 8 prerequisite above).
 
 **Files to change:**
-- `src/components/insights/ToriTagFrequencies.tsx` (lines 131-137, 250-262)
-  - The `EvidencePopover` receives evidence (comments) but doesn't show student names.
-  - **Backend query:** Check if `GET_STUDENT_ENGAGEMENT` or the tag evidence query returns `studentName` / `studentId`. If not, add it.
-  - **Frontend:** Group evidence by student in the popover, showing student name as a header for each group.
-  - Make student names clickable → `onStudentClick`.
-
 - `src/components/insights/EvidencePopover.tsx`
-  - Add student name display for each evidence item.
-  - Add `onStudentClick` callback prop.
+  - When opened for a tag (no specific student), group evidence items by student
+  - Show student name as a section header for each group
+  - Make student name clickable → `onStudentClick`
+  - Show student name even when popover is for a single student (as a header)
 
-**Risk: MODERATE** — May need backend query changes.
+- `src/components/insights/ToriTagFrequencies.tsx`
+  - Pass `onStudentClick` through to `EvidencePopover`
+
+**Unit tests:**
+- `EvidencePopover.test.tsx`: Tag drill-down groups evidence by student
+- `EvidencePopover.test.tsx`: Each student group header is clickable
+- `EvidencePopover.test.tsx`: Student names use `getDisplayName()` formatting
+
+**Browser verification:**
+- Insights → TORI Tag Frequencies → click "Pattern Recognition (22)" → popover shows evidence grouped by student name
+- Click a student name in the popover → Faculty Panel opens to that student
 
 ---
 
 ### 8.3 Student Selector in Panel (Item #6)
 
-**Problem:** No way to switch students from within the panel. Panel is empty if no student selected.
+**New component:** `src/components/faculty-panel/StudentSearchAutocomplete.tsx`
+
+**Implementation:**
+- MUI `Autocomplete` with `freeSolo` and debounced input
+- Data source: `GET_STUDENT_PROFILES` query (same as Chat Explorer), filtered by current scope's `institutionId` and optionally `courseId`
+- On select: Call `panel.openStudentProfile(selectedStudent.id, selectedStudent.name)`
+- Show prominently at top of Student tab when no student is loaded
+- Show as a compact search bar when a student IS loaded (allows switching)
 
 **Files to change:**
+- New file: `src/components/faculty-panel/StudentSearchAutocomplete.tsx`
 - `src/components/faculty-panel/FacultyPanel.tsx`
-  - Student tab: Add a search-as-you-type `Autocomplete` at the top.
-  - Data source: Use `GET_STUDENT_PROFILES` query (same as Chat Explorer).
-  - On select: Call `panel.openStudentProfile(selectedStudent.id, selectedStudent.name)`.
-  - Show the selector prominently when no student is loaded.
+  - Student tab: Render `StudentSearchAutocomplete` above `StudentProfilePage`
+  - When no student selected: Show the autocomplete full-width with placeholder "Search for a student..."
+  - When student selected: Show compact autocomplete with current student name pre-filled
 
-- `src/components/faculty-panel/FacultyPanelContext.tsx`
-  - No changes needed — `openStudentProfile` already accepts `studentId` + `studentName`.
+**Unit tests:**
+- `StudentSearchAutocomplete.test.tsx`: Renders with placeholder when no student selected
+- `StudentSearchAutocomplete.test.tsx`: Filtering works — typing narrows the list
+- `StudentSearchAutocomplete.test.tsx`: Selecting a student calls `onSelect` with correct id and name
+- `FacultyPanel.test.tsx`: Student tab shows autocomplete when no student loaded
 
-**Component:** New `StudentSearchAutocomplete` component — MUI `Autocomplete` with `freeSolo`, debounced input, filtered against the student list.
-
-**Risk: MODERATE** — New component, but well-defined scope.
+**Browser verification:**
+- Faculty Panel → Student tab (no student) → search bar visible → type student name → autocomplete shows matches → select → student profile loads
+- Faculty Panel → Student tab (student loaded) → compact search bar at top → can switch to different student
 
 ---
 
@@ -150,61 +228,162 @@ Items: #3, #5, #6
 
 Items: #8, #9, #10
 
+### 9.0 Backend Prerequisites (must complete before frontend work)
+
+**9.0a — Evidence by reflection category query:**
+
+Needed for Growth cell interactivity (9.2).
+
+- `src/server/types/schema.ts`: Add query:
+  ```graphql
+  categoryEvidence(input: CategoryEvidenceInput!): CategoryEvidenceResult!
+  ```
+  Input: `{ scope, studentId, assignmentId, category }`. Returns: list of comments with thread info.
+
+- `src/server/resolvers/analytics.ts`: Add resolver that joins:
+  `CommentReflectionClassification` (by category) → `Comment` (by studentId via thread) → `Thread` (by assignmentId)
+
+- `src/server/services/analytics/`: New service function or extend existing evidence service.
+
+**9.0b — Multi-tag intersection query:**
+
+Needed for Co-occurrence interactivity (9.3).
+
+- `src/server/types/schema.ts`: Add query:
+  ```graphql
+  multiTagEvidence(input: MultiTagEvidenceInput!): MultiTagEvidenceResult!
+  ```
+  Input: `{ scope, toriTagIds: [ID!]! }`. Returns: comments that have ALL specified tags.
+
+- SQL pattern:
+  ```sql
+  SELECT "commentId" FROM "comment_tori_tag"
+  WHERE "toriTagId" IN ($tagIds)
+  GROUP BY "commentId"
+  HAVING COUNT(DISTINCT "toriTagId") = $tagCount
+  ```
+
+- `src/server/resolvers/analytics.ts`: Add resolver.
+
+**9.0c — Tag IDs in co-occurrence data:**
+
+Currently `CoOccurrenceList` only has tag names (`tags: string[]`), not IDs. Need tag IDs to call the multi-tag query.
+
+- `src/server/services/analytics/tori.ts`: Include `tagIds: string[]` alongside `tags: string[]` in co-occurrence results.
+- `src/server/types/schema.ts`: Add `tagIds` field to co-occurrence type.
+
+**Backend tests:**
+- `categoryEvidence` returns only comments matching the specified student + assignment + category
+- `categoryEvidence` returns empty for non-existent combinations
+- `multiTagEvidence` returns only comments containing ALL specified tags (not ANY)
+- `multiTagEvidence` with 2 tags returns correct intersection
+- `multiTagEvidence` with 3 tags returns correct intersection
+- Co-occurrence data includes `tagIds` alongside `tags`
+
+---
+
 ### 9.1 Thread Viewer Tag Highlighting (Item #8)
 
-**Problem:** Thread viewer doesn't support tag filtering like Chat Explorer does.
+**Current state:** `ThreadView.tsx` already has `activeToriFilters` prop and highlight/dim logic (lines 135-177). What's missing is the tag chip bar UI.
 
-**Current state:** `ThreadView.tsx` already has:
-- `onToriTagClick` callback prop (line 24)
-- Highlight/dim logic for active TORI filters (lines 136-141, 168-177)
+**Component extraction:** The `ToriFilters` component currently lives in `ChatExplorerPage`. Extract it into a shared component.
 
 **Files to change:**
+- New file: `src/components/explorer/ToriFilterBar.tsx`
+  - Extract the tag chip bar from `ChatExplorerPage` into a reusable component
+  - Props: `availableTags: string[]`, `activeTags: string[]`, `onToggle: (tag: string) => void`
+  - Renders horizontal scrollable row of `Chip` components
+
 - `src/components/explorer/ThreadView.tsx`
-  - Add a tag chip bar at the top (same pattern as Chat Explorer's `ToriTagFilter`).
-  - Pre-select the tag that was clicked to open this thread (pass as prop).
-  - When a tag chip is toggled, filter/highlight matching comments.
+  - Add `ToriFilterBar` at the top of the thread view
+  - Derive available tags from the thread's comments' TORI tags
+  - Add `initialToriTag?: string` prop — pre-select this tag on mount
+  - Manage local `activeFilters` state (or accept from parent)
 
-- `src/components/insights/StudentEngagementTable.tsx` (or wherever tag clicks originate)
-  - When clicking a tag in the engagement table → open thread with that tag pre-selected.
-  - Pass `initialToriTag` to the thread viewer.
+- `src/pages/ChatExplorerPage.tsx`
+  - Refactor to use the extracted `ToriFilterBar` component (no behavior change)
 
-**Risk: MODERATE** — Building on existing highlight infrastructure.
+- When opening a thread from Student Engagement tag click:
+  - `InsightsPage.tsx` → `StudentEngagementTable` → tag click → `panel.openThread(threadId, studentName, { initialTag: tagName })`
+  - `FacultyPanelContext.tsx`: Add optional `initialToriTag` to thread state
+  - `FacultyPanel.tsx`: Pass `initialToriTag` to `ThreadPanel` → `ThreadView`
+
+**Unit tests:**
+- `ToriFilterBar.test.tsx`: Renders chips for all available tags
+- `ToriFilterBar.test.tsx`: Clicking a chip calls `onToggle`
+- `ToriFilterBar.test.tsx`: Active chips have distinct styling
+- `ThreadView.test.tsx`: Tag filter bar renders with tags from comments
+- `ThreadView.test.tsx`: `initialToriTag` prop pre-selects that tag and highlights matching comments
+- `ThreadView.test.tsx`: Toggling a tag filters/highlights comments correctly
+
+**Browser verification:**
+- Student Engagement → click tag chip on a student row → thread opens with that tag highlighted
+- Thread viewer → tag bar visible → clicking tags toggles highlighting
+- Highlighted comments are visually distinct; non-matching comments are dimmed
 
 ---
 
 ### 9.2 Student Growth Cell Interactivity (Item #9)
 
-**Problem:** Growth cells (Matrix, Delta views) are not clickable.
+**Requires:** Backend 9.0a (category evidence query).
 
 **Files to change:**
 - `src/components/insights/GrowthVisualization.tsx`
-  - **Matrix view** (lines 239-322): Add `onClick` to category chip cells.
-    - Click → open evidence popover showing conversations for that student + assignment + category.
-    - Need: `onCellClick(studentId, assignmentId, category)` callback.
-  - **Delta/Before-After view** (lines 333-460): Add `onClick` to before/after chips.
-    - Click → show conversations matching that category for the student in the before or after period.
-  - **Sparkline view** (lines 136-235): Add `onClick` to sparkline dots.
-    - Click → show evidence for that student at that assignment point.
+  - **Matrix view** (lines 239-322): Add `onClick` to category cells
+    - Click → open `EvidencePopover` with `studentId`, `assignmentId`, and category filter
+    - Add `cursor: pointer` styling to cells with data
+  - **Delta view** (lines 333-460): Add `onClick` to before/after category chips
+    - Click → same evidence popover pattern
+  - **Sparkline view** (lines 136-235): Add `onClick` to trajectory dots
+    - Click → show evidence for that student at that assignment point
+  - Add `onCellClick?: (studentId: string, assignmentId: string, category: string) => void` prop
+  - Add popover state management (same pattern as HeatmapView)
 
-**Backend consideration:** May need a query that fetches comments by student + assignment + reflection category.
+- `src/lib/queries/analytics.ts`: Add `GET_CATEGORY_EVIDENCE` query matching the backend schema from 9.0a.
 
-**Risk: MODERATE** — Pattern exists in heatmap, extend it here.
+- `src/components/insights/EvidencePopover.tsx` or new `CategoryEvidencePopover.tsx`:
+  - Accept category filter in addition to existing tag filter
+  - Fetch and display evidence for the specific category
+
+**Unit tests:**
+- `GrowthVisualization.test.tsx`: Matrix cell click calls `onCellClick` with correct params
+- `GrowthVisualization.test.tsx`: Delta chip click calls callback
+- `GrowthVisualization.test.tsx`: Sparkline dot click calls callback
+- `GrowthVisualization.test.tsx`: Cells with data show pointer cursor; empty cells don't
+
+**Browser verification:**
+- Growth → Matrix → click a cell with a category → popover shows matching conversations
+- Growth → Delta → click before/after chip → popover shows evidence
+- Growth → Sparkline → click a dot → popover shows evidence for that assignment
 
 ---
 
 ### 9.3 Co-Occurrence Pattern Interactivity (Item #10)
 
-**Problem:** Co-occurrence pairs/triples are static, no drill-down.
+**Requires:** Backend 9.0b (multi-tag intersection query) and 9.0c (tag IDs in co-occurrence data).
 
 **Files to change:**
-- `src/components/insights/CoOccurrenceList.tsx` (lines 107-133)
-  - Make each pair/triple row clickable.
-  - Click → open `EvidencePopover` showing conversations that contain BOTH/ALL tags together.
-  - Need: Backend query or client-side filter for comments matching multiple tags simultaneously.
+- `src/components/insights/CoOccurrenceList.tsx`
+  - Make each pair/triple row clickable: add `onClick` and `cursor: pointer`
+  - On click → open `EvidencePopover` (or new popover) with multi-tag filter
+  - Add `onItemClick?: (tagNames: string[], tagIds: string[]) => void` prop
+  - Add popover state management
 
-**Backend consideration:** The co-occurrence data likely comes from analyzing tag co-occurrences in comments. Need to be able to fetch the actual comments where those tags co-occur.
+- `src/lib/queries/analytics.ts`: Add `GET_MULTI_TAG_EVIDENCE` query.
 
-**Risk: MODERATE** — Query may be complex (multi-tag intersection).
+- `src/components/insights/EvidencePopover.tsx`: Support multi-tag filtering mode — pass array of tag IDs, show evidence containing all of them.
+
+- `src/pages/InsightsPage.tsx`: Wire `onItemClick` callback to open evidence.
+
+**Unit tests:**
+- `CoOccurrenceList.test.tsx`: Row click calls `onItemClick` with correct tag names and IDs
+- `CoOccurrenceList.test.tsx`: Rows have pointer cursor
+- `EvidencePopover.test.tsx`: Multi-tag mode fetches and displays intersection results
+
+**Browser verification:**
+- Co-occurrence → click a pair → popover shows conversations containing both tags
+- Click a triple → popover shows conversations containing all three tags
+- Verify count in popover matches the co-occurrence count
 
 ---
 
@@ -212,85 +391,175 @@ Items: #8, #9, #10
 
 Item: #7
 
-### 10.1 Mind-Map Style Network with Visible Labels
+**This phase requires a design decision before implementation.** The current hover-only approach is unusable. The redesign needs a visual spec.
 
-**Problem:** Current hover-only approach is unusable. No persistent labels, no connection context.
+### 10.0 Design Spec (do first)
 
-**Current implementation:** `ToriNetworkGraph.tsx` — force-directed layout, circles only, hover for name, click for evidence.
+Produce a concrete visual spec covering:
+- **Node rendering:** Rounded rectangles with tag name inside. Font size: 11-14px scaled by frequency. Fill color by community (existing `COMMUNITY_COLORS`). Min width: text width + 16px padding. Height: 24-32px.
+- **Edge rendering:** Lines between connected nodes. Thickness: 1-3px scaled by co-occurrence count. Color: light gray (`#ccc`).
+- **Interaction model:**
+  - Hover a node → highlight that node + ALL connected nodes + connecting edges. Dim everything else to opacity 0.15. Connected node labels remain fully visible.
+  - Click a node → lock the highlight state. Click again or click background → unlock.
+  - Click a node → also open evidence popover (existing behavior).
+- **Dense graph handling:** If >30 nodes, collapse nodes with frequency < 5 into an "Other" group. Show top N nodes (N = viewport-dependent, ~25-35).
+- **Layout:** Force-directed with rectangle-rectangle collision detection using AABB (axis-aligned bounding box) overlap.
+- **Canvas size:** SVG fills container width. Height: max(400px, node count × 18px). If graph exceeds viewport, add CSS `overflow: auto` for scrolling (no zoom/pan — keep it simple for v1).
 
-**Redesign approach:**
-
-1. **Label-first layout:**
-   - Replace circle-only nodes with rounded rectangles containing the tag name.
-   - Bounding box size based on text width (measure with canvas `measureText` or SVG `getComputedTextLength`).
-   - Font size proportional to frequency (min 10px, max 16px).
-
-2. **Collision detection on bounding boxes:**
-   - Replace circle-radius collision (lines 134-151) with rectangle-rectangle collision.
-   - Use separating axis theorem or simple AABB overlap.
-   - Increase repulsion force to account for larger node footprints.
-
-3. **Connection highlighting:**
-   - On hover: highlight the hovered node + ALL connected nodes + connecting edges.
-   - Connected nodes remain highlighted with their labels visible.
-   - Dim everything else (opacity 0.15).
-   - On click: lock the highlight (toggle behavior).
-
-4. **Layout adjustments:**
-   - Increase canvas size to accommodate labels.
-   - Stronger centering force to prevent spread.
-   - More simulation iterations (300+) for stability with larger nodes.
+### 10.1 Layout Algorithm Rewrite
 
 **Files to change:**
-- `src/components/insights/ToriNetworkGraph.tsx` — major rewrite of rendering and layout.
+- `src/components/insights/ToriNetworkGraph.tsx` — major rewrite
 
-**Risk: HIGH** — Significant visual redesign, layout algorithm changes, potential performance concerns with many labeled nodes.
+**Key implementation details:**
+
+1. **Text measurement:** Use off-screen `<canvas>` context with `measureText()` to compute label widths before layout. Store as `node.labelWidth`. Match font: `12px Inter, sans-serif` (or whatever the app uses).
+
+2. **Rectangle collision detection:** Replace circle collision (lines 134-151) with AABB:
+   ```typescript
+   const overlapX = (node1.labelWidth/2 + node2.labelWidth/2 + padding) - Math.abs(dx);
+   const overlapY = (nodeHeight/2 + nodeHeight/2 + padding) - Math.abs(dy);
+   if (overlapX > 0 && overlapY > 0) { /* resolve collision */ }
+   ```
+
+3. **Repulsion radius:** Increase based on label width. Currently uses fixed radius; change to `node.labelWidth / 2 + padding`.
+
+4. **Iterations:** Increase from 200 to 300 for stability with larger nodes.
+
+5. **Rendering:** Replace circle SVG elements (lines 268-311) with `<g>` groups containing `<rect>` + `<text>`.
+
+6. **Hover interaction:** On mouseenter → set `hoveredNodeId` state. In render: compute `connectedNodeIds` set from edges. Apply `opacity: 0.15` to all nodes/edges NOT in the connected set.
+
+7. **Click interaction:** On click → toggle `lockedNodeId` state. Same highlight logic as hover but persistent.
+
+8. **Memoization:** Memoize the force layout computation with `useMemo` keyed on input data. Don't recompute on hover/click.
+
+**Unit tests:**
+- `ToriNetworkGraph.test.ts`: Label-based layout produces no overlapping labels (check all node pairs for AABB overlap)
+- `ToriNetworkGraph.test.ts`: All nodes within canvas bounds after layout
+- `ToriNetworkGraph.test.ts`: `getConnectedNodes(nodeId, edges)` returns correct set
+- `ToriNetworkGraph.test.ts`: Bounding box collision detection resolves overlaps correctly
+- `ToriNetworkGraph.test.ts`: Nodes with frequency < threshold are filtered when node count > 30
+
+**Browser verification:**
+- Insights → TORI Network → all nodes have visible text labels
+- Hover a node → that node + connected nodes highlighted, others dimmed
+- Click a node → highlight locks; click again → unlocks
+- Verify no label overlaps (visual inspection)
+- Verify graph doesn't overflow or look broken with 49 nodes
+- Remove legend below graph (labels are now on nodes — legend is redundant)
 
 ---
 
-## Phase 11 — Chat Explorer & AI Chat Fixes (HIGH risk)
+## Phase 11 — Chat Explorer & AI Chat Scope (HIGH risk)
 
 Items: #12, #13, #14, #15
 
-### 11.1 Default Student Selection in Chat Explorer (Item #12)
+**Note:** Items #14 (scope matrix) and #15 (scope change bug) are merged — they're the same problem. The bug exists because the old scope model doesn't persist changes; the new model must handle this correctly from the start.
 
-**Problem:** No students shown when no course is selected.
+### 11.0 Backend Prerequisites
+
+**11.0a — Fix `CROSS_COURSE` buildContext() (CRITICAL BUG):**
+
+Currently `buildContext()` in `ai-chat.ts` returns **empty context** for `CROSS_COURSE` when no `courseId` is set (lines 136-146). This must be fixed before the scope matrix can work.
+
+- `src/server/services/ai-chat.ts` lines 136-146:
+  - When `CROSS_COURSE` and no `courseId`: fetch ALL courses for the user's institution → gather ALL comments across all courses.
+  - Need: `courseRepo.find({ where: { institutionId } })` → then aggregate comments across all courses.
+  - Respect `session.studentId` if set (for "this student — all courses" scope).
+
+**11.0b — Add `updateChatSessionScope` mutation:**
+
+- `src/server/types/schema.ts`: Add mutation:
+  ```graphql
+  updateChatSessionScope(id: ID!, scope: String!, studentId: ID, courseId: ID, assignmentId: ID): ChatSession!
+  ```
+
+- `src/server/resolvers/chat.ts`: Add resolver:
+  - Verify ownership (`session.userId === user.id`)
+  - Verify institutional access
+  - Update scope, studentId, courseId, assignmentId fields on the session
+  - Return updated session
+
+**11.0c — Scope change messages (system messages):**
+
+Store scope changes as persisted messages so they survive page refreshes and render in correct chronological order.
+
+- `src/server/entities/ChatMessage.ts`: Add `SYSTEM` to `ChatMessageRole` enum.
+- `src/server/resolvers/chat.ts`: In `updateChatSessionScope`, after updating scope fields, create a SYSTEM message:
+  ```
+  "Context changed to: [scope label]. AI context refreshed."
+  ```
+- Frontend: `ChatMessageBubble.tsx` — render SYSTEM messages as centered dividers (existing divider style), not as chat bubbles.
+
+**11.0d — Student profiles without courseId:**
+
+- Check if `GET_STUDENT_PROFILES` resolver supports querying by `institutionId` alone (no `courseId`). If not, add support.
+- Deduplicate students that appear in multiple courses (group by `studentId`).
+
+**Backend tests:**
+- `ai-chat.test.ts`: `buildContext()` with `CROSS_COURSE` and no courseId returns comments from ALL courses in institution
+- `ai-chat.test.ts`: `buildContext()` with `CROSS_COURSE` + `studentId` returns only that student's comments across all courses
+- `ai-chat.test.ts`: `buildContext()` for all 6 scope permutations returns correct data
+- `chat.test.ts`: `updateChatSessionScope` updates scope fields and creates SYSTEM message
+- `chat.test.ts`: `updateChatSessionScope` rejects unauthorized access
+- `chat.test.ts`: SYSTEM messages included in session message history
+- Student profiles resolver: returns deduplicated students for institution when no courseId
+
+---
+
+### 11.1 Default Student Selection in Chat Explorer (Item #12)
 
 **Files to change:**
 - `src/pages/ChatExplorerPage.tsx`
-  - Line 70: Remove `skip: !courseId` condition — always fetch students.
-  - When no courseId: fetch all students for the institution (paginated, first 50).
-  - Backend query may need `institutionId`-based filtering when `courseId` is null.
-  - Auto-select first student (line 76-81 logic already handles this).
+  - Line 70: Remove `skip: !courseId` — query with `institutionId` from scope when no courseId
+  - Handle potentially large result set: request first 50 students (add `limit` param to query if needed)
+  - Deduplicate by `studentId` in case a student appears in multiple courses
+  - Auto-select first student (line 76-81 logic already handles this)
+  - Remove "Select a course to get started" message (line 195) — students now always appear
 
-- Backend: Check if `GET_STUDENT_PROFILES` resolver supports institution-wide queries without courseId. If not, add that capability.
+**Unit tests:**
+- `ChatExplorerPage.test.tsx`: Students load when no course selected
+- `ChatExplorerPage.test.tsx`: First student auto-selected from all-institution list
+- `ChatExplorerPage.test.tsx`: Students are deduplicated (same studentId from multiple courses appears once)
 
-**Risk: MODERATE** — May need backend changes for institution-wide student listing.
+**Browser verification:**
+- Chat Explorer → no course selected → students appear in carousel → first one selected → their conversations shown
 
 ---
 
 ### 11.2 Panel Context Mismatch Fix (Item #13)
 
-**Problem:** Clicking a student in Chat Explorer doesn't update the Faculty Panel's student context.
+**Problem:** Selecting a student in Chat Explorer doesn't update Faculty Panel.
 
 **Files to change:**
 - `src/pages/ChatExplorerPage.tsx`
-  - When `selectedStudentIds` changes, call `panel.openStudentProfile(newStudentId, name)` if the panel is open on the Student tab.
-  - Add a `useEffect` that watches `selectedStudentIds` and syncs panel state.
+  - Add `useEffect` watching `selectedStudentIds`:
+    ```typescript
+    useEffect(() => {
+      if (panel.isOpen && panel.activeTab === "student" && selectedStudentIds.length === 1) {
+        const student = studentProfiles.find(s => s.studentId === selectedStudentIds[0]);
+        if (student) panel.openStudentProfile(student.studentId, student.name);
+      }
+    }, [selectedStudentIds]);
+    ```
+  - Only auto-update Student tab (per confirmed behavior). Thread and Chat tabs are not auto-updated.
 
-- Consider debouncing to avoid rapid updates when clicking through students.
+**Unit tests:**
+- `ChatExplorerPage.test.tsx`: Selecting a student when panel is open on Student tab updates panel context
+- `ChatExplorerPage.test.tsx`: Selecting a student when panel is on Thread tab does NOT update panel
 
-**Risk: LOW** — Straightforward state sync.
+**Browser verification:**
+- Chat Explorer → open Faculty Panel → Student tab → click different student in carousel → panel updates to new student
+- Chat Explorer → open Faculty Panel → Thread tab → click different student → panel stays on current thread
 
 ---
 
-### 11.3 Full Scope Matrix (Item #14)
-
-**Problem:** Scope toggle only shows "this course" vs "all courses." Plan called for a full matrix.
+### 11.3 Full Scope Matrix + Scope Change Fix (Items #14 + #15 merged)
 
 **Scope matrix (confirmed 2026-04-12):**
 
-Within a single course, the 2x2 (student × assignment) matrix applies. When "All courses" is selected, the assignment axis disappears.
+Within a single course, the 2x2 (student x assignment) matrix applies. When "All courses" is selected, the assignment axis disappears.
 
 | Course | Student | Assignment | Label |
 |--------|---------|------------|-------|
@@ -301,136 +570,204 @@ Within a single course, the 2x2 (student × assignment) matrix applies. When "Al
 | All courses | This student | (n/a) | "Kalena — All courses" |
 | All courses | All students | (n/a) | "All students — All courses" |
 
-Only show rows where context is available (e.g., no "this student" rows if no student selected, no "this assignment" rows if no assignment selected). Hide the assignment toggle entirely when "All courses" is selected.
+Only show rows where context is available. Hide the assignment toggle entirely when "All courses" is selected.
 
 **Files to change:**
-- `src/components/ai/AiChatPanel.tsx`
-  - Replace the 3-value scope model with the full matrix.
-  - `getScopeLabel()` and `handleScopeChange()` need to handle the 5+ options.
-  - The `Chip` + `Menu` dropdown needs to render available options dynamically.
-  - When scope changes, update the session's scope context.
 
-- `src/server/entities/ChatSession.ts`
-  - Current enum: `SELECTION | COURSE | CROSS_COURSE`
-  - Need finer granularity. Options:
-    a. Expand the enum (breaking change for existing sessions), OR
-    b. Keep the enum but add `studentId`, `assignmentId`, `courseId` fields on the session to define the exact scope (these fields already exist).
-  - **Recommended:** Keep the existing enum mapping but use the combination of `scope` + `studentId` + `assignmentId` + `courseId` to define the full matrix. The frontend controls which fields are set.
+- `src/components/ai/AiChatPanel.tsx` — Major rework of scope UI:
+  - Replace single `Chip` dropdown with a structured scope selector:
+    - Course toggle: "This course" / "All courses" (only if course context available)
+    - Student toggle: "This student" / "All students" (only if student context available)
+    - Assignment toggle: "This assignment" / "All assignments" (only if assignment context AND course is "this course")
+  - Could be implemented as 2-3 small toggle groups or a single dropdown with grouped options.
+  - On scope change:
+    1. Call `updateChatSessionScope` mutation to persist the new scope
+    2. Wait for mutation to succeed
+    3. Backend creates SYSTEM message (from 11.0c)
+    4. Refetch session messages — SYSTEM message appears in correct chronological position
+    5. Remove local `scopeDividers` state entirely (dividers are now persisted messages)
 
-- `src/server/services/ai-chat.ts` (buildContext)
-  - Already reads `session.scope`, `session.studentId`, `session.courseId`, `session.assignmentId` (lines 42-102).
-  - Verify all 5 matrix combinations are handled correctly.
-  - May need to adjust the filtering logic for "this student + all assignments" vs "this student + this assignment."
+- `src/components/ai/AiChatPanel.tsx` — Remove `scopeOverride` and `scopeDividers` local state:
+  - Scope is now always read from the session (persisted, not local override)
+  - Dividers are SYSTEM messages (persisted, not local state)
+  - This fixes the bug where dividers appear in wrong order
 
-**Risk: HIGH** — Core AI context model change, must preserve existing sessions.
+- `src/server/services/ai-chat.ts` — Ensure `buildContext()` handles all 6 scope permutations:
+  - SELECTION + studentId + assignmentId + courseId → student in specific assignment
+  - SELECTION + studentId + courseId (no assignmentId) → student across all assignments in course
+  - COURSE + assignmentId + courseId → all students in specific assignment
+  - COURSE + courseId (no assignmentId) → all students, all assignments in course
+  - CROSS_COURSE + studentId → student across all courses (fixed in 11.0a)
+  - CROSS_COURSE (no studentId) → all students, all courses (fixed in 11.0a)
+
+**Unit tests:**
+- `AiChatPanel.test.tsx`: Scope selector shows correct options based on available context (studentId, courseId, assignmentId)
+- `AiChatPanel.test.tsx`: "All courses" hides assignment toggle
+- `AiChatPanel.test.tsx`: Scope change calls `updateChatSessionScope` mutation
+- `AiChatPanel.test.tsx`: After scope change, refetched messages include SYSTEM divider message
+- `AiChatPanel.test.tsx`: No local `scopeDividers` state — dividers come from message history
+- `ChatMessageBubble.test.tsx`: SYSTEM role messages render as centered dividers
+
+**Browser verification:**
+- AI Chat → scope selector shows correct options for current context
+- Change scope → SYSTEM message appears in chat ("Context changed to: ...")
+- Send message after scope change → AI response uses NEW context (not old)
+- Refresh page → scope dividers still visible (persisted as SYSTEM messages)
+- "All courses" selected → assignment toggle disappears
 
 ---
 
-### 11.4 Scope Change Bug Fix (Item #15)
-
-**Problem:** Scope change divider appears but AI uses old context. Divider gets pushed below new response.
-
-**Root cause analysis:**
-1. Scope dividers are UI-only state (`scopeDividers` array) — not tied to message chronology.
-2. When scope changes, `scopeOverride` updates but the backend session's scope fields aren't updated.
-3. Next `sendMessage` call uses the session's stored scope, not the UI override.
-
-**Fix:**
-- `src/components/ai/AiChatPanel.tsx`
-  - On scope change: call a new mutation `updateChatSessionScope(sessionId, scope, studentId, courseId, assignmentId)` to persist the new scope to the session.
-  - Wait for the mutation to complete before allowing the next message.
-  - Divider ordering: Instead of a separate `scopeDividers` array, inject dividers into the message display based on timestamps. Store scope changes as pseudo-messages or annotate messages with "scope changed before this message."
-
-- Backend:
-  - Add `updateChatSessionScope` mutation to `chat.ts` resolver.
-  - GraphQL schema: Add the mutation.
-
-**Risk: HIGH** — Touches the core message ordering and scope persistence.
-
----
-
-## Phase 12 — Context-Aware Panel & AI Chat (HIGH risk)
+## Phase 12 — Context-Aware Panel (HIGH risk)
 
 Items: #16, #17
 
 ### 12.1 Insights Page AI Chat Context (Item #16)
 
-**Problem:** AI Chat on the Insights page doesn't know about the analytics data visible on the page.
-
-**Approach:**
-- When AI Chat is opened from the Insights page, build a context summary of the visible analytics:
-  - Reflection Heatmap summary (top students, distribution)
-  - TORI tag frequencies (top tags, counts)
-  - Engagement metrics (summary stats)
-  - Growth trends (notable changes)
-- Pass this as a system prompt addition or context payload.
-
-**Files to change:**
-- `src/components/faculty-panel/FacultyPanel.tsx`
-  - When on Insights page and Chat tab is active, gather analytics summary.
-  - Pass as `analyticsContext` prop to `AiChatPanel`.
-
-- `src/components/ai/AiChatPanel.tsx`
-  - Accept `analyticsContext?: string` prop.
-  - Include in the context sent to the backend.
-
-- `src/server/services/ai-chat.ts`
-  - Accept optional analytics context and include in the system prompt.
-
-**Risk: HIGH** — Defining what analytics context to include and how to format it for the AI.
-
----
-
-### 12.2 Panel Persistence with Context Change Choice (Item #17)
-
-**Problem:** Panel doesn't respond when the page context changes.
-
-**Behavior per tab (confirmed by user):**
-- **Student tab:** Always auto-update to match new context.
-- **Thread tab:** Prompt or auto-update (thread may not relate to new context).
-- **AI Chat tab:** Prompt with choice ("Context changed to [X]. Start a new chat?").
+**Architecture decision:** Use a **summary registration pattern**. Each Insights section registers a brief text summary with a shared context. The AI Chat reads this context.
 
 **Implementation:**
 
-1. **Detect context changes:**
-   - `src/components/faculty-panel/FacultyPanelContext.tsx`
-     - Add `currentPageContext` state (page name + scope).
-     - Expose `setPageContext(context)` action.
-     - When `setPageContext` is called with a different value, trigger update logic per tab.
+- New context: `src/components/insights/InsightsAnalyticsContext.tsx`
+  ```typescript
+  interface InsightsAnalyticsSummary {
+    sectionSummaries: Map<string, string>; // section name → brief summary
+    registerSummary: (section: string, summary: string) => void;
+  }
+  ```
+  - Each section component calls `registerSummary` when its data loads, with a 1-2 sentence summary:
+    - MetricsCards: "60 threads, 47 participants, 684 comments, mean 49 words"
+    - Heatmap: "Top tags: Problem-Solving (56), Adaptive Learning (48). 15 students."
+    - DepthBands: "11% Descriptive Writing, 66% Descriptive Reflection, 15% Dialogic, 8% Critical"
+    - etc.
+  - Total summary stays under ~500 tokens to avoid bloating AI context.
 
-2. **Page-level context reporting:**
-   - `src/pages/InsightsPage.tsx`, `src/pages/ChatExplorerPage.tsx`, etc.
-     - Call `panel.setPageContext({ page: "insights", scope })` on mount and scope change.
+- `src/components/faculty-panel/FacultyPanel.tsx`:
+  - Read `InsightsAnalyticsSummary` from context
+  - Pass `analyticsContext` string (joined summaries) to `AiChatPanel` when on Insights page
 
-3. **Tab-specific update behavior:**
-   - Student tab: Auto-call `panel.openStudentProfile()` with new context's student (if available). If no student in new context, show the student selector (from Phase 8).
-   - Thread tab: Show a snackbar/banner: "You navigated to [new context]. This thread is from [old context]." with "Update" / "Keep" buttons.
-   - AI Chat tab: Show inline banner: "Context changed to [new context]. Start a new chat with this context?" with "New Chat" / "Continue" buttons.
+- `src/components/ai/AiChatPanel.tsx`:
+  - Accept `analyticsContext?: string` prop
+  - Pass to backend as a new field on `createChatSession` or `sendChatMessage`
+
+- `src/server/services/ai-chat.ts`:
+  - In system prompt, prepend analytics summary before comment context:
+    ```
+    The user is viewing an analytics dashboard showing:
+    {analyticsContext}
+
+    Below is the detailed conversation data:
+    {comment context}
+    ```
+
+**Backend tests:**
+- `ai-chat.test.ts`: System prompt includes analytics context when provided
+- `ai-chat.test.ts`: System prompt works correctly without analytics context (backward compatible)
+
+**Unit tests:**
+- `InsightsAnalyticsContext.test.tsx`: `registerSummary` stores and retrieves section summaries
+- `InsightsAnalyticsContext.test.tsx`: Multiple sections can register summaries
+- `AiChatPanel.test.tsx`: `analyticsContext` prop included when creating session or sending message
+
+**Browser verification:**
+- Insights → open AI Chat → ask "What patterns do you see?" → AI response references heatmap/engagement data (not just raw comments)
+- Verify AI context doesn't exceed token limits (check response time)
+
+---
+
+### 12.2 Panel Persistence with Context Change (Item #17)
+
+**Definitions:**
+- **Context change triggers:** (1) Page navigation (Insights ↔ Chat Explorer), (2) Course change in scope selector, (3) Student selection change
+- **Per-tab behavior (confirmed by user):**
+  - Student tab: Always auto-update to match new context
+  - Thread tab: Show banner — "Context changed. This thread is from [old context]." with "Update" / "Keep" buttons
+  - AI Chat tab: Show banner — "Context changed to [new context]. Start new chat?" with "New Chat" / "Continue" buttons
 
 **Files to change:**
-- `src/components/faculty-panel/FacultyPanelContext.tsx` — Context change detection + dispatch
-- `src/components/faculty-panel/FacultyPanel.tsx` — Per-tab update UI (banners, auto-update)
-- `src/pages/InsightsPage.tsx` — Report context
-- `src/pages/ChatExplorerPage.tsx` — Report context
 
-**Risk: HIGH** — Cross-cutting concern touching many components.
+- `src/components/faculty-panel/FacultyPanelContext.tsx`:
+  - Add state:
+    ```typescript
+    pageContext: { page: string; scope: InsightsScope; studentId?: string } | null;
+    prevPageContext: { ... } | null;
+    contextChanged: boolean;
+    ```
+  - Add action: `SET_PAGE_CONTEXT` — compares new vs. old, sets `contextChanged` flag
+  - Add action: `ACKNOWLEDGE_CONTEXT_CHANGE` — clears the flag
+
+- `src/pages/InsightsPage.tsx`:
+  - On mount and scope change: `panel.setPageContext({ page: "insights", scope })`
+
+- `src/pages/ChatExplorerPage.tsx`:
+  - On mount and scope/student change: `panel.setPageContext({ page: "chat-explorer", scope, studentId: selectedStudentIds[0] })`
+
+- `src/components/faculty-panel/FacultyPanel.tsx`:
+  - Student tab: When `contextChanged` is true, auto-update:
+    - If new context has a student → `panel.openStudentProfile(newStudentId, name)`
+    - If no student in new context → show `StudentSearchAutocomplete` (from Phase 8.3)
+    - Clear `contextChanged` flag
+  - Thread tab: When `contextChanged` is true, show banner:
+    ```tsx
+    <Alert severity="info" action={<>
+      <Button onClick={handleUpdateThread}>Update</Button>
+      <Button onClick={handleKeep}>Keep</Button>
+    </>}>
+      Context changed. This thread is from a different context.
+    </Alert>
+    ```
+    - "Update" → close thread tab, navigate to Student tab with new context
+    - "Keep" → dismiss banner, keep current thread
+  - Chat tab: When `contextChanged` is true, show banner:
+    ```tsx
+    <Alert severity="info" action={<>
+      <Button onClick={handleNewChat}>New Chat</Button>
+      <Button onClick={handleContinue}>Continue</Button>
+    </>}>
+      Context changed to {newContextLabel}. Start a new chat?
+    </Alert>
+    ```
+    - "New Chat" → create new session with new scope, clear old session from view
+    - "Continue" → dismiss banner, keep current chat session
+
+**Unit tests:**
+- `FacultyPanelContext.test.tsx`: `setPageContext` with different page sets `contextChanged` to true
+- `FacultyPanelContext.test.tsx`: `setPageContext` with same page/scope does NOT set `contextChanged`
+- `FacultyPanelContext.test.tsx`: `acknowledgeContextChange` clears the flag
+- `FacultyPanel.test.tsx`: Student tab auto-updates on context change
+- `FacultyPanel.test.tsx`: Thread tab shows banner on context change
+- `FacultyPanel.test.tsx`: Chat tab shows banner on context change
+- `FacultyPanel.test.tsx`: "New Chat" button creates new session with new scope
+- `FacultyPanel.test.tsx`: "Continue" button dismisses banner
+
+**Browser verification:**
+- Insights → open panel (Student tab) → change course in scope selector → Student tab updates (auto)
+- Insights → open panel (Thread tab) → change course → banner appears → click "Keep" → thread stays
+- Insights → open panel (Chat tab) → change course → banner appears → click "New Chat" → new session starts with new scope
+- Navigate from Insights to Chat Explorer → panel stays open → context change detected → tabs respond per rules
 
 ---
 
 ## Phase Summary
 
-| Phase | Items | Risk | Estimated Scope |
-|-------|-------|------|----------------|
-| **7** — Quick Fixes | #1, #2, #4, #11 | LOW | 4 files, display fixes + bug fix |
-| **8** — Clickable Names | #3, #5, #6 | MOD | 8+ files, new component, consistent pattern |
-| **9** — Interactivity | #8, #9, #10 | MOD | 4 files, extend existing drill-down patterns |
-| **10** — TORI Network | #7 | HIGH | 1 file, major redesign |
-| **11** — Chat Explorer & Scope | #12, #13, #14, #15 | HIGH | 6+ files, backend changes, scope model rework |
-| **12** — Context-Aware Panel | #16, #17 | HIGH | 5+ files, cross-cutting UX pattern |
+| Phase | Items | Risk | Backend Work | New Files | Test Count |
+|-------|-------|------|-------------|-----------|------------|
+| **7** | #1, #2, #4, #11 | LOW | None | 1 test file | ~10 unit, 6 browser |
+| **8** | #3, #5, #6 | MOD | Evidence query schema | 2 new files | ~14 unit, 6 browser |
+| **9** | #8, #9, #10 | MOD | 3 new queries/resolvers | 2 new files | ~14 unit, 6 backend, 6 browser |
+| **10** | #7 | HIGH | None | Design spec first | ~5 unit, 5 browser |
+| **11** | #12, #13, #14, #15 | HIGH | 4 backend changes | 0 new files | ~14 unit, 7 backend, 6 browser |
+| **12** | #16, #17 | HIGH | 1 backend change | 1 new file | ~10 unit, 2 backend, 4 browser |
 
 ## Dependencies
 
-- Phase 8 (clickable names) should come before Phase 9 (interactivity) — both use `onStudentClick` pattern.
-- Phase 11.3 (scope matrix) should come before Phase 11.4 (scope bug fix) — fixing the bug on the old model then rewriting it would be wasted work.
-- Phase 12 depends on Phase 8.3 (student selector) for the "no student in new context" fallback.
-- Phase 7 has no dependencies — start here.
+```
+Phase 7 (no deps) ─────────────────────────┐
+Phase 8 (no deps, but benefits from 7.3) ──┤
+Phase 9 (depends on 8 for onStudentClick)  ├── All independently deployable
+Phase 10 (fully independent) ──────────────┤
+Phase 11 (no deps) ────────────────────────┤
+Phase 12 (depends on 8.3 for student selector fallback, 11 for scope model) ──┘
+```
+
+Phase 10 (TORI Network) is fully independent and can be deferred without blocking anything.
+Phase 12 should be last — it depends on both Phase 8 (student selector) and Phase 11 (scope model).

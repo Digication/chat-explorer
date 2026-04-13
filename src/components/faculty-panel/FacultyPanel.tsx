@@ -105,7 +105,11 @@ export default function FacultyPanel() {
       {/* ── Tab content ────────────────────────────────────────── */}
       <Box sx={{ flex: 1, overflow: panel.activeTab === "chat" ? "hidden" : "auto", minHeight: 0 }}>
         {panel.activeTab === "student" && panel.studentId && (
-          <StudentProfilePage studentId={panel.studentId} embedded />
+          <StudentProfilePage
+            studentId={panel.studentId}
+            embedded
+            onViewThread={(threadId, studentName) => panel.openThread(threadId, studentName)}
+          />
         )}
 
         {panel.activeTab === "thread" && panel.threadId && (

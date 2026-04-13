@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, fireEvent } from "@testing-library/react";
 import { renderWithProviders } from "@/lib/__tests__/test-utils";
 import type { MockedResponse } from "@apollo/client/testing";
 import { GET_STUDENT_PROFILE } from "@/lib/queries/analytics";
@@ -258,5 +258,48 @@ describe("StudentProfilePage", () => {
       expect(screen.getAllByText("Assignment 1").length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText("Assignment 2").length).toBeGreaterThanOrEqual(1);
     });
+  });
+
+  it("calls onViewThread prop when 'View full conversation' is clicked (embedded mode)", async () => {
+    const mockOnViewThread = vi.fn();
+    render(
+      renderWithProviders({
+        mocks: [profileMock()],
+        children: (
+          <StudentProfilePage
+            studentId="student-1"
+            embedded
+            onViewThread={mockOnViewThread}
+          />
+        ),
+      })
+    );
+    await waitFor(() => {
+      expect(screen.getByText("View full conversation →")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText("View full conversation →"));
+    expect(mockOnViewThread).toHaveBeenCalledWith("thread-1", "Jane Doe");
+  });
+
+  it("does NOT show local thread panel when embedded and onViewThread is provided", async () => {
+    const mockOnViewThread = vi.fn();
+    render(
+      renderWithProviders({
+        mocks: [profileMock()],
+        children: (
+          <StudentProfilePage
+            studentId="student-1"
+            embedded
+            onViewThread={mockOnViewThread}
+          />
+        ),
+      })
+    );
+    await waitFor(() => {
+      expect(screen.getByText("View full conversation →")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText("View full conversation →"));
+    // The local ThreadPanel overlay should NOT render (embedded mode uses panel)
+    expect(document.querySelector("[class*='fixed']")).toBeNull();
   });
 });

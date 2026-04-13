@@ -66,11 +66,14 @@ interface StudentProfilePageProps {
   studentId?: string;
   /** When true, hides breadcrumb and reduces padding for panel embedding. */
   embedded?: boolean;
+  /** When provided (panel mode), called instead of opening local thread modal. */
+  onViewThread?: (threadId: string, studentName: string) => void;
 }
 
 export default function StudentProfilePage({
   studentId: propStudentId,
   embedded,
+  onViewThread: onViewThreadProp,
 }: StudentProfilePageProps = {}) {
   const { studentId: routeStudentId } = useParams<{ studentId: string }>();
   const studentId = propStudentId ?? routeStudentId;
@@ -91,9 +94,13 @@ export default function StudentProfilePage({
 
   const handleViewThread = useCallback(
     (threadId: string, studentName: string) => {
-      setOpenThread({ threadId, studentName });
+      if (onViewThreadProp) {
+        onViewThreadProp(threadId, studentName);
+      } else {
+        setOpenThread({ threadId, studentName });
+      }
     },
-    []
+    [onViewThreadProp]
   );
 
   const { data, loading, error, refetch } = useQuery<any>(
