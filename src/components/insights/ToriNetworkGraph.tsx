@@ -31,9 +31,9 @@ const COMMUNITY_FILLS = [
 
 /** Layout constants */
 const NODE_HEIGHT_MIN = 22;
-const NODE_HEIGHT_MAX = 44;
+const NODE_HEIGHT_MAX = 60;
 const NODE_PAD_X_MIN = 10; // horizontal padding inside rect (low frequency)
-const NODE_PAD_X_MAX = 20; // horizontal padding inside rect (high frequency)
+const NODE_PAD_X_MAX = 24; // horizontal padding inside rect (high frequency)
 const NODE_PAD_Y = 8;  // vertical padding between nodes in collision
 const FONT = "12px Inter, system-ui, sans-serif";
 const MAX_VISIBLE_NODES = 30;
@@ -428,7 +428,7 @@ export default function ToriNetworkGraph({ onViewThread, onStudentClick }: ToriN
 
             // Font size scales with node height
             const freqScale = (node.boxHeight - NODE_HEIGHT_MIN) / (NODE_HEIGHT_MAX - NODE_HEIGHT_MIN);
-            const fontSize = 10 + freqScale * 4; // 10-14px
+            const fontSize = 10 + freqScale * 6; // 10-16px
 
             return (
               <g
