@@ -367,8 +367,8 @@ export default function AiChatPanel({
                 </ToggleButton>
               </ToggleButtonGroup>
             )}
-            {/* Assignment axis — hidden when "All courses" is selected */}
-            {assignmentId && scopeCourse === "this" && (
+            {/* Assignment axis — shown when in "this course" mode */}
+            {courseId && scopeCourse === "this" && (
               <ToggleButtonGroup
                 size="small"
                 exclusive
@@ -380,7 +380,11 @@ export default function AiChatPanel({
                 }}
                 sx={{ height: 22 }}
               >
-                <ToggleButton value="this" sx={{ fontSize: "0.65rem", px: 1, py: 0, textTransform: "none" }}>
+                <ToggleButton
+                  value="this"
+                  disabled={!assignmentId}
+                  sx={{ fontSize: "0.65rem", px: 1, py: 0, textTransform: "none" }}
+                >
                   This assignment
                 </ToggleButton>
                 <ToggleButton value="all" sx={{ fontSize: "0.65rem", px: 1, py: 0, textTransform: "none" }}>
