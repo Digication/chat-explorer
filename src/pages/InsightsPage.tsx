@@ -96,12 +96,12 @@ export default function InsightsPage() {
 
         {/* Student growth over time */}
         <Section id="growth" title="Student Growth Over Time">
-          <GrowthVisualization onOpenStudent={handleOpenStudent} />
+          <GrowthVisualization onOpenStudent={handleOpenStudent} onViewThread={handleOpenThread} />
         </Section>
 
         {/* Co-occurrence patterns */}
         <Section id="cooccurrence" title="Co-Occurrence Patterns">
-          <CoOccurrenceList />
+          <CoOccurrenceList onViewThread={handleOpenThread} onStudentClick={handleOpenStudent} />
         </Section>
       </Box>
     </Box>

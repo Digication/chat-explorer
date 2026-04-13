@@ -208,6 +208,7 @@ export const typeDefs = /* GraphQL */ `
 
   type CoOccurrence {
     tags: [String!]!
+    tagIds: [ID!]!
     count: Int!
   }
 
@@ -625,6 +626,37 @@ export const typeDefs = /* GraphQL */ `
     offset: Int
   }
 
+  input CategoryEvidenceInput {
+    scope: AnalyticsScopeInput!
+    studentId: ID!
+    assignmentId: ID!
+    category: String!
+    limit: Int
+    offset: Int
+  }
+
+  type CategoryEvidenceItem {
+    commentId: ID!
+    text: String!
+    threadId: ID!
+    threadName: String!
+    category: String!
+    evidenceQuote: String
+    timestamp: String
+  }
+
+  type CategoryEvidenceResult {
+    items: [CategoryEvidenceItem!]!
+    totalCount: Int!
+  }
+
+  input MultiTagEvidenceInput {
+    scope: AnalyticsScopeInput!
+    toriTagIds: [ID!]!
+    limit: Int
+    offset: Int
+  }
+
   input ConsentInput {
     studentId: ID!
     institutionId: ID!
@@ -653,6 +685,8 @@ export const typeDefs = /* GraphQL */ `
     engagement(scope: AnalyticsScopeInput!): EngagementAnalysisResult!
     heatmap(input: HeatmapInput!): HeatmapResult!
     heatmapCellEvidence(input: CellEvidenceInput!): CellEvidenceResult!
+    categoryEvidence(input: CategoryEvidenceInput!): CategoryEvidenceResult!
+    multiTagEvidence(input: MultiTagEvidenceInput!): CellEvidenceResult!
     network(scope: AnalyticsScopeInput!): NetworkResult!
     instructionalInsights(scope: AnalyticsScopeInput!): InsightsResult!
     recommendations(scope: AnalyticsScopeInput!): RecommendationsResult!

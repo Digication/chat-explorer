@@ -10,6 +10,7 @@ interface HistoryEntry {
   threadId?: string;
   threadStudentId?: string;
   threadStudentName?: string;
+  threadInitialToriTag?: string;
 }
 
 export interface FacultyPanelState {
@@ -24,6 +25,7 @@ export interface FacultyPanelState {
   threadId: string | null;
   threadStudentId: string | null;
   threadStudentName: string | null;
+  threadInitialToriTag: string | null;
 
   // Chat tab
   activeChatSessionId: string | null;
@@ -34,7 +36,7 @@ export interface FacultyPanelState {
 
 export interface FacultyPanelActions {
   openStudentProfile: (studentId: string, studentName: string) => void;
-  openThread: (threadId: string, studentName: string, studentId?: string) => void;
+  openThread: (threadId: string, studentName: string, studentId?: string, initialToriTag?: string) => void;
   openChat: () => void;
   switchTab: (tab: PanelTab) => void;
   goBack: () => void;
@@ -45,7 +47,7 @@ export interface FacultyPanelActions {
 // ── Reducer ─────────────────────────────────────────────────────
 type Action =
   | { type: "OPEN_STUDENT"; studentId: string; studentName: string }
-  | { type: "OPEN_THREAD"; threadId: string; studentName: string; studentId?: string }
+  | { type: "OPEN_THREAD"; threadId: string; studentName: string; studentId?: string; initialToriTag?: string }
   | { type: "OPEN_CHAT" }
   | { type: "SWITCH_TAB"; tab: PanelTab }
   | { type: "GO_BACK" }
@@ -60,6 +62,7 @@ const initialState: FacultyPanelState = {
   threadId: null,
   threadStudentId: null,
   threadStudentName: null,
+  threadInitialToriTag: null,
   activeChatSessionId: null,
   history: [],
 };
@@ -73,6 +76,7 @@ function snapshotEntry(state: FacultyPanelState): HistoryEntry {
     threadId: state.threadId ?? undefined,
     threadStudentId: state.threadStudentId ?? undefined,
     threadStudentName: state.threadStudentName ?? undefined,
+    threadInitialToriTag: state.threadInitialToriTag ?? undefined,
   };
 }
 
@@ -97,6 +101,7 @@ function reducer(state: FacultyPanelState, action: Action): FacultyPanelState {
         threadId: action.threadId,
         threadStudentId: action.studentId ?? null,
         threadStudentName: action.studentName,
+        threadInitialToriTag: action.initialToriTag ?? null,
         history: state.isOpen ? [...state.history, snapshotEntry(state)] : [],
       };
 
@@ -122,6 +127,7 @@ function reducer(state: FacultyPanelState, action: Action): FacultyPanelState {
         threadId: prev.threadId ?? null,
         threadStudentId: prev.threadStudentId ?? null,
         threadStudentName: prev.threadStudentName ?? null,
+        threadInitialToriTag: prev.threadInitialToriTag ?? null,
         history: state.history.slice(0, -1),
       };
     }
@@ -157,8 +163,8 @@ export function FacultyPanelProvider({ children }: { children: React.ReactNode }
   );
 
   const openThread = useCallback(
-    (threadId: string, studentName: string, studentId?: string) =>
-      dispatch({ type: "OPEN_THREAD", threadId, studentName, studentId }),
+    (threadId: string, studentName: string, studentId?: string, initialToriTag?: string) =>
+      dispatch({ type: "OPEN_THREAD", threadId, studentName, studentId, initialToriTag }),
     [],
   );
 

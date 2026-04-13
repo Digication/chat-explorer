@@ -135,6 +135,7 @@ export default function FacultyPanel() {
             onClose={panel.close}
             embedded
             onStudentClick={(id, name) => panel.openStudentProfile(id, name)}
+            initialToriTag={panel.threadInitialToriTag ?? undefined}
           />
         )}
 

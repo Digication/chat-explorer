@@ -10,6 +10,7 @@ import { getToriAnalysis } from "../services/analytics/tori.js";
 import { getTextSignals } from "../services/analytics/text-signals.js";
 import { getEngagement } from "../services/analytics/engagement.js";
 import { getHeatmap, getHeatmapCellEvidence } from "../services/analytics/heatmap.js";
+import { getCategoryEvidence, getMultiTagEvidence } from "../services/analytics/evidence.js";
 import { getNetwork } from "../services/analytics/network.js";
 import { getInsights } from "../services/analytics/instructional-insights.js";
 import { getRecommendations } from "../services/analytics/recommendations.js";
@@ -101,6 +102,56 @@ export const analyticsResolvers = {
         validated,
         input.studentId,
         input.toriTagId,
+        input.limit,
+        input.offset
+      );
+    },
+
+    categoryEvidence: async (
+      _: unknown,
+      {
+        input,
+      }: {
+        input: {
+          scope: ScopeInput;
+          studentId: string;
+          assignmentId: string;
+          category: string;
+          limit?: number;
+          offset?: number;
+        };
+      },
+      ctx: GraphQLContext
+    ) => {
+      const validated = await validateScope(ctx, input.scope);
+      return getCategoryEvidence(
+        validated,
+        input.studentId,
+        input.assignmentId,
+        input.category,
+        input.limit,
+        input.offset
+      );
+    },
+
+    multiTagEvidence: async (
+      _: unknown,
+      {
+        input,
+      }: {
+        input: {
+          scope: ScopeInput;
+          toriTagIds: string[];
+          limit?: number;
+          offset?: number;
+        };
+      },
+      ctx: GraphQLContext
+    ) => {
+      const validated = await validateScope(ctx, input.scope);
+      return getMultiTagEvidence(
+        validated,
+        input.toriTagIds,
         input.limit,
         input.offset
       );

@@ -73,10 +73,12 @@ export const GET_TORI_ANALYSIS = gql`
         }
         coOccurrencePairs {
           tags
+          tagIds
           count
         }
         coOccurrenceTriples {
           tags
+          tagIds
           count
         }
       }
@@ -143,6 +145,42 @@ export const GET_HEATMAP = gql`
 export const GET_HEATMAP_CELL_EVIDENCE = gql`
   query HeatmapCellEvidence($input: CellEvidenceInput!) {
     heatmapCellEvidence(input: $input) {
+      items {
+        commentId
+        text
+        threadId
+        threadName
+        studentId
+        studentName
+        timestamp
+      }
+      totalCount
+    }
+  }
+`;
+
+/** Evidence for a specific reflection category (Growth drill-down). */
+export const GET_CATEGORY_EVIDENCE = gql`
+  query CategoryEvidence($input: CategoryEvidenceInput!) {
+    categoryEvidence(input: $input) {
+      items {
+        commentId
+        text
+        threadId
+        threadName
+        category
+        evidenceQuote
+        timestamp
+      }
+      totalCount
+    }
+  }
+`;
+
+/** Evidence for comments containing ALL specified TORI tags (co-occurrence drill-down). */
+export const GET_MULTI_TAG_EVIDENCE = gql`
+  query MultiTagEvidence($input: MultiTagEvidenceInput!) {
+    multiTagEvidence(input: $input) {
       items {
         commentId
         text
