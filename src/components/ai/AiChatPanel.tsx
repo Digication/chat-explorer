@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@apollo/client/react";
 import {
   Box,
-  Chip,
   Collapse,
   Drawer,
   Typography,
@@ -11,19 +10,13 @@ import {
   CircularProgress,
   Alert,
   Divider,
-  Menu,
-  MenuItem,
-  ListItemIcon,
-  ListItemText,
+  ToggleButton,
+  ToggleButtonGroup,
 } from "@mui/material";
 import SendIcon from "@mui/icons-material/Send";
 import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add";
 import HistoryIcon from "@mui/icons-material/History";
-import PersonIcon from "@mui/icons-material/Person";
-import SchoolIcon from "@mui/icons-material/School";
-import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
   GET_CHAT_SESSIONS,
   GET_CHAT_SESSION,
@@ -97,8 +90,10 @@ export default function AiChatPanel({
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  // Anchor element for the scope dropdown menu
-  const [scopeMenuAnchor, setScopeMenuAnchor] = useState<null | HTMLElement>(null);
+  // Scope toggles: track each axis independently
+  const [scopeCourse, setScopeCourse] = useState<"this" | "all">(courseId ? "this" : "all");
+  const [scopeStudent, setScopeStudent] = useState<"this" | "all">(studentId ? "this" : "all");
+  const [scopeAssignment, setScopeAssignment] = useState<"this" | "all">(assignmentId ? "this" : "all");
 
   // Ref for auto-scrolling the message area to the bottom
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -150,42 +145,38 @@ export default function AiChatPanel({
 
   // ── Handlers ───────────────────────────────────────────────────────
 
-  /** Determine the AI chat scope based on available context. */
-  const chatScope = studentId ? "SELECTION" : courseId ? "COURSE" : "CROSS_COURSE";
+  /** Derive the backend scope enum from the toggle state. */
+  const chatScope =
+    scopeStudent === "this" && studentId ? "SELECTION" :
+    scopeCourse === "this" && courseId ? "COURSE" :
+    "CROSS_COURSE";
 
-  /** Human-readable label for each scope value. */
-  const getScopeLabel = (scope: string) => {
-    if (scope === "SELECTION") {
-      return studentName
-        ? (studentName.includes("students")
-            ? `Selected (${studentName})`
-            : getDisplayName(studentName))
-        : "This student";
-    }
-    if (scope === "COURSE") return "This course";
-    return "All courses";
-  };
-
-  /** Handle scope change — persists to backend and creates a SYSTEM message. */
-  const handleScopeChange = useCallback(async (newScope: string) => {
-    setScopeMenuAnchor(null);
-    if (newScope === chatScope || !activeSessionId) return;
+  /** Persist scope change to backend. */
+  const persistScopeChange = useCallback(async (
+    newCourse: "this" | "all",
+    newStudent: "this" | "all",
+    newAssignment: "this" | "all",
+  ) => {
+    if (!activeSessionId) return;
+    const newScope =
+      newStudent === "this" && studentId ? "SELECTION" :
+      newCourse === "this" && courseId ? "COURSE" :
+      "CROSS_COURSE";
     try {
       await updateScope({
         variables: {
           id: activeSessionId,
           scope: newScope,
-          studentId: newScope === "SELECTION" ? studentId : undefined,
-          courseId: newScope !== "CROSS_COURSE" ? courseId : undefined,
-          assignmentId: newScope === "SELECTION" ? assignmentId : undefined,
+          studentId: newStudent === "this" ? studentId : undefined,
+          courseId: newCourse === "this" ? courseId : undefined,
+          assignmentId: newCourse === "this" && newAssignment === "this" ? assignmentId : undefined,
         },
       });
-      // Refetch session to pick up the new SYSTEM message
       await refetchSession();
     } catch (err) {
       console.error("Failed to update scope:", err);
     }
-  }, [chatScope, activeSessionId, studentId, courseId, assignmentId, updateScope, refetchSession]);
+  }, [activeSessionId, studentId, courseId, assignmentId, updateScope, refetchSession]);
 
   /** Create a new session and make it active. */
   const handleNewChat = useCallback(async () => {
@@ -329,53 +320,81 @@ export default function AiChatPanel({
           <Typography variant="subtitle1" fontWeight={600} noWrap>
             {sessionData?.chatSession?.title || "AI Chat"}
           </Typography>
-          {/* Scope indicator chip with dropdown override */}
-          <Chip
-            size="small"
-            icon={
-              chatScope === "SELECTION" ? <PersonIcon sx={{ fontSize: 14 }} /> :
-              chatScope === "COURSE" ? <SchoolIcon sx={{ fontSize: 14 }} /> :
-              <AccountBalanceIcon sx={{ fontSize: 14 }} />
-            }
-            label={getScopeLabel(chatScope)}
-            deleteIcon={<ExpandMoreIcon sx={{ fontSize: 14 }} />}
-            onDelete={(e) => setScopeMenuAnchor(e.currentTarget as HTMLElement)}
-            onClick={(e) => setScopeMenuAnchor(e.currentTarget)}
-            variant="outlined"
-            sx={{ height: 22, fontSize: "0.7rem", "& .MuiChip-icon": { ml: 0.5 } }}
-          />
-          <Menu
-            anchorEl={scopeMenuAnchor}
-            open={Boolean(scopeMenuAnchor)}
-            onClose={() => setScopeMenuAnchor(null)}
-            slotProps={{ paper: { sx: { minWidth: 180 } } }}
-          >
-            {studentId && (
-              <MenuItem
-                selected={chatScope === "SELECTION"}
-                onClick={() => void handleScopeChange("SELECTION")}
-              >
-                <ListItemIcon><PersonIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>{getScopeLabel("SELECTION")}</ListItemText>
-              </MenuItem>
-            )}
+          {/* 2x2 scope selector toggles */}
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5, mt: 0.5 }}>
+            {/* Course axis */}
             {courseId && (
-              <MenuItem
-                selected={chatScope === "COURSE"}
-                onClick={() => void handleScopeChange("COURSE")}
+              <ToggleButtonGroup
+                size="small"
+                exclusive
+                value={scopeCourse}
+                onChange={(_, v) => {
+                  if (!v) return;
+                  setScopeCourse(v);
+                  // When switching to "all courses", reset assignment to "all"
+                  const newAssignment = v === "all" ? "all" : scopeAssignment;
+                  if (v === "all") setScopeAssignment("all");
+                  void persistScopeChange(v, scopeStudent, newAssignment);
+                }}
+                sx={{ height: 22 }}
               >
-                <ListItemIcon><SchoolIcon fontSize="small" /></ListItemIcon>
-                <ListItemText>This course</ListItemText>
-              </MenuItem>
+                <ToggleButton value="this" sx={{ fontSize: "0.65rem", px: 1, py: 0, textTransform: "none" }}>
+                  This course
+                </ToggleButton>
+                <ToggleButton value="all" sx={{ fontSize: "0.65rem", px: 1, py: 0, textTransform: "none" }}>
+                  All courses
+                </ToggleButton>
+              </ToggleButtonGroup>
             )}
-            <MenuItem
-              selected={chatScope === "CROSS_COURSE"}
-              onClick={() => void handleScopeChange("CROSS_COURSE")}
-            >
-              <ListItemIcon><AccountBalanceIcon fontSize="small" /></ListItemIcon>
-              <ListItemText>All courses</ListItemText>
-            </MenuItem>
-          </Menu>
+            {/* Student axis */}
+            {studentId && (
+              <ToggleButtonGroup
+                size="small"
+                exclusive
+                value={scopeStudent}
+                onChange={(_, v) => {
+                  if (!v) return;
+                  setScopeStudent(v);
+                  void persistScopeChange(scopeCourse, v, scopeAssignment);
+                }}
+                sx={{ height: 22 }}
+              >
+                <ToggleButton value="this" sx={{ fontSize: "0.65rem", px: 1, py: 0, textTransform: "none" }}>
+                  {studentName ? getDisplayName(studentName) : "This student"}
+                </ToggleButton>
+                <ToggleButton value="all" sx={{ fontSize: "0.65rem", px: 1, py: 0, textTransform: "none" }}>
+                  All students
+                </ToggleButton>
+              </ToggleButtonGroup>
+            )}
+            {/* Assignment axis — hidden when "All courses" is selected */}
+            {assignmentId && scopeCourse === "this" && (
+              <ToggleButtonGroup
+                size="small"
+                exclusive
+                value={scopeAssignment}
+                onChange={(_, v) => {
+                  if (!v) return;
+                  setScopeAssignment(v);
+                  void persistScopeChange(scopeCourse, scopeStudent, v);
+                }}
+                sx={{ height: 22 }}
+              >
+                <ToggleButton value="this" sx={{ fontSize: "0.65rem", px: 1, py: 0, textTransform: "none" }}>
+                  This assignment
+                </ToggleButton>
+                <ToggleButton value="all" sx={{ fontSize: "0.65rem", px: 1, py: 0, textTransform: "none" }}>
+                  All assignments
+                </ToggleButton>
+              </ToggleButtonGroup>
+            )}
+            {/* Fallback when no context toggles are available */}
+            {!courseId && !studentId && (
+              <Typography variant="caption" color="text.secondary" sx={{ lineHeight: "22px" }}>
+                All courses
+              </Typography>
+            )}
+          </Box>
         </Box>
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
           {/* History toggle (embedded & drawer modes) */}

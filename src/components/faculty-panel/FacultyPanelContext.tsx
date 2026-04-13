@@ -17,6 +17,7 @@ export interface PageContext {
   page: string;
   scopeKey: string; // serialized scope for comparison
   studentId?: string;
+  studentName?: string;
 }
 
 export interface FacultyPanelState {

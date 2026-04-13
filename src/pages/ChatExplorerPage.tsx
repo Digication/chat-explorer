@@ -100,10 +100,14 @@ export default function ChatExplorerPage() {
       const scopeKey = [scope.institutionId, scope.courseId, scope.assignmentId]
         .filter(Boolean)
         .join("/");
+      const selectedStudent = studentProfiles.find(
+        (s: { studentId: string }) => s.studentId === selectedStudentIds[0]
+      );
       panel.setPageContext({
         page: "chat-explorer",
         scopeKey,
         studentId: selectedStudentIds[0],
+        studentName: selectedStudent?.name,
       });
     }
   }, [scope, selectedStudentIds, panel.setPageContext]);

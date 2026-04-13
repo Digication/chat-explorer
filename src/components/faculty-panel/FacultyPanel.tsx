@@ -28,12 +28,16 @@ export default function FacultyPanel() {
   const { scope } = useInsightsScope();
   const { getAnalyticsContext } = useInsightsAnalytics();
 
-  // Auto-acknowledge context change on the Student tab (it always reflects current context)
+  // Auto-update Student tab when context changes — load the new student if available
   useEffect(() => {
     if (panel.contextChanged && panel.activeTab === "student") {
+      const ctx = panel.pageContext;
+      if (ctx?.studentId && ctx?.studentName) {
+        panel.openStudentProfile(ctx.studentId, ctx.studentName);
+      }
       panel.acknowledgeContextChange();
     }
-  }, [panel.contextChanged, panel.activeTab, panel.acknowledgeContextChange]);
+  }, [panel.contextChanged, panel.activeTab, panel.acknowledgeContextChange, panel.pageContext, panel.openStudentProfile]);
 
   const tabIndex = TAB_ORDER.indexOf(panel.activeTab);
 
@@ -219,6 +223,8 @@ export default function FacultyPanel() {
               institutionId={scope?.institutionId}
               courseId={scope?.courseId}
               assignmentId={scope?.assignmentId}
+              studentId={panel.studentId ?? panel.pageContext?.studentId ?? undefined}
+              studentName={panel.studentName ?? panel.pageContext?.studentName ?? undefined}
               analyticsContext={getAnalyticsContext()}
             />
           </>
