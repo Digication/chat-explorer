@@ -5,6 +5,7 @@ import {
   GET_STUDENT_PROFILES,
   GET_ASSIGNMENT_THREADS,
 } from "@/lib/queries/explorer";
+import { GET_COURSES } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
 import { useFacultyPanel } from "@/components/faculty-panel/FacultyPanelContext";
 import ThreadView from "@/components/explorer/ThreadView";
@@ -20,7 +21,7 @@ import StudentListPanel from "@/components/explorer/StudentListPanel";
  */
 export default function ChatExplorerPage() {
   // ── Shared scope (persists across page navigation) ──���──────────────
-  const { scope } = useInsightsScope();
+  const { scope, setScope } = useInsightsScope();
   const courseId = scope?.courseId;
   const assignmentId = scope?.assignmentId;
   const panel = useFacultyPanel();
@@ -61,6 +62,19 @@ export default function ChatExplorerPage() {
   }, []);
 
   // ── Queries ────────────────────────────────────────────────────────
+
+  // Fetch available courses so we can auto-select the first one when no course is chosen
+  const { data: coursesData } = useQuery<any>(GET_COURSES, {
+    variables: { institutionId: scope?.institutionId },
+    skip: !scope?.institutionId || !!courseId,
+  });
+
+  // Auto-select the first course when none is selected (so threads can load)
+  useEffect(() => {
+    if (!courseId && scope?.institutionId && coursesData?.courses?.length > 0) {
+      setScope({ ...scope, courseId: coursesData.courses[0].id });
+    }
+  }, [courseId, scope, coursesData, setScope]);
 
   // Student profiles for the selected scope (works at institution or course level)
   const { data: studentsData, loading: studentsLoading } = useQuery<any>(
