@@ -1,7 +1,6 @@
 import { AppBar, Toolbar, Box, ButtonBase, Badge, Typography } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
 import PeopleIcon from "@mui/icons-material/People";
-import SmartToyOutlinedIcon from "@mui/icons-material/SmartToyOutlined";
 import StudentCarousel from "@/components/explorer/StudentCarousel";
 import { sidebarTheme } from "@/lib/theme";
 
@@ -112,19 +111,19 @@ export default function BottomBar({
               right: 16,
               display: "flex",
               alignItems: "center",
-              gap: 1,
               borderRadius: 1,
               px: 1.5,
               py: 1,
               minHeight: 44,
-              color: analyzeOpen ? "primary.main" : "text.secondary",
-              "&:hover": { bgcolor: "action.hover" },
+              borderLeft: analyzeOpen ? "3px solid #1976d2" : "3px solid transparent",
+              bgcolor: analyzeOpen ? "rgba(255, 255, 255, 0.12)" : "transparent",
+              color: analyzeOpen ? "#fff" : "text.secondary",
+              "&:hover": { bgcolor: "rgba(255, 255, 255, 0.08)" },
             }}
           >
-            <Typography variant="caption" sx={{ color: "inherit" }}>
+            <Typography variant="caption" sx={{ color: "inherit", fontWeight: analyzeOpen ? 500 : 400 }}>
               Analyze
             </Typography>
-            <SmartToyOutlinedIcon />
           </ButtonBase>
         )}
       </Toolbar>

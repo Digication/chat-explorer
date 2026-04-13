@@ -12,6 +12,13 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    hmr: {
+      // Connect HMR WebSocket through the Caddy reverse proxy so it
+      // works from outside Docker (avoids full-page reload fallback).
+      host: "chat-explorer.localhost",
+      protocol: "wss",
+      port: 443,
+    },
     watch: {
       // Ignore server-side files — they're watched by node --watch separately.
       // Prevents Vite from triggering unnecessary full-page reloads when
