@@ -49,6 +49,9 @@ export const auth = betterAuth({
               <p style="color: #999; font-size: 12px;">If you didn't request this, you can safely ignore this email.</p>
             </div>
           `,
+          trackingSettings: {
+            clickTracking: { enable: false, enableText: false },
+          },
         });
       },
     }),
@@ -114,6 +117,9 @@ export async function notifyAdminOfBlockedSignIn(
         <p>If you'd like to invite this person, go to the Admin Console and use "Invite User."</p>
       </div>
     `,
+    trackingSettings: {
+      clickTracking: { enable: false, enableText: false },
+    },
   });
 }
 
