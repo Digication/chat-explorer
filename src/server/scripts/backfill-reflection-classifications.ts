@@ -23,6 +23,7 @@ import {
   CLASSIFIER_VERSION,
   ClassifierError,
 } from "../services/reflection/classifier.js";
+import { isDoneMessage } from "../services/tori-extractor.js";
 
 // Small delay between calls so we don't get rate-limited by Gemini.
 const DELAY_BETWEEN_CALLS_MS = 250;
@@ -59,10 +60,16 @@ async function main(): Promise<void> {
     .select(["c.id", "c.text"])
     .getMany();
 
+  // Filter out "done" messages (e.g. "I'm done for now") — these are UI
+  // control signals, not reflective content. See ingest-hook.ts for details.
+  const classifiable = todo.filter((c) => !isDoneMessage(c.text));
+  const skippedDone = todo.length - classifiable.length;
+
   console.log(
-    `Backfill: ${todo.length} comments need classification (model=${CLASSIFIER_VERSION})`
+    `Backfill: ${classifiable.length} comments need classification (model=${CLASSIFIER_VERSION})` +
+      (skippedDone > 0 ? `, skipped ${skippedDone} "done" message(s)` : "")
   );
-  if (todo.length === 0) {
+  if (classifiable.length === 0) {
     await AppDataSource.destroy();
     return;
   }
@@ -71,8 +78,8 @@ async function main(): Promise<void> {
   let failed = 0;
   const failures: { commentId: string; error: string }[] = [];
 
-  for (let i = 0; i < todo.length; i++) {
-    const comment = todo[i];
+  for (let i = 0; i < classifiable.length; i++) {
+    const comment = classifiable[i];
     try {
       const result = await classifyComment(comment.text);
       await classificationRepo.save({
@@ -94,13 +101,13 @@ async function main(): Promise<void> {
       console.warn(`  [skip] ${comment.id}: ${msg}`);
     }
 
-    if ((i + 1) % PROGRESS_EVERY === 0 || i === todo.length - 1) {
+    if ((i + 1) % PROGRESS_EVERY === 0 || i === classifiable.length - 1) {
       console.log(
-        `  progress: ${i + 1}/${todo.length} (${succeeded} ok, ${failed} failed)`
+        `  progress: ${i + 1}/${classifiable.length} (${succeeded} ok, ${failed} failed)`
       );
     }
 
-    if (i < todo.length - 1) {
+    if (i < classifiable.length - 1) {
       await sleep(DELAY_BETWEEN_CALLS_MS);
     }
   }

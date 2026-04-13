@@ -20,6 +20,7 @@ import {
   CLASSIFIER_VERSION,
   ClassifierError,
 } from "./classifier.js";
+import { isDoneMessage } from "../tori-extractor.js";
 
 const DELAY_BETWEEN_CALLS_MS = 250;
 
@@ -65,10 +66,20 @@ export async function classifyUserCommentsInBackground(
     `[reflection] classifying ${todo.length} new USER comments (model=${CLASSIFIER_VERSION})`
   );
 
+  // Filter out "done" messages (e.g. "I'm done for now") — these are UI
+  // control signals sent when a student clicks the "finish" button, not
+  // actual reflective content. Classifying them would unfairly lower the
+  // student's reflection depth scores.
+  const classifiable = todo.filter((c) => !isDoneMessage(c.text));
+  const skippedDone = todo.length - classifiable.length;
+  if (skippedDone > 0) {
+    console.log(`[reflection] skipped ${skippedDone} "done" message(s)`);
+  }
+
   let ok = 0;
   let failed = 0;
-  for (let i = 0; i < todo.length; i++) {
-    const comment = todo[i];
+  for (let i = 0; i < classifiable.length; i++) {
+    const comment = classifiable[i];
     try {
       const result = await classifyComment(comment.text);
       await classificationRepo.save({
@@ -86,7 +97,7 @@ export async function classifyUserCommentsInBackground(
         e instanceof ClassifierError ? e.message : (e as Error).message;
       console.warn(`[reflection]   skip ${comment.id}: ${msg}`);
     }
-    if (i < todo.length - 1) {
+    if (i < classifiable.length - 1) {
       await new Promise((r) => setTimeout(r, DELAY_BETWEEN_CALLS_MS));
     }
   }

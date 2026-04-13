@@ -24,6 +24,7 @@ import { AddReflectionClassification1775574300000 } from "./migrations/177557430
 import { AddInstitutionIdToChatSession1775574400000 } from "./migrations/1775574400000-AddInstitutionIdToChatSession.js";
 import { AddInvitationTracking1775574500000 } from "./migrations/1775574500000-AddInvitationTracking.js";
 import { AddUserDeactivated1775574600000 } from "./migrations/1775574600000-AddUserDeactivated.js";
+import { RemoveDoneMessageClassifications1775574700000 } from "./migrations/1775574700000-RemoveDoneMessageClassifications.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -59,5 +60,6 @@ export const AppDataSource = new DataSource({
     AddInstitutionIdToChatSession1775574400000,
     AddInvitationTracking1775574500000,
     AddUserDeactivated1775574600000,
+    RemoveDoneMessageClassifications1775574700000,
   ],
 });
