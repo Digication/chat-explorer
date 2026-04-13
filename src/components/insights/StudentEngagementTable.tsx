@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery } from "@apollo/client/react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -16,6 +16,7 @@ import { GET_STUDENT_ENGAGEMENT } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
 import EvidencePopover from "@/components/insights/EvidencePopover";
 import { useUserSettings } from "@/lib/UserSettingsContext";
+import { useInsightsAnalytics } from "@/components/insights/InsightsAnalyticsContext";
 import { CATEGORY_CONFIG, CATEGORY_COLORS, CATEGORY_LABELS } from "@/lib/reflection-categories";
 
 /** Map category key → ordinal for sorting (higher = deeper reflection). */
@@ -60,6 +61,7 @@ interface StudentPopoverState {
 export default function StudentEngagementTable({ onOpenStudent, onViewThread }: Props) {
   const { scope } = useInsightsScope();
   const { getDisplayName } = useUserSettings();
+  const { registerSummary } = useInsightsAnalytics();
 
   const [sortKey, setSortKey] = useState<SortKey>("modalCategory");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -72,6 +74,28 @@ export default function StudentEngagementTable({ onOpenStudent, onViewThread }: 
       skip: !scope,
     },
   );
+
+  // Register student engagement summary for AI Chat context
+  useEffect(() => {
+    const profiles: StudentProfile[] =
+      data?.instructionalInsights?.data?.studentProfiles ?? [];
+    if (profiles.length > 0) {
+      const avgComments = Math.round(
+        profiles.reduce((sum, s) => sum + s.commentCount, 0) / profiles.length
+      );
+      const categoryCounts = new Map<string, number>();
+      for (const s of profiles) {
+        categoryCounts.set(s.modalCategory, (categoryCounts.get(s.modalCategory) ?? 0) + 1);
+      }
+      const catParts = [...categoryCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([cat, n]) => `${cat}: ${n}`);
+      registerSummary(
+        "Student Engagement",
+        `${profiles.length} students, avg ${avgComments} comments/student. Modal categories: ${catParts.join(", ")}`
+      );
+    }
+  }, [data, registerSummary]);
 
   // ── Error state ────────────────────────────────────────────────────────────
 

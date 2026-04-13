@@ -64,8 +64,8 @@ export const CREATE_CHAT_SESSION = gql`
 
 /** Send a message in a chat session and receive the assistant reply. */
 export const SEND_CHAT_MESSAGE = gql`
-  mutation SendChatMessage($sessionId: ID!, $content: String!) {
-    sendChatMessage(sessionId: $sessionId, content: $content) {
+  mutation SendChatMessage($sessionId: ID!, $content: String!, $analyticsContext: String) {
+    sendChatMessage(sessionId: $sessionId, content: $content, analyticsContext: $analyticsContext) {
       id
       sessionId
       role

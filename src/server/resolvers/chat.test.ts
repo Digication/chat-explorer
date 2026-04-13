@@ -155,7 +155,7 @@ describe("chatResolvers.Mutation", () => {
       null, { sessionId: "s1", content: "hello" }, makeCtx(defaultUser),
     );
 
-    expect(mockSendChatMessage).toHaveBeenCalledWith("s1", "hello", "user-1");
+    expect(mockSendChatMessage).toHaveBeenCalledWith("s1", "hello", "user-1", undefined);
   });
 
   it("deleteChatSession removes session", async () => {

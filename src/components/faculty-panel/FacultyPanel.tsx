@@ -1,5 +1,7 @@
-import React from "react";
+import React, { useEffect } from "react";
+import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
@@ -12,6 +14,7 @@ import StudentSearchAutocomplete from "./StudentSearchAutocomplete";
 import ThreadPanel from "@/components/insights/ThreadPanel";
 import AiChatPanel from "@/components/ai/AiChatPanel";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
+import { useInsightsAnalytics } from "@/components/insights/InsightsAnalyticsContext";
 
 const TAB_ORDER: PanelTab[] = ["student", "thread", "chat"];
 const TAB_LABELS: Record<PanelTab, string> = {
@@ -23,6 +26,14 @@ const TAB_LABELS: Record<PanelTab, string> = {
 export default function FacultyPanel() {
   const panel = useFacultyPanel();
   const { scope } = useInsightsScope();
+  const { getAnalyticsContext } = useInsightsAnalytics();
+
+  // Auto-acknowledge context change on the Student tab (it always reflects current context)
+  useEffect(() => {
+    if (panel.contextChanged && panel.activeTab === "student") {
+      panel.acknowledgeContextChange();
+    }
+  }, [panel.contextChanged, panel.activeTab, panel.acknowledgeContextChange]);
 
   const tabIndex = TAB_ORDER.indexOf(panel.activeTab);
 
@@ -128,26 +139,89 @@ export default function FacultyPanel() {
         )}
 
         {panel.activeTab === "thread" && panel.threadId && (
-          <ThreadPanel
-            threadId={panel.threadId}
-            studentName={panel.threadStudentName ?? ""}
-            studentId={panel.threadStudentId ?? undefined}
-            onClose={panel.close}
-            embedded
-            onStudentClick={(id, name) => panel.openStudentProfile(id, name)}
-            initialToriTag={panel.threadInitialToriTag ?? undefined}
-          />
+          <>
+            {panel.contextChanged && (
+              <Alert
+                severity="info"
+                sx={{ mx: 1, mt: 1 }}
+                action={
+                  <>
+                    <Button
+                      color="inherit"
+                      size="small"
+                      onClick={() => {
+                        panel.acknowledgeContextChange();
+                        panel.switchTab("student");
+                      }}
+                    >
+                      Update
+                    </Button>
+                    <Button
+                      color="inherit"
+                      size="small"
+                      onClick={() => panel.acknowledgeContextChange()}
+                    >
+                      Keep
+                    </Button>
+                  </>
+                }
+              >
+                Context changed. This thread is from a different context.
+              </Alert>
+            )}
+            <ThreadPanel
+              threadId={panel.threadId}
+              studentName={panel.threadStudentName ?? ""}
+              studentId={panel.threadStudentId ?? undefined}
+              onClose={panel.close}
+              embedded
+              onStudentClick={(id, name) => panel.openStudentProfile(id, name)}
+              initialToriTag={panel.threadInitialToriTag ?? undefined}
+            />
+          </>
         )}
 
         {panel.activeTab === "chat" && (
-          <AiChatPanel
-            open={true}
-            onClose={panel.close}
-            anchor="embedded"
-            institutionId={scope?.institutionId}
-            courseId={scope?.courseId}
-            assignmentId={scope?.assignmentId}
-          />
+          <>
+            {panel.contextChanged && (
+              <Alert
+                severity="info"
+                sx={{ mx: 1, mt: 1 }}
+                action={
+                  <>
+                    <Button
+                      color="inherit"
+                      size="small"
+                      onClick={() => {
+                        panel.acknowledgeContextChange();
+                        panel.setActiveChatSession(null);
+                      }}
+                    >
+                      New Chat
+                    </Button>
+                    <Button
+                      color="inherit"
+                      size="small"
+                      onClick={() => panel.acknowledgeContextChange()}
+                    >
+                      Continue
+                    </Button>
+                  </>
+                }
+              >
+                Context changed. Start a new chat?
+              </Alert>
+            )}
+            <AiChatPanel
+              open={true}
+              onClose={panel.close}
+              anchor="embedded"
+              institutionId={scope?.institutionId}
+              courseId={scope?.courseId}
+              assignmentId={scope?.assignmentId}
+              analyticsContext={getAnalyticsContext()}
+            />
+          </>
         )}
       </Box>
     </Box>

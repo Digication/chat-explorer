@@ -282,6 +282,7 @@ export async function sendChatMessage(
   sessionId: string,
   userContent: string,
   userId: string,
+  analyticsContext?: string,
 ): Promise<ChatMessage> {
   const sessionRepo = AppDataSource.getRepository(ChatSession);
   const messageRepo = AppDataSource.getRepository(ChatMessage);
@@ -302,10 +303,14 @@ export async function sendChatMessage(
   // 3. Build data context from the database
   const contextData = await buildContext(session);
 
-  // 4. Build the system prompt
+  // 4. Build the system prompt (with optional analytics dashboard context)
+  let data = contextData;
+  if (analyticsContext) {
+    data = `The user is viewing an analytics dashboard showing:\n${analyticsContext}\n\nBelow is the detailed conversation data:\n${contextData}`;
+  }
   const systemPrompt = buildSystemPrompt({
     scope: session.scope,
-    data: contextData,
+    data,
     showPII: session.showPII,
   });
 

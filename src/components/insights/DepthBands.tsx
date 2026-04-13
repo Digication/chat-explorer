@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery } from "@apollo/client/react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -12,6 +12,7 @@ import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import { GET_ENGAGEMENT, GET_STUDENT_ENGAGEMENT } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
+import { useInsightsAnalytics } from "@/components/insights/InsightsAnalyticsContext";
 import StudentDrillDown, { type StudentItem } from "@/components/insights/StudentDrillDown";
 import { CATEGORY_CONFIG } from "@/lib/reflection-categories";
 
@@ -27,6 +28,7 @@ interface DrillDownState {
 
 export default function DepthBands({ onOpenStudent }: DepthBandsProps) {
   const { scope } = useInsightsScope();
+  const { registerSummary } = useInsightsAnalytics();
   const [drillDown, setDrillDown] = useState<DrillDownState | null>(null);
 
   const { data, loading, error, refetch } = useQuery<any>(GET_ENGAGEMENT, {
@@ -38,6 +40,25 @@ export default function DepthBands({ onOpenStudent }: DepthBandsProps) {
     variables: { scope },
     skip: !scope,
   });
+
+  // Register depth distribution summary for AI Chat context
+  useEffect(() => {
+    const dist = data?.engagement?.data?.categoryDistribution;
+    if (dist) {
+      const total = CATEGORY_CONFIG.reduce(
+        (sum, c) => sum + ((dist[c.key] as number) ?? 0),
+        0
+      );
+      if (total > 0) {
+        const parts = CATEGORY_CONFIG.map((c) => {
+          const count = (dist[c.key] as number) ?? 0;
+          const pct = ((count / total) * 100).toFixed(0);
+          return `${c.label}: ${count} (${pct}%)`;
+        });
+        registerSummary("Reflection Depth", parts.join(", "));
+      }
+    }
+  }, [data, registerSummary]);
 
   if (error) {
     return (

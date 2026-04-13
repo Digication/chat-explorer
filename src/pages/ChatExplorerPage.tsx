@@ -80,6 +80,20 @@ export default function ChatExplorerPage() {
     }
   }, [studentProfiles]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Notify panel of current page context for context-change detection
+  useEffect(() => {
+    if (scope) {
+      const scopeKey = [scope.institutionId, scope.courseId, scope.assignmentId]
+        .filter(Boolean)
+        .join("/");
+      panel.setPageContext({
+        page: "chat-explorer",
+        scopeKey,
+        studentId: selectedStudentIds[0],
+      });
+    }
+  }, [scope, selectedStudentIds, panel.setPageContext]);
+
   // Sync selected student with Faculty Panel's Student tab
   useEffect(() => {
     if (panel.isOpen && panel.activeTab === "student" && selectedStudentIds.length === 1) {

@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect } from "react";
 import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
@@ -36,6 +36,16 @@ function Section({
 export default function InsightsPage() {
   const { scope } = useInsightsScope();
   const panel = useFacultyPanel();
+
+  // Notify panel of current page context for context-change detection
+  useEffect(() => {
+    if (scope) {
+      const scopeKey = [scope.institutionId, scope.courseId, scope.assignmentId]
+        .filter(Boolean)
+        .join("/");
+      panel.setPageContext({ page: "insights", scopeKey });
+    }
+  }, [scope, panel.setPageContext]);
 
   // Student name clicks → open Student Profile in Faculty Panel
   const handleOpenStudent = useCallback(

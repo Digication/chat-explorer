@@ -54,6 +54,8 @@ interface AiChatPanelProps {
   studentName?: string;
   /** TORI tags to focus the AI conversation on. */
   selectedToriTags?: string[];
+  /** Analytics context summary from Insights page sections (passed to AI system prompt). */
+  analyticsContext?: string;
   /**
    * Display mode:
    * - "right": renders inside a right-anchored MUI Drawer (400px wide)
@@ -86,6 +88,7 @@ export default function AiChatPanel({
   studentId,
   studentName,
   selectedToriTags,
+  analyticsContext,
   anchor = "right",
 }: AiChatPanelProps) {
   const { getDisplayName } = useUserSettings();
@@ -248,7 +251,7 @@ export default function AiChatPanel({
       setIsSending(true);
 
       try {
-        await sendMessage({ variables: { sessionId, content } });
+        await sendMessage({ variables: { sessionId, content, analyticsContext: analyticsContext || undefined } });
         // Refetch session to get both the user message and assistant reply
         await refetchSession();
         await refetchSessions(); // Update the session list (updatedAt changes)
@@ -267,6 +270,7 @@ export default function AiChatPanel({
       studentId,
       chatScope,
       selectedToriTags,
+      analyticsContext,
       createSession,
       sendMessage,
       refetchSession,

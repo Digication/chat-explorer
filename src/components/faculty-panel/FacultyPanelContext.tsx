@@ -13,6 +13,12 @@ interface HistoryEntry {
   threadInitialToriTag?: string;
 }
 
+export interface PageContext {
+  page: string;
+  scopeKey: string; // serialized scope for comparison
+  studentId?: string;
+}
+
 export interface FacultyPanelState {
   isOpen: boolean;
   activeTab: PanelTab;
@@ -32,6 +38,11 @@ export interface FacultyPanelState {
 
   // Navigation history (for back button)
   history: HistoryEntry[];
+
+  // Context tracking for panel persistence
+  pageContext: PageContext | null;
+  contextChanged: boolean;
+  contextChangeLabel: string | null;
 }
 
 export interface FacultyPanelActions {
@@ -42,6 +53,8 @@ export interface FacultyPanelActions {
   goBack: () => void;
   close: () => void;
   setActiveChatSession: (sessionId: string | null) => void;
+  setPageContext: (ctx: PageContext) => void;
+  acknowledgeContextChange: () => void;
 }
 
 // ── Reducer ─────────────────────────────────────────────────────
@@ -52,7 +65,9 @@ type Action =
   | { type: "SWITCH_TAB"; tab: PanelTab }
   | { type: "GO_BACK" }
   | { type: "CLOSE" }
-  | { type: "SET_CHAT_SESSION"; sessionId: string | null };
+  | { type: "SET_CHAT_SESSION"; sessionId: string | null }
+  | { type: "SET_PAGE_CONTEXT"; ctx: PageContext }
+  | { type: "ACKNOWLEDGE_CONTEXT_CHANGE" };
 
 const initialState: FacultyPanelState = {
   isOpen: false,
@@ -65,6 +80,9 @@ const initialState: FacultyPanelState = {
   threadInitialToriTag: null,
   activeChatSessionId: null,
   history: [],
+  pageContext: null,
+  contextChanged: false,
+  contextChangeLabel: null,
 };
 
 /** Snapshot the current tab state so we can restore it on goBack. */
@@ -143,6 +161,25 @@ function reducer(state: FacultyPanelState, action: Action): FacultyPanelState {
     case "SET_CHAT_SESSION":
       return { ...state, activeChatSessionId: action.sessionId };
 
+    case "SET_PAGE_CONTEXT": {
+      const prev = state.pageContext;
+      const next = action.ctx;
+      // Only flag context change if panel is open and context actually differs
+      const changed =
+        state.isOpen &&
+        prev !== null &&
+        (prev.scopeKey !== next.scopeKey || prev.page !== next.page);
+      return {
+        ...state,
+        pageContext: next,
+        contextChanged: changed,
+        contextChangeLabel: changed ? next.page : state.contextChangeLabel,
+      };
+    }
+
+    case "ACKNOWLEDGE_CONTEXT_CHANGE":
+      return { ...state, contextChanged: false, contextChangeLabel: null };
+
     default:
       return state;
   }
@@ -182,6 +219,16 @@ export function FacultyPanelProvider({ children }: { children: React.ReactNode }
     [],
   );
 
+  const setPageContext = useCallback(
+    (ctx: PageContext) => dispatch({ type: "SET_PAGE_CONTEXT", ctx }),
+    [],
+  );
+
+  const acknowledgeContextChange = useCallback(
+    () => dispatch({ type: "ACKNOWLEDGE_CONTEXT_CHANGE" }),
+    [],
+  );
+
   const value = useMemo(
     () => ({
       ...state,
@@ -192,8 +239,10 @@ export function FacultyPanelProvider({ children }: { children: React.ReactNode }
       goBack,
       close,
       setActiveChatSession,
+      setPageContext,
+      acknowledgeContextChange,
     }),
-    [state, openStudentProfile, openThread, openChat, switchTab, goBack, close, setActiveChatSession],
+    [state, openStudentProfile, openThread, openChat, switchTab, goBack, close, setActiveChatSession, setPageContext, acknowledgeContextChange],
   );
 
   return (

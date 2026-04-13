@@ -75,7 +75,7 @@ export const chatResolvers = {
 
     sendChatMessage: async (
       _: unknown,
-      { sessionId, content }: { sessionId: string; content: string },
+      { sessionId, content, analyticsContext }: { sessionId: string; content: string; analyticsContext?: string },
       ctx: GraphQLContext
     ) => {
       const user = requireAuth(ctx);
@@ -88,7 +88,7 @@ export const chatResolvers = {
       }
 
       // Use the AI chat service to handle message + LLM response
-      return sendChatMessageService(sessionId, content, user.id);
+      return sendChatMessageService(sessionId, content, user.id, analyticsContext);
     },
 
     deleteChatSession: async (

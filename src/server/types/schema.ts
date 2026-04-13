@@ -723,7 +723,7 @@ export const typeDefs = /* GraphQL */ `
   type Mutation {
     # Chat
     createChatSession(institutionId: ID!, courseId: ID, assignmentId: ID, studentId: ID, scope: String, selectedToriTags: [String!], selectedCommentIds: [ID!], title: String): ChatSession!
-    sendChatMessage(sessionId: ID!, content: String!): ChatMessage!
+    sendChatMessage(sessionId: ID!, content: String!, analyticsContext: String): ChatMessage!
     deleteChatSession(id: ID!): Boolean!
     renameChatSession(id: ID!, title: String!): ChatSession!
     updateChatSessionScope(id: ID!, scope: String!, studentId: ID, courseId: ID, assignmentId: ID): ChatSession!

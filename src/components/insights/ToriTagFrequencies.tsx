@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery } from "@apollo/client/react";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -10,6 +10,7 @@ import Typography from "@mui/material/Typography";
 import { GET_TORI_ANALYSIS } from "@/lib/queries/analytics";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
 import EvidencePopover from "@/components/insights/EvidencePopover";
+import { useInsightsAnalytics } from "@/components/insights/InsightsAnalyticsContext";
 
 /** Colors for each TORI domain — matches ToriChip. */
 const DOMAIN_COLORS: Record<string, string> = {
@@ -68,6 +69,7 @@ const DOMAIN_LIMIT = 3;
 
 export default function ToriTagFrequencies({ onViewThread, onStudentClick }: ToriTagFrequenciesProps) {
   const { scope } = useInsightsScope();
+  const { registerSummary } = useInsightsAnalytics();
   const [viewMode, setViewMode] = useState<"grouped" | "flat">("grouped");
   const [showAll, setShowAll] = useState(false);
   const [popover, setPopover] = useState<PopoverState | null>(null);
@@ -76,6 +78,16 @@ export default function ToriTagFrequencies({ onViewThread, onStudentClick }: Tor
     variables: { scope },
     skip: !scope,
   });
+
+  // Register TORI tag summary for AI Chat context
+  useEffect(() => {
+    const freqs: TagFrequency[] = data?.toriAnalysis?.data?.tagFrequencies ?? [];
+    if (freqs.length > 0) {
+      const top5 = [...freqs].sort((a, b) => b.count - a.count).slice(0, 5);
+      const summary = `Top tags: ${top5.map((t) => `${t.tagName} (${t.count})`).join(", ")}`;
+      registerSummary("TORI Tags", summary);
+    }
+  }, [data, registerSummary]);
 
   // ── Error state ────────────────────────────────────────────────────────────
 
