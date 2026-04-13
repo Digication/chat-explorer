@@ -100,14 +100,14 @@ export default function AiChatPanel({
 
   // ── Queries ────────────────────────────────────────────────────────
 
-  // Fetch all sessions for this course/assignment scope
+  // Fetch all sessions for this institution (unfiltered by scope so full history is visible)
   const {
     data: sessionsData,
     loading: sessionsLoading,
     error: sessionsError,
     refetch: refetchSessions,
   } = useQuery<any>(GET_CHAT_SESSIONS, {
-    variables: { institutionId, courseId, assignmentId },
+    variables: { institutionId },
     skip: !open || !institutionId,
   });
   const sessions = sessionsData?.chatSessions ?? [];

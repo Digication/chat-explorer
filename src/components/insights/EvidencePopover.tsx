@@ -118,7 +118,16 @@ export default function EvidencePopover({
       }}
     >
       {/* Header */}
-      <Typography variant="subtitle2" fontWeight={700} gutterBottom>
+      <Typography
+        variant="subtitle2"
+        fontWeight={700}
+        gutterBottom
+        {...(!toriTagName && studentName && onStudentClick && studentId ? {
+          component: "div",
+          sx: { cursor: "pointer", color: "primary.main", "&:hover": { textDecoration: "underline" } },
+          onClick: () => { onStudentClick(studentId, studentName); onClose(); },
+        } : {})}
+      >
         {toriTagName || (studentName ? getDisplayName(studentName) : null) || "Evidence"}
       </Typography>
       <Typography variant="caption" color="text.secondary" display="block" component="div" sx={{ mb: 1.5 }}>

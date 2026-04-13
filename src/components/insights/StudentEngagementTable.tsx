@@ -285,6 +285,10 @@ export default function StudentEngagementTable({ onOpenStudent, onViewThread }: 
             setPopover(null);
             onViewThread?.(threadId, studentName, studentId, initialToriTag);
           }}
+          onStudentClick={(studentId, studentName) => {
+            setPopover(null);
+            onOpenStudent?.(studentId, studentName);
+          }}
         />
       )}
 

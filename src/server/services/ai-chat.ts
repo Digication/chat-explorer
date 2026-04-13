@@ -339,6 +339,7 @@ export async function sendChatMessage(
   const assistantText = await provider.sendChat(llmMessages, {
     model: modelId,
     systemPrompt,
+    maxTokens: 4096,
   });
 
   // 7. Save the assistant response
