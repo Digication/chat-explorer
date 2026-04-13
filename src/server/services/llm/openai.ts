@@ -34,7 +34,7 @@ export class OpenAIProvider implements LLMProvider {
       model: options.model,
       messages: formatted,
       temperature: options.temperature ?? 0.7,
-      max_tokens: options.maxTokens ?? 2000,
+      max_tokens: options.maxTokens ?? 16384,
     });
 
     // The first choice always contains the assistant reply.

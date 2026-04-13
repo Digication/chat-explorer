@@ -22,7 +22,7 @@ export interface LLMChatMessage {
 export interface LLMOptions {
   model: string;
   temperature?: number; // default 0.7
-  maxTokens?: number; // default 2000
+  maxTokens?: number; // default 16384 — high enough to avoid truncation
   systemPrompt?: string;
 }
 

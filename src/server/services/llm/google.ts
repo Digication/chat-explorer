@@ -51,7 +51,7 @@ export class GoogleProvider implements LLMProvider {
       ...(systemInstruction ? { systemInstruction } : {}),
       generationConfig: {
         temperature: options.temperature ?? 0.7,
-        maxOutputTokens: options.maxTokens ?? 2000,
+        maxOutputTokens: options.maxTokens ?? 16384,
       },
     });
 
