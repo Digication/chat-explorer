@@ -30,6 +30,7 @@ import {
   CREATE_CHAT_SESSION,
   SEND_CHAT_MESSAGE,
   DELETE_CHAT_SESSION,
+  UPDATE_CHAT_SESSION_SCOPE,
 } from "@/lib/queries/chat";
 import ChatMessageBubble from "./ChatMessageBubble";
 import SuggestionChips from "./SuggestionChips";
@@ -92,10 +93,7 @@ export default function AiChatPanel({
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const [scopeOverride, setScopeOverride] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
-  // Track scope-change dividers shown in the message list (UI-only, not persisted)
-  const [scopeDividers, setScopeDividers] = useState<Array<{ id: string; label: string }>>([]);
   // Anchor element for the scope dropdown menu
   const [scopeMenuAnchor, setScopeMenuAnchor] = useState<null | HTMLElement>(null);
 
@@ -133,6 +131,7 @@ export default function AiChatPanel({
   const [createSession] = useMutation<any>(CREATE_CHAT_SESSION);
   const [sendMessage] = useMutation<any>(SEND_CHAT_MESSAGE);
   const [deleteSession] = useMutation<any>(DELETE_CHAT_SESSION);
+  const [updateScope] = useMutation<any>(UPDATE_CHAT_SESSION_SCOPE);
 
   // ── Auto-load the most recent session when panel opens ─────────────
   useEffect(() => {
@@ -148,9 +147,8 @@ export default function AiChatPanel({
 
   // ── Handlers ───────────────────────────────────────────────────────
 
-  /** Determine the AI chat scope — user override takes precedence. */
-  const defaultScope = studentId ? "SELECTION" : courseId ? "COURSE" : "CROSS_COURSE";
-  const chatScope = scopeOverride ?? defaultScope;
+  /** Determine the AI chat scope based on available context. */
+  const chatScope = studentId ? "SELECTION" : courseId ? "COURSE" : "CROSS_COURSE";
 
   /** Human-readable label for each scope value. */
   const getScopeLabel = (scope: string) => {
@@ -165,17 +163,26 @@ export default function AiChatPanel({
     return "All courses";
   };
 
-  /** Handle scope change from the dropdown menu. */
-  const handleScopeChange = (newScope: string) => {
+  /** Handle scope change — persists to backend and creates a SYSTEM message. */
+  const handleScopeChange = useCallback(async (newScope: string) => {
     setScopeMenuAnchor(null);
-    if (newScope === chatScope) return;
-    setScopeOverride(newScope);
-    const label = getScopeLabel(newScope);
-    setScopeDividers((prev) => [
-      ...prev,
-      { id: `scope-${Date.now()}`, label: `Context changed to: ${label} — AI context cleared` },
-    ]);
-  };
+    if (newScope === chatScope || !activeSessionId) return;
+    try {
+      await updateScope({
+        variables: {
+          id: activeSessionId,
+          scope: newScope,
+          studentId: newScope === "SELECTION" ? studentId : undefined,
+          courseId: newScope !== "CROSS_COURSE" ? courseId : undefined,
+          assignmentId: newScope === "SELECTION" ? assignmentId : undefined,
+        },
+      });
+      // Refetch session to pick up the new SYSTEM message
+      await refetchSession();
+    } catch (err) {
+      console.error("Failed to update scope:", err);
+    }
+  }, [chatScope, activeSessionId, studentId, courseId, assignmentId, updateScope, refetchSession]);
 
   /** Create a new session and make it active. */
   const handleNewChat = useCallback(async () => {
@@ -342,7 +349,7 @@ export default function AiChatPanel({
             {studentId && (
               <MenuItem
                 selected={chatScope === "SELECTION"}
-                onClick={() => handleScopeChange("SELECTION")}
+                onClick={() => void handleScopeChange("SELECTION")}
               >
                 <ListItemIcon><PersonIcon fontSize="small" /></ListItemIcon>
                 <ListItemText>{getScopeLabel("SELECTION")}</ListItemText>
@@ -351,7 +358,7 @@ export default function AiChatPanel({
             {courseId && (
               <MenuItem
                 selected={chatScope === "COURSE"}
-                onClick={() => handleScopeChange("COURSE")}
+                onClick={() => void handleScopeChange("COURSE")}
               >
                 <ListItemIcon><SchoolIcon fontSize="small" /></ListItemIcon>
                 <ListItemText>This course</ListItemText>
@@ -359,7 +366,7 @@ export default function AiChatPanel({
             )}
             <MenuItem
               selected={chatScope === "CROSS_COURSE"}
-              onClick={() => handleScopeChange("CROSS_COURSE")}
+              onClick={() => void handleScopeChange("CROSS_COURSE")}
             >
               <ListItemIcon><AccountBalanceIcon fontSize="small" /></ListItemIcon>
               <ListItemText>All courses</ListItemText>
@@ -456,17 +463,6 @@ export default function AiChatPanel({
             <ChatMessageBubble key={msg.id} message={msg} />
           ))
         )}
-
-        {/* Scope-change dividers (UI-only, not persisted) */}
-        {scopeDividers.map((d) => (
-          <Box key={d.id} sx={{ display: "flex", alignItems: "center", gap: 1, px: 2, py: 0.5 }}>
-            <Box sx={{ flex: 1, height: "1px", bgcolor: "divider" }} />
-            <Typography variant="caption" color="text.disabled" sx={{ whiteSpace: "nowrap" }}>
-              {d.label}
-            </Typography>
-            <Box sx={{ flex: 1, height: "1px", bgcolor: "divider" }} />
-          </Box>
-        ))}
 
         {/* Typing indicator while waiting for a response */}
         {isSending && (

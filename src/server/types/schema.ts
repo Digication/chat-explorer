@@ -726,6 +726,7 @@ export const typeDefs = /* GraphQL */ `
     sendChatMessage(sessionId: ID!, content: String!): ChatMessage!
     deleteChatSession(id: ID!): Boolean!
     renameChatSession(id: ID!, title: String!): ChatSession!
+    updateChatSessionScope(id: ID!, scope: String!, studentId: ID, courseId: ID, assignmentId: ID): ChatSession!
 
     # Consent
     setStudentConsent(input: ConsentInput!): StudentConsent!

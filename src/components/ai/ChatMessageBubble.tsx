@@ -41,6 +41,20 @@ function formatTimestamp(dateStr: string): string {
  */
 export default function ChatMessageBubble({ message, isTyping }: ChatMessageBubbleProps) {
   const isUser = message.role === "USER";
+  const isSystem = message.role === "SYSTEM";
+
+  // SYSTEM messages render as centered dividers
+  if (isSystem) {
+    return (
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, my: 1.5, px: 2 }}>
+        <Box sx={{ flex: 1, height: "1px", bgcolor: "divider" }} />
+        <Typography variant="caption" color="text.secondary" sx={{ whiteSpace: "nowrap" }}>
+          {message.content}
+        </Typography>
+        <Box sx={{ flex: 1, height: "1px", bgcolor: "divider" }} />
+      </Box>
+    );
+  }
 
   return (
     <Box

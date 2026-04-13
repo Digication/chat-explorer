@@ -62,12 +62,12 @@ export default function ChatExplorerPage() {
 
   // ── Queries ────────────────────────────────────────────────────────
 
-  // Student profiles for the selected scope
+  // Student profiles for the selected scope (works at institution or course level)
   const { data: studentsData, loading: studentsLoading } = useQuery<any>(
     GET_STUDENT_PROFILES,
     {
       variables: { scope },
-      skip: !courseId,
+      skip: !scope?.institutionId,
     }
   );
   const studentProfiles =
@@ -79,6 +79,18 @@ export default function ChatExplorerPage() {
       setSelectedStudentIds([studentProfiles[0].studentId]);
     }
   }, [studentProfiles]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync selected student with Faculty Panel's Student tab
+  useEffect(() => {
+    if (panel.isOpen && panel.activeTab === "student" && selectedStudentIds.length === 1) {
+      const student = studentProfiles.find(
+        (s: { studentId: string; name: string }) => s.studentId === selectedStudentIds[0]
+      );
+      if (student) {
+        panel.openStudentProfile(student.studentId, student.name);
+      }
+    }
+  }, [selectedStudentIds]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Thread data (for extracting available TORI tags and rendering threads)
   const { data: threadsData } = useQuery<any>(GET_ASSIGNMENT_THREADS, {
@@ -180,20 +192,7 @@ export default function ChatExplorerPage() {
 
         {/* Thread view — takes full available width */}
         <Box sx={{ flex: 1, overflowY: "auto", pb: "80px", px: 3 }}>
-          {!courseId ? (
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                height: "100%",
-                minHeight: 300,
-                color: "text.secondary",
-              }}
-            >
-              <Typography>Select a course to get started.</Typography>
-            </Box>
-          ) : studentsLoading ? (
+          {studentsLoading ? (
             <Box>
               <Skeleton variant="rounded" height={60} sx={{ mb: 1 }} />
               <Skeleton variant="rounded" height={60} sx={{ mb: 1 }} />
@@ -202,7 +201,7 @@ export default function ChatExplorerPage() {
           ) : (
             <ThreadView
               studentIds={selectedStudentIds}
-              courseId={courseId}
+              courseId={courseId ?? null}
               assignmentId={assignmentId ?? null}
               activeToriFilters={toriFilters}
               onToriTagClick={handleToriTagClick}

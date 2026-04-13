@@ -91,3 +91,17 @@ export const RENAME_CHAT_SESSION = gql`
     }
   }
 `;
+
+/** Update the scope of an existing chat session. */
+export const UPDATE_CHAT_SESSION_SCOPE = gql`
+  mutation UpdateChatSessionScope($id: ID!, $scope: String!, $studentId: ID, $courseId: ID, $assignmentId: ID) {
+    updateChatSessionScope(id: $id, scope: $scope, studentId: $studentId, courseId: $courseId, assignmentId: $assignmentId) {
+      id
+      title
+      courseId
+      institutionId
+      createdAt
+      updatedAt
+    }
+  }
+`;

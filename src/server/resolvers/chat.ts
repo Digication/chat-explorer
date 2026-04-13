@@ -124,6 +124,54 @@ export const chatResolvers = {
       session.title = title;
       return repo.save(session);
     },
+
+    updateChatSessionScope: async (
+      _: unknown,
+      { id, scope, studentId, courseId, assignmentId }: {
+        id: string;
+        scope: string;
+        studentId?: string;
+        courseId?: string;
+        assignmentId?: string;
+      },
+      ctx: GraphQLContext
+    ) => {
+      const user = requireAuth(ctx);
+      const sessionRepo = AppDataSource.getRepository(ChatSession);
+      const session = await sessionRepo.findOne({ where: { id } });
+      if (!session || session.userId !== user.id) {
+        throw new GraphQLError("Chat session not found", {
+          extensions: { code: "NOT_FOUND" },
+        });
+      }
+      if (session.institutionId) {
+        requireInstitutionAccess(ctx, session.institutionId);
+      }
+
+      // Update scope fields
+      session.scope = scope as ChatScope;
+      session.studentId = studentId ?? null;
+      session.courseId = courseId ?? null;
+      session.assignmentId = assignmentId ?? null;
+      const updated = await sessionRepo.save(session);
+
+      // Create a SYSTEM message to mark the scope change
+      const msgRepo = AppDataSource.getRepository(ChatMessage);
+      const scopeLabels: Record<string, string> = {
+        SELECTION: studentId ? "This student" : "Selected comments",
+        COURSE: "This course",
+        CROSS_COURSE: "All courses",
+      };
+      const label = scopeLabels[scope] ?? scope;
+      const systemMsg = msgRepo.create({
+        sessionId: id,
+        role: ChatMessageRole.SYSTEM,
+        content: `Context changed to: ${label}. AI context refreshed.`,
+      });
+      await msgRepo.save(systemMsg);
+
+      return updated;
+    },
   },
 
   ChatSession: {
