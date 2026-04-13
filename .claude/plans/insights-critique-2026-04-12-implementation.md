@@ -10,16 +10,18 @@ Items: #1, #2, #4, #11
 
 ### 7.1 Decimal Precision (Item #1)
 
-**Problem:** Excessive decimal places in heatmap values.
+**Problem:** When heatmap scaling is ROW or GLOBAL, `applyScaling()` in the backend divides counts by the row/global max, producing long floats (e.g., `3/7 = 0.42857...`). These are rendered directly in cells and tooltips.
+
+**Root cause:** `src/server/services/analytics/heatmap.ts` lines 146-166 — `applyScaling()` returns unrounded floats. Frontend renders them as-is.
 
 **Files to change:**
 - `src/components/insights/HeatmapView.tsx`
-  - Classic mode cell rendering (line ~547): Values are raw integers from the data. If the backend returns floats (e.g., normalized values), format with `.toFixed(2)`.
-  - Sparkline mode tooltip/values (line ~378): Same treatment.
-  - Small Multiples count display (line ~202): Same treatment.
-  - Apply to any tooltip that shows numeric values.
+  - Classic mode cell (line 547): `{raw > 0 ? raw : null}` → format with 2 decimal places when scaling is not RAW
+  - Classic mode tooltip (line 518): `${raw}` → same formatting
+  - Sparkline mode values/tooltips (line ~378): Same treatment
+  - Small Multiples count (line ~202): Same treatment
 
-**Pattern:** Create a shared utility `formatValue(n: number): string` that returns integers as-is and floats capped at 2 decimal places. Use it everywhere a heatmap value is displayed.
+**Pattern:** Create a helper `formatHeatmapValue(value: number, scaling: string): string` — returns integers as-is for RAW, `.toFixed(2)` for ROW/GLOBAL. Use it everywhere a matrix value is displayed.
 
 **Risk: LOW** — Display-only change.
 
@@ -286,17 +288,20 @@ Items: #12, #13, #14, #15
 
 **Problem:** Scope toggle only shows "this course" vs "all courses." Plan called for a full matrix.
 
-**Scope matrix:**
+**Scope matrix (confirmed 2026-04-12):**
 
-| Student Axis | Assignment Axis | Course Axis | Label |
-|---|---|---|---|
-| This student | This assignment | This course | "Kalena — Assignment 3 — PSYC 101" |
-| This student | All assignments | This course | "Kalena — All assignments — PSYC 101" |
-| All students | This assignment | This course | "All students — Assignment 3 — PSYC 101" |
-| All students | All assignments | This course | "All students — PSYC 101" |
-| All students | All assignments | All courses | "All students — All courses" |
+Within a single course, the 2x2 (student × assignment) matrix applies. When "All courses" is selected, the assignment axis disappears.
 
-Only show options where context is available (e.g., no "this student" if no student selected).
+| Course | Student | Assignment | Label |
+|--------|---------|------------|-------|
+| This course | This student | This assignment | "Kalena — Assignment 3 — PSYC 101" |
+| This course | This student | All assignments | "Kalena — PSYC 101" |
+| This course | All students | This assignment | "All students — Assignment 3 — PSYC 101" |
+| This course | All students | All assignments | "All students — PSYC 101" |
+| All courses | This student | (n/a) | "Kalena — All courses" |
+| All courses | All students | (n/a) | "All students — All courses" |
+
+Only show rows where context is available (e.g., no "this student" rows if no student selected, no "this assignment" rows if no assignment selected). Hide the assignment toggle entirely when "All courses" is selected.
 
 **Files to change:**
 - `src/components/ai/AiChatPanel.tsx`

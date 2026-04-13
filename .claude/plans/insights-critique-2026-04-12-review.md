@@ -6,36 +6,33 @@ Thorough review of the Phase 7–12 implementation plan. Covers factual errors, 
 
 ## FACTUAL ERRORS
 
-### 1. Item #1 (Decimal Precision) may not exist
+### 1. ~~Item #1 (Decimal Precision) may not exist~~ — CONFIRMED via screenshot
 
-The plan says heatmap values show excessive decimal places. **The codebase audit found no floats** — `HeatmapView.tsx` only renders raw integer counts (`{raw}`, `{count}`). The cell values come from TORI tag counts, which are always integers.
+**UPDATE:** Decimal issue confirmed. The root cause is `applyScaling()` in `src/server/services/analytics/heatmap.ts` (lines 146-166). When scaling is ROW or GLOBAL, values are divided by the row/global max (e.g., `3/7 = 0.42857142857...`). These floats are returned to the frontend and rendered directly at `HeatmapView.tsx` line 547: `{raw > 0 ? raw : null}`.
 
-**Possible explanations:**
-- The decimals might appear in **tooltip percentages** or **normalized scaling values**, not the cell values themselves.
-- The decimals might come from the **Reflection Depth** section (which uses Hatton & Smith percentages) rather than the heatmap.
-- The decimals might appear in **sparkline axis labels** or **summary row aggregations**.
-
-**Action needed:** Before implementing, reproduce the exact decimal issue. Screenshot or identify the exact component and value that shows too many decimal places. The plan points at `HeatmapView.tsx` but the bug may be elsewhere — possibly `DepthBands.tsx`, `StudentEngagementTable.tsx`, or a tooltip in `ToriTagFrequencies.tsx` (which uses `.toFixed(1)` at line 178 — already fixed to 1 decimal).
-
-**Risk if wrong:** Wasted time modifying code that doesn't need changing while the actual decimal issue remains unfixed.
+**Fix:** Format the display value in the frontend with `.toFixed(2)` or similar. Also check Tooltip text at line 518 which shows `${raw}` — same issue. The Sparkline and Small Multiples modes likely have the same problem since they use the same `matrix` data.
 
 ---
 
-### 2. The original scope matrix is 2x2, not 5-row
+### 2. ~~The original scope matrix is 2x2, not 5-row~~ — CLARIFIED by user
 
-The plan (Phase 11.3) describes a 5-row scope matrix. But the **original plan** (`04-ux-polish.md`, Theme I) defined it as a **2x2 matrix**:
+**UPDATE:** User confirmed the scope model. The original 2x2 (student × assignment) applies **within a single course**. There's also a course axis, but it constrains the other axes:
 
-> `{this student / all students}` x `{this assignment / all assignments}`
-> Implemented as two side-by-side toggles.
+- **This course:** Full 2x2 matrix available (student × assignment = 4 options)
+- **All courses:** Assignment axis disappears (can't pick one assignment across all courses). Only student axis remains (this student / all students = 2 options)
 
-The 5th row ("All students — All courses") is a third axis (course), not part of the original 2x2. The plan inflates the matrix without acknowledging this is a scope expansion beyond what was agreed.
+**Corrected scope matrix:**
 
-**Resolution needed:** Confirm with the user whether the scope model is:
-- **2x2** (student × assignment) within the current course, plus a separate "cross-course" option = 5 total
-- **2x2** only (4 options within current course context)
-- Something else
+| Course | Student | Assignment | Label |
+|--------|---------|------------|-------|
+| This course | This student | This assignment | "Kalena — Assignment 3 — PSYC 101" |
+| This course | This student | All assignments | "Kalena — PSYC 101" |
+| This course | All students | This assignment | "All students — Assignment 3 — PSYC 101" |
+| This course | All students | All assignments | "All students — PSYC 101" |
+| All courses | This student | (n/a) | "Kalena — All courses" |
+| All courses | All students | (n/a) | "All students — All courses" |
 
-The current plan's 5-row table is likely correct given the user's critique mentions "all courses" as an option, but this should be explicit.
+Only show options where context is available (e.g., no "this student" rows if no student selected, no "this assignment" rows if no assignment selected). The assignment toggle should be hidden/disabled when "All courses" is selected.
 
 ---
 
