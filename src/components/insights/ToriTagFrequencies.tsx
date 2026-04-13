@@ -58,6 +58,7 @@ function groupByDomain(tags: TagFrequency[]): Map<string, TagFrequency[]> {
 
 interface ToriTagFrequenciesProps {
   onViewThread?: (threadId: string, studentName: string) => void;
+  onStudentClick?: (studentId: string, studentName: string) => void;
 }
 
 /** Max tags shown before "Show all" toggle in flat mode. */
@@ -65,7 +66,7 @@ const FLAT_LIMIT = 10;
 /** Max tags shown per domain before "Show all" toggle in grouped mode. */
 const DOMAIN_LIMIT = 3;
 
-export default function ToriTagFrequencies({ onViewThread }: ToriTagFrequenciesProps) {
+export default function ToriTagFrequencies({ onViewThread, onStudentClick }: ToriTagFrequenciesProps) {
   const { scope } = useInsightsScope();
   const [viewMode, setViewMode] = useState<"grouped" | "flat">("grouped");
   const [showAll, setShowAll] = useState(false);
@@ -259,6 +260,10 @@ export default function ToriTagFrequencies({ onViewThread }: ToriTagFrequenciesP
             setPopover(null);
             onViewThread?.(threadId, studentName);
           }}
+          onStudentClick={onStudentClick ? (id, name) => {
+            setPopover(null);
+            onStudentClick(id, name);
+          } : undefined}
         />
       )}
     </Box>

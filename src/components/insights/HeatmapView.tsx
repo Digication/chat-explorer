@@ -139,18 +139,22 @@ function Sparkline({
 /** Tag list card for one student (used in small-multiples mode). */
 function StudentTagCard({
   name,
+  studentId,
   values,
   labels,
   colIds,
   scaling = "RAW",
   onTagClick,
+  onStudentClick,
 }: {
   name: string;
+  studentId?: string;
   values: number[];
   labels: string[];
   colIds: string[];
   scaling?: string;
   onTagClick?: (event: React.MouseEvent<HTMLElement>, toriTagId: string, toriTagName: string, count: number) => void;
+  onStudentClick?: (studentId: string, studentName: string) => void;
 }) {
   // Build tag array with original colId so we can reference it after sorting
   const tags = labels
@@ -166,7 +170,16 @@ function StudentTagCard({
           fontWeight={700}
           display="block"
           noWrap
-          sx={{ mb: 0.75, fontSize: 11 }}
+          sx={{
+            mb: 0.75,
+            fontSize: 11,
+            ...(onStudentClick && studentId
+              ? { cursor: "pointer", color: "primary.main", "&:hover": { textDecoration: "underline" } }
+              : {}),
+          }}
+          onClick={() => {
+            if (onStudentClick && studentId) onStudentClick(studentId, name);
+          }}
         >
           {name}
         </Typography>
@@ -244,9 +257,10 @@ interface PopoverState {
 
 interface HeatmapViewProps {
   onViewThread?: (threadId: string, studentName: string) => void;
+  onStudentClick?: (studentId: string, studentName: string) => void;
 }
 
-export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
+export default function HeatmapView({ onViewThread, onStudentClick }: HeatmapViewProps) {
   const { scope } = useInsightsScope();
   const { getDisplayName } = useUserSettings();
 
@@ -403,9 +417,23 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
                         whiteSpace: "nowrap",
                         width: 140,
                         verticalAlign: "middle",
+                        cursor: onStudentClick ? "pointer" : "default",
                       }}
+                      onClick={() => onStudentClick?.(rowIds[ri], rowLabels[ri])}
                     >
-                      {getDisplayName(rowLabels[ri])}
+                      <Typography
+                        component="span"
+                        variant="body2"
+                        sx={{
+                          fontSize: "inherit",
+                          fontWeight: "inherit",
+                          ...(onStudentClick
+                            ? { color: "primary.main", "&:hover": { textDecoration: "underline" } }
+                            : {}),
+                        }}
+                      >
+                        {getDisplayName(rowLabels[ri])}
+                      </Typography>
                     </td>
                     <td style={{ padding: "2px 0", verticalAlign: "middle", width: "100%" }}>
                       <Sparkline
@@ -444,10 +472,12 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
             <StudentTagCard
               key={ri}
               name={getDisplayName(rowLabels[ri])}
+              studentId={rowIds[ri]}
               values={colOrder.map((ci) => matrix[ri]?.[ci] ?? 0)}
               labels={colOrder.map((ci) => colLabels[ci])}
               colIds={colOrder.map((ci) => colIds[ci])}
               scaling={scaling}
+              onStudentClick={onStudentClick}
               onTagClick={(e, toriTagId, toriTagName, count) => {
                 setPopoverState({
                   anchorEl: e.currentTarget as HTMLElement,
@@ -555,7 +585,7 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
               })()}
               {rowOrder.map((ri) => (
                 <tr key={ri}>
-                  {/* Row label — sticky on the left */}
+                  {/* Row label — sticky on the left, clickable */}
                   <td
                     style={{
                       position: "sticky",
@@ -565,9 +595,23 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
                       padding: "4px 8px",
                       fontWeight: 500,
                       whiteSpace: "nowrap",
+                      cursor: onStudentClick ? "pointer" : "default",
                     }}
+                    onClick={() => onStudentClick?.(rowIds[ri], rowLabels[ri])}
                   >
-                    {getDisplayName(rowLabels[ri])}
+                    <Typography
+                      component="span"
+                      variant="body2"
+                      sx={{
+                        fontSize: "inherit",
+                        fontWeight: "inherit",
+                        ...(onStudentClick
+                          ? { color: "primary.main", "&:hover": { textDecoration: "underline" } }
+                          : {}),
+                      }}
+                    >
+                      {getDisplayName(rowLabels[ri])}
+                    </Typography>
                   </td>
                   {colOrder.map((ci) => {
                     const raw = matrix[ri]?.[ci] ?? 0;
@@ -632,6 +676,10 @@ export default function HeatmapView({ onViewThread }: HeatmapViewProps) {
             setPopoverState(null);
             onViewThread?.(threadId, studentName);
           }}
+          onStudentClick={onStudentClick ? (id, name) => {
+            setPopoverState(null);
+            onStudentClick(id, name);
+          } : undefined}
         />
       )}
     </Box>

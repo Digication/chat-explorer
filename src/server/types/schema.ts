@@ -305,6 +305,8 @@ export const typeDefs = /* GraphQL */ `
     text: String!
     threadId: ID!
     threadName: String!
+    studentId: ID
+    studentName: String
     timestamp: String
   }
 

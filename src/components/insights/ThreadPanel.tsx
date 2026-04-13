@@ -17,9 +17,13 @@ interface ThreadPanelProps {
   onClose: () => void;
   /** When true, renders as normal-flow component instead of fixed overlay. */
   embedded?: boolean;
+  /** When provided, student name in the header becomes clickable. */
+  onStudentClick?: (studentId: string, studentName: string) => void;
+  /** Student ID — needed for onStudentClick to work. */
+  studentId?: string;
 }
 
-export default function ThreadPanel({ threadId, studentName, onClose, embedded }: ThreadPanelProps) {
+export default function ThreadPanel({ threadId, studentName, onClose, embedded, onStudentClick, studentId }: ThreadPanelProps) {
   const { getDisplayName } = useUserSettings();
   const { data, loading, error, refetch } = useQuery<any>(GET_THREAD_BY_ID, {
     variables: { id: threadId },
@@ -66,7 +70,19 @@ export default function ThreadPanel({ threadId, studentName, onClose, embedded }
         }}
       >
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="subtitle1" fontWeight={700} noWrap>
+          <Typography
+            variant="subtitle1"
+            fontWeight={700}
+            noWrap
+            sx={{
+              ...(onStudentClick && studentId
+                ? { cursor: "pointer", color: "primary.main", "&:hover": { textDecoration: "underline" } }
+                : {}),
+            }}
+            onClick={() => {
+              if (onStudentClick && studentId) onStudentClick(studentId, studentName);
+            }}
+          >
             {getDisplayName(studentName)}
           </Typography>
           {thread && (

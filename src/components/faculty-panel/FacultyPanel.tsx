@@ -8,6 +8,7 @@ import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import CloseIcon from "@mui/icons-material/Close";
 import { useFacultyPanel, PanelTab } from "./FacultyPanelContext";
 import StudentProfilePage from "@/pages/StudentProfilePage";
+import StudentSearchAutocomplete from "./StudentSearchAutocomplete";
 import ThreadPanel from "@/components/insights/ThreadPanel";
 import AiChatPanel from "@/components/ai/AiChatPanel";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
@@ -29,6 +30,9 @@ export default function FacultyPanel() {
     const tab = TAB_ORDER[newIndex];
     if (tab === "student" && panel.studentId) {
       panel.openStudentProfile(panel.studentId, panel.studentName ?? "");
+    } else if (tab === "student") {
+      // No student loaded — just switch to the tab (shows search)
+      panel.switchTab("student");
     } else if (tab === "thread" && panel.threadId) {
       panel.openThread(panel.threadId, panel.threadStudentName ?? "");
     } else if (tab === "chat") {
@@ -94,30 +98,43 @@ export default function FacultyPanel() {
           <Tab
             key={tab}
             label={TAB_LABELS[tab]}
-            disabled={
-              (tab === "student" && !panel.studentId) ||
-              (tab === "thread" && !panel.threadId)
-            }
+            disabled={tab === "thread" && !panel.threadId}
           />
         ))}
       </Tabs>
 
       {/* ── Tab content ────────────────────────────────────────── */}
       <Box sx={{ flex: 1, overflow: panel.activeTab === "chat" ? "hidden" : "auto", minHeight: 0 }}>
-        {panel.activeTab === "student" && panel.studentId && (
-          <StudentProfilePage
-            studentId={panel.studentId}
-            embedded
-            onViewThread={(threadId, studentName) => panel.openThread(threadId, studentName)}
-          />
+        {panel.activeTab === "student" && (
+          <>
+            <StudentSearchAutocomplete
+              onSelect={(id, name) => panel.openStudentProfile(id, name)}
+              currentStudentName={panel.studentName ?? undefined}
+            />
+            {panel.studentId ? (
+              <StudentProfilePage
+                studentId={panel.studentId}
+                embedded
+                onViewThread={(threadId, studentName) => panel.openThread(threadId, studentName)}
+              />
+            ) : (
+              <Box sx={{ p: 3, textAlign: "center" }}>
+                <Typography color="text.secondary">
+                  Search for a student above, or click a student name on the page.
+                </Typography>
+              </Box>
+            )}
+          </>
         )}
 
         {panel.activeTab === "thread" && panel.threadId && (
           <ThreadPanel
             threadId={panel.threadId}
             studentName={panel.threadStudentName ?? ""}
+            studentId={panel.threadStudentId ?? undefined}
             onClose={panel.close}
             embedded
+            onStudentClick={(id, name) => panel.openStudentProfile(id, name)}
           />
         )}
 

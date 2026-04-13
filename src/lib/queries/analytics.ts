@@ -148,6 +148,8 @@ export const GET_HEATMAP_CELL_EVIDENCE = gql`
         text
         threadId
         threadName
+        studentId
+        studentName
         timestamp
       }
       totalCount

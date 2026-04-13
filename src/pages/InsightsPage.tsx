@@ -68,12 +68,12 @@ export default function InsightsPage() {
 
         {/* Heatmap — with drill-down */}
         <Section id="heatmap" title="Reflection Heatmap">
-          <HeatmapView onViewThread={handleOpenThread} />
+          <HeatmapView onViewThread={handleOpenThread} onStudentClick={handleOpenStudent} />
         </Section>
 
         {/* TORI tag frequency bars */}
         <Section id="tori-frequencies" title="TORI Tag Frequencies">
-          <ToriTagFrequencies onViewThread={handleOpenThread} />
+          <ToriTagFrequencies onViewThread={handleOpenThread} onStudentClick={handleOpenStudent} />
         </Section>
 
         {/* Network graph */}

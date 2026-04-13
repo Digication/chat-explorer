@@ -8,6 +8,7 @@ interface HistoryEntry {
   studentId?: string;
   studentName?: string;
   threadId?: string;
+  threadStudentId?: string;
   threadStudentName?: string;
 }
 
@@ -21,6 +22,7 @@ export interface FacultyPanelState {
 
   // Thread tab
   threadId: string | null;
+  threadStudentId: string | null;
   threadStudentName: string | null;
 
   // Chat tab
@@ -32,8 +34,9 @@ export interface FacultyPanelState {
 
 export interface FacultyPanelActions {
   openStudentProfile: (studentId: string, studentName: string) => void;
-  openThread: (threadId: string, studentName: string) => void;
+  openThread: (threadId: string, studentName: string, studentId?: string) => void;
   openChat: () => void;
+  switchTab: (tab: PanelTab) => void;
   goBack: () => void;
   close: () => void;
   setActiveChatSession: (sessionId: string | null) => void;
@@ -42,8 +45,9 @@ export interface FacultyPanelActions {
 // ── Reducer ─────────────────────────────────────────────────────
 type Action =
   | { type: "OPEN_STUDENT"; studentId: string; studentName: string }
-  | { type: "OPEN_THREAD"; threadId: string; studentName: string }
+  | { type: "OPEN_THREAD"; threadId: string; studentName: string; studentId?: string }
   | { type: "OPEN_CHAT" }
+  | { type: "SWITCH_TAB"; tab: PanelTab }
   | { type: "GO_BACK" }
   | { type: "CLOSE" }
   | { type: "SET_CHAT_SESSION"; sessionId: string | null };
@@ -54,6 +58,7 @@ const initialState: FacultyPanelState = {
   studentId: null,
   studentName: null,
   threadId: null,
+  threadStudentId: null,
   threadStudentName: null,
   activeChatSessionId: null,
   history: [],
@@ -66,6 +71,7 @@ function snapshotEntry(state: FacultyPanelState): HistoryEntry {
     studentId: state.studentId ?? undefined,
     studentName: state.studentName ?? undefined,
     threadId: state.threadId ?? undefined,
+    threadStudentId: state.threadStudentId ?? undefined,
     threadStudentName: state.threadStudentName ?? undefined,
   };
 }
@@ -89,6 +95,7 @@ function reducer(state: FacultyPanelState, action: Action): FacultyPanelState {
         isOpen: true,
         activeTab: "thread",
         threadId: action.threadId,
+        threadStudentId: action.studentId ?? null,
         threadStudentName: action.studentName,
         history: state.isOpen ? [...state.history, snapshotEntry(state)] : [],
       };
@@ -101,6 +108,9 @@ function reducer(state: FacultyPanelState, action: Action): FacultyPanelState {
         history: state.isOpen ? [...state.history, snapshotEntry(state)] : [],
       };
 
+    case "SWITCH_TAB":
+      return { ...state, isOpen: true, activeTab: action.tab };
+
     case "GO_BACK": {
       if (state.history.length === 0) return state;
       const prev = state.history[state.history.length - 1];
@@ -110,6 +120,7 @@ function reducer(state: FacultyPanelState, action: Action): FacultyPanelState {
         studentId: prev.studentId ?? null,
         studentName: prev.studentName ?? null,
         threadId: prev.threadId ?? null,
+        threadStudentId: prev.threadStudentId ?? null,
         threadStudentName: prev.threadStudentName ?? null,
         history: state.history.slice(0, -1),
       };
@@ -146,12 +157,16 @@ export function FacultyPanelProvider({ children }: { children: React.ReactNode }
   );
 
   const openThread = useCallback(
-    (threadId: string, studentName: string) =>
-      dispatch({ type: "OPEN_THREAD", threadId, studentName }),
+    (threadId: string, studentName: string, studentId?: string) =>
+      dispatch({ type: "OPEN_THREAD", threadId, studentName, studentId }),
     [],
   );
 
   const openChat = useCallback(() => dispatch({ type: "OPEN_CHAT" }), []);
+  const switchTab = useCallback(
+    (tab: PanelTab) => dispatch({ type: "SWITCH_TAB", tab }),
+    [],
+  );
   const goBack = useCallback(() => dispatch({ type: "GO_BACK" }), []);
   const close = useCallback(() => dispatch({ type: "CLOSE" }), []);
 
@@ -167,11 +182,12 @@ export function FacultyPanelProvider({ children }: { children: React.ReactNode }
       openStudentProfile,
       openThread,
       openChat,
+      switchTab,
       goBack,
       close,
       setActiveChatSession,
     }),
-    [state, openStudentProfile, openThread, openChat, goBack, close, setActiveChatSession],
+    [state, openStudentProfile, openThread, openChat, switchTab, goBack, close, setActiveChatSession],
   );
 
   return (

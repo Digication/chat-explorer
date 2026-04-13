@@ -22,6 +22,7 @@ interface EvidencePopoverProps {
   scope: { institutionId: string; courseId?: string; assignmentId?: string };
   onClose: () => void;
   onViewThread: (threadId: string, studentName: string) => void;
+  onStudentClick?: (studentId: string, studentName: string) => void;
 }
 
 interface EvidenceItem {
@@ -29,6 +30,8 @@ interface EvidenceItem {
   text: string;
   threadId: string;
   threadName: string;
+  studentId: string | null;
+  studentName: string | null;
   timestamp: string | null;
 }
 
@@ -47,6 +50,7 @@ export default function EvidencePopover({
   scope,
   onClose,
   onViewThread,
+  onStudentClick,
 }: EvidencePopoverProps) {
   const { getDisplayName } = useUserSettings();
   const [accumulated, setAccumulated] = React.useState<EvidenceItem[]>([]);
@@ -169,6 +173,29 @@ export default function EvidencePopover({
                 borderColor: "primary.main",
               }}
             >
+              {/* Student name (shown when evidence spans multiple students) */}
+              {!studentId && item.studentName && (
+                <Typography
+                  variant="caption"
+                  fontWeight={600}
+                  sx={{
+                    mb: 0.5,
+                    display: "block",
+                    ...(onStudentClick && item.studentId
+                      ? { cursor: "pointer", color: "primary.main", "&:hover": { textDecoration: "underline" } }
+                      : { color: "text.secondary" }),
+                  }}
+                  onClick={() => {
+                    if (onStudentClick && item.studentId) {
+                      onStudentClick(item.studentId, item.studentName!);
+                      onClose();
+                    }
+                  }}
+                >
+                  {getDisplayName(item.studentName)}
+                </Typography>
+              )}
+
               {/* Truncated quote */}
               <Typography variant="body2" sx={{ mb: 0.5, lineHeight: 1.5 }}>
                 "{(() => { const t = decodeEntities(item.text); return t.length > 200 ? t.slice(0, 200) + "…" : t; })()}"
@@ -192,7 +219,7 @@ export default function EvidencePopover({
                 variant="caption"
                 sx={{ mt: 0.5, display: "inline-block" }}
                 onClick={() => {
-                  onViewThread(item.threadId, studentName || "Student");
+                  onViewThread(item.threadId, item.studentName || studentName || "Student");
                   onClose();
                 }}
               >
