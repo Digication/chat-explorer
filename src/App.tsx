@@ -21,6 +21,11 @@ import { InsightsScopeProvider } from "@/components/insights/ScopeSelector";
 import { InsightsAnalyticsProvider } from "@/components/insights/InsightsAnalyticsContext";
 import { FacultyPanelProvider } from "@/components/faculty-panel/FacultyPanelContext";
 import PageViewTracker from "@/components/tracking/PageViewTracker";
+import RoleBasedRedirect from "@/components/layout/RoleBasedRedirect";
+import StudentDashboardPage from "@/pages/student/StudentDashboardPage";
+import StudentTreePage from "@/pages/student/StudentTreePage";
+import StudentGrowthPage from "@/pages/student/StudentGrowthPage";
+import StudentOutcomesPage from "@/pages/student/StudentOutcomesPage";
 
 function DashboardPage() {
   return (
@@ -139,7 +144,7 @@ export default function App() {
                   </ProtectedRoute>
                 }
               >
-                <Route index element={<Navigate to="/insights" replace />} />
+                <Route index element={<RoleBasedRedirect />} />
                 <Route path="upload" element={<DashboardPage />} />
                 <Route path="insights" element={<InsightsPage />} />
                 <Route path="insights/compare" element={<CrossCourseComparisonPage />} />
@@ -154,6 +159,39 @@ export default function App() {
                   element={
                     <RoleProtectedRoute allowedRoles={["institution_admin", "digication_admin"]}>
                       <AdminPage />
+                    </RoleProtectedRoute>
+                  }
+                />
+                {/* Student routes */}
+                <Route
+                  path="student"
+                  element={
+                    <RoleProtectedRoute allowedRoles={["student"]}>
+                      <StudentDashboardPage />
+                    </RoleProtectedRoute>
+                  }
+                />
+                <Route
+                  path="student/tree"
+                  element={
+                    <RoleProtectedRoute allowedRoles={["student"]}>
+                      <StudentTreePage />
+                    </RoleProtectedRoute>
+                  }
+                />
+                <Route
+                  path="student/growth"
+                  element={
+                    <RoleProtectedRoute allowedRoles={["student"]}>
+                      <StudentGrowthPage />
+                    </RoleProtectedRoute>
+                  }
+                />
+                <Route
+                  path="student/outcomes"
+                  element={
+                    <RoleProtectedRoute allowedRoles={["student"]}>
+                      <StudentOutcomesPage />
                     </RoleProtectedRoute>
                   }
                 />

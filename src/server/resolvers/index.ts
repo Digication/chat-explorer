@@ -11,6 +11,7 @@ import { consentResolvers } from "./consent.js";
 import { exportResolvers } from "./export.js";
 import { adminResolvers } from "./admin.js";
 import { telemetryResolvers } from "./telemetry.js";
+import { studentAuthResolvers } from "./student-auth.js";
 
 /**
  * Merges all resolver groups into a single resolver map.
@@ -26,6 +27,7 @@ export const resolvers = {
     ...exportResolvers.Query,
     ...adminResolvers.Query,
     ...telemetryResolvers.Query,
+    ...studentAuthResolvers.Query,
 
     // Reference data
     toriTags: async () => {
@@ -50,6 +52,7 @@ export const resolvers = {
     ...adminResolvers.Mutation,
     ...institutionResolvers.Mutation,
     ...telemetryResolvers.Mutation,
+    ...studentAuthResolvers.Mutation,
   },
 
   // Field resolvers

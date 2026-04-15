@@ -9,6 +9,7 @@ import {
   type Relation,
 } from "typeorm";
 import type { Institution } from "./Institution.js";
+import type { User } from "./User.js";
 import type { Comment } from "./Comment.js";
 import type { StudentConsent } from "./StudentConsent.js";
 
@@ -41,6 +42,13 @@ export class Student {
 
   @Column({ type: "varchar", nullable: true })
   courseRole!: string | null;
+
+  @Column({ type: "varchar", nullable: true })
+  userId!: string | null;
+
+  @ManyToOne("User", { nullable: true })
+  @JoinColumn({ name: "userId" })
+  user!: Relation<User> | null;
 
   @ManyToOne("Institution", "students")
   @JoinColumn({ name: "institutionId" })

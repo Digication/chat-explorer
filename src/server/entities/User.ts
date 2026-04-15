@@ -18,6 +18,7 @@ export enum UserRole {
   INSTRUCTOR = "instructor",
   INSTITUTION_ADMIN = "institution_admin",
   DIGICATION_ADMIN = "digication_admin",
+  STUDENT = "student",
 }
 
 @Entity()

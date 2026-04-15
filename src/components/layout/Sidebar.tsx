@@ -18,6 +18,10 @@ import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
+import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
+import AccountTreeOutlinedIcon from "@mui/icons-material/AccountTreeOutlined";
+import TrendingUpOutlinedIcon from "@mui/icons-material/TrendingUpOutlined";
+import EmojiEventsOutlinedIcon from "@mui/icons-material/EmojiEventsOutlined";
 import MenuIcon from "@mui/icons-material/Menu";
 import { sidebarTheme } from "@/lib/theme";
 import { HEADER_HEIGHT } from "./GlobalHeader";
@@ -26,12 +30,19 @@ import { useAuth } from "@/lib/AuthProvider";
 const COLLAPSED_WIDTH = 60;
 const EXPANDED_WIDTH = 280;
 
-const NAV_ITEMS = [
+const FACULTY_NAV_ITEMS = [
   { label: "Insights", icon: <InsightsOutlinedIcon />, path: "/insights" },
   { label: "Chat Explorer", icon: <ChatOutlinedIcon />, path: "/chat" },
   { label: "Upload", icon: <CloudUploadOutlinedIcon />, path: "/upload" },
   { label: "Reports", icon: <DescriptionOutlinedIcon />, path: "/reports" },
   { label: "Settings", icon: <SettingsOutlinedIcon />, path: "/settings" },
+];
+
+const STUDENT_NAV_ITEMS = [
+  { label: "My Dashboard", icon: <DashboardOutlinedIcon />, path: "/student" },
+  { label: "My Learning Map", icon: <AccountTreeOutlinedIcon />, path: "/student/tree" },
+  { label: "My Growth", icon: <TrendingUpOutlinedIcon />, path: "/student/growth" },
+  { label: "My Outcomes", icon: <EmojiEventsOutlinedIcon />, path: "/student/outcomes" },
 ];
 
 function SidebarContent({
@@ -45,21 +56,24 @@ function SidebarContent({
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  const isStudent = user?.role === "student";
   const isAdmin =
     user?.role === "institution_admin" || user?.role === "digication_admin";
 
-  const navItems = [
-    ...NAV_ITEMS,
-    ...(isAdmin
-      ? [
-          {
-            label: "Admin",
-            icon: <AdminPanelSettingsOutlinedIcon />,
-            path: "/admin",
-          },
-        ]
-      : []),
-  ];
+  const navItems = isStudent
+    ? STUDENT_NAV_ITEMS
+    : [
+        ...FACULTY_NAV_ITEMS,
+        ...(isAdmin
+          ? [
+              {
+                label: "Admin",
+                icon: <AdminPanelSettingsOutlinedIcon />,
+                path: "/admin",
+              },
+            ]
+          : []),
+      ];
 
   const handleNav = (path: string) => {
     navigate(path);
