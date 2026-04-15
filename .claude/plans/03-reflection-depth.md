@@ -242,7 +242,7 @@ After the new path is wired, verify in Chrome via the in-Chrome MCP:
 
 1. **Which Gemini model?** Default to `gemini-2.0-flash` for cost; happy to use `gemini-2.5-pro` for the backfill if you want higher-quality labels on the seed corpus. Once classified, comments are not re-classified unless we bump `classifierVersion`.
 2. **Color palette for the 4 categories.** Proposed: Descriptive Writing = neutral gray, Descriptive Reflection = blue, Dialogic Reflection = purple, Critical Reflection = amber. OK to lock that in?
-3. **Modal vs. distribution in the Student Engagement table.** I propose showing the modal category as a chip + a small 4-bar mini-distribution next to it. Acceptable, or do you want only the modal?
+3. **Modal vs. distribution in the Student Engagement table.** ✅ RESOLVED (2026-04-15): Show the full distribution, not the modal. The modal is misleading — it makes everyone look "Descriptive." PR #5 shipped the fix for StudentListPanel; remaining views (EngagementTable, DepthBands, GrowthVisualization) should follow. See `.claude/plans/depth-distribution-design-decision.md` for the full rationale.
 4. **Backfill on dev first.** I'll run the backfill on the local Docker DB before we touch prod. Confirm that's OK (it will spend a few cents of Gemini quota on your key).
 
 ## Out of scope for Plan 3
