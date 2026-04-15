@@ -623,6 +623,7 @@ export const typeDefs = /* GraphQL */ `
     topFeatures: [FeatureUsage!]!
     aiChatAdoption: AdoptionData!
     dailyEvents: [DailyEventCount!]!
+    userActivity: [UserActivity!]!
   }
 
   type ActiveUsersData {
@@ -647,6 +648,15 @@ export const typeDefs = /* GraphQL */ `
   type DailyEventCount {
     date: String!
     count: Int!
+  }
+
+  type UserActivity {
+    userId: ID!
+    name: String!
+    email: String!
+    lastActive: String!
+    totalEvents: Int!
+    featuresUsed: [String!]!
   }
 
   # ── Input Types ───────────────────────────────────────────────
@@ -767,7 +777,7 @@ export const typeDefs = /* GraphQL */ `
     me: User
 
     # Telemetry (admin only)
-    telemetrySummary(institutionId: ID, startDate: String!, endDate: String!): TelemetrySummary!
+    telemetrySummary(institutionId: ID, userId: ID, startDate: String!, endDate: String!): TelemetrySummary!
   }
 
   type Mutation {

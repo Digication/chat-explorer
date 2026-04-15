@@ -13,6 +13,7 @@ import {
   Skeleton,
   Alert,
   Button,
+  Chip,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -53,6 +54,7 @@ export default function AnalyticsTab() {
   const [startDate, setStartDate] = useState(defaultStart);
   const [endDate, setEndDate] = useState(today);
   const [institutionId, setInstitutionId] = useState<string>("");
+  const [selectedUser, setSelectedUser] = useState<{ id: string; name: string } | null>(null);
   const [purgeOpen, setPurgeOpen] = useState(false);
 
   // Fetch institutions for the filter dropdown (digication_admin only)
@@ -60,16 +62,19 @@ export default function AnalyticsTab() {
     skip: !isDigicationAdmin,
   });
 
+  const queryVariables = {
+    institutionId: institutionId || undefined,
+    userId: selectedUser?.id || undefined,
+    startDate,
+    endDate,
+  };
+
   const { data, loading, error } = useQuery<any>(GET_TELEMETRY_SUMMARY, {
-    variables: {
-      institutionId: institutionId || undefined,
-      startDate,
-      endDate,
-    },
+    variables: queryVariables,
   });
 
   const [purgeEvents, { loading: purging }] = useMutation(PURGE_OLD_TELEMETRY, {
-    refetchQueries: [{ query: GET_TELEMETRY_SUMMARY, variables: { institutionId: institutionId || undefined, startDate, endDate } }],
+    refetchQueries: [{ query: GET_TELEMETRY_SUMMARY, variables: queryVariables }],
   });
 
   const summary = data?.telemetrySummary;
@@ -124,6 +129,15 @@ export default function AnalyticsTab() {
               </MenuItem>
             ))}
           </Select>
+        )}
+        {selectedUser && (
+          <Chip
+            label={`User: ${selectedUser.name}`}
+            onDelete={() => setSelectedUser(null)}
+            color="primary"
+            variant="outlined"
+            size="small"
+          />
         )}
       </Box>
 
@@ -198,6 +212,84 @@ export default function AnalyticsTab() {
                   <TableCell colSpan={3} align="center">
                     <Typography variant="body2" color="text.secondary">
                       No events recorded yet
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+
+          {/* ── User Activity ─────────────────────────────── */}
+          <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
+            User Activity
+          </Typography>
+          <Table size="small" sx={{ mb: 3 }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>User</TableCell>
+                <TableCell>Last Active</TableCell>
+                <TableCell align="right">Events</TableCell>
+                <TableCell>Features Used</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {summary.userActivity.map(
+                (u: { userId: string; name: string; email: string; lastActive: string; totalEvents: number; featuresUsed: string[] }) => (
+                  <TableRow
+                    key={u.userId}
+                    hover
+                    onClick={() =>
+                      setSelectedUser(
+                        selectedUser?.id === u.userId ? null : { id: u.userId, name: u.name }
+                      )
+                    }
+                    selected={selectedUser?.id === u.userId}
+                    sx={{ cursor: "pointer" }}
+                  >
+                    <TableCell>
+                      <Typography variant="body2" fontWeight={500}>{u.name}</Typography>
+                      <Typography variant="caption" color="text.secondary">{u.email}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {new Date(u.lastActive).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">{u.totalEvents}</TableCell>
+                    <TableCell>
+                      <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
+                        {u.featuresUsed
+                          .filter((f) => f !== "PAGE_VIEW")
+                          .map((f) => (
+                            <Box
+                              key={f}
+                              sx={{
+                                px: 1,
+                                py: 0.25,
+                                borderRadius: 1,
+                                bgcolor: "action.hover",
+                                fontSize: "0.75rem",
+                                textTransform: "capitalize",
+                              }}
+                            >
+                              {f.replace(/_/g, " ").toLowerCase()}
+                            </Box>
+                          ))}
+                        {u.featuresUsed.every((f) => f === "PAGE_VIEW") && (
+                          <Typography variant="caption" color="text.secondary">
+                            Browsing only
+                          </Typography>
+                        )}
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                )
+              )}
+              {summary.userActivity.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={4} align="center">
+                    <Typography variant="body2" color="text.secondary">
+                      No user activity recorded yet
                     </Typography>
                   </TableCell>
                 </TableRow>

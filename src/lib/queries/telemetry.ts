@@ -19,11 +19,13 @@ export const PURGE_OLD_TELEMETRY = gql`
 export const GET_TELEMETRY_SUMMARY = gql`
   query TelemetrySummary(
     $institutionId: ID
+    $userId: ID
     $startDate: String!
     $endDate: String!
   ) {
     telemetrySummary(
       institutionId: $institutionId
+      userId: $userId
       startDate: $startDate
       endDate: $endDate
     ) {
@@ -46,6 +48,14 @@ export const GET_TELEMETRY_SUMMARY = gql`
       dailyEvents {
         date
         count
+      }
+      userActivity {
+        userId
+        name
+        email
+        lastActive
+        totalEvents
+        featuresUsed
       }
     }
   }
