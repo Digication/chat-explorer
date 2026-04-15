@@ -144,11 +144,14 @@ app.post(
         return;
       }
 
+      const replaceMode = req.body?.replaceMode === "true";
+
       const result = await commitUpload(
         req.file.buffer,
         req.user!.id,
         institutionId,
-        req.file.originalname
+        req.file.originalname,
+        replaceMode
       );
 
       // Fire-and-forget reflection classification (Plan 3 / Hatton & Smith).

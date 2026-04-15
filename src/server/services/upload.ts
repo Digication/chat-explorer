@@ -61,6 +61,8 @@ export interface UploadCommitResult extends UploadPreviewResult {
   // IDs of newly created USER comments — used by the upload route to fire
   // off background reflection-classification (Plan 3 / Hatton & Smith).
   newUserCommentIds: string[];
+  // Number of existing comments whose text was replaced (replaceMode only)
+  updatedComments: number;
 }
 
 // ── Institution detection ──────────────────────────────────────────
@@ -275,7 +277,8 @@ export async function commitUpload(
   fileBuffer: Buffer,
   uploadedById: string,
   institutionId: string,
-  originalFilename: string
+  originalFilename: string,
+  replaceMode = false
 ): Promise<UploadCommitResult> {
   const rows = parseCsvBuffer(fileBuffer);
 
@@ -316,6 +319,7 @@ export async function commitUpload(
 
     // ── Counters ─────────────────────────────────────────────────
     let newCommentsCount = 0;
+    let updatedCommentsCount = 0;
     let newThreadsCount = 0;
     let newStudentsCount = 0;
     let newAssignmentsCount = 0;
@@ -497,8 +501,23 @@ export async function commitUpload(
         const insertedCommentIds = new Set<string>();
 
         for (const row of threadRows) {
-          // Skip duplicate comments (already in DB or already inserted this upload)
-          if (dedup.existingCommentIds.has(row.commentId)) continue;
+          // Handle duplicate comments — skip or update depending on mode
+          if (dedup.existingCommentIds.has(row.commentId)) {
+            if (replaceMode) {
+              // Update the existing comment's text with the cleaner version
+              await manager.update(
+                Comment,
+                { externalId: row.commentId, threadId: thread.id },
+                {
+                  text: decodeEntities(row.commentFullText ?? ""),
+                  timestamp: parseDateOrNull(row.commentTimestamp),
+                  grade: row.grade || null,
+                }
+              );
+              updatedCommentsCount++;
+            }
+            continue;
+          }
           if (insertedCommentIds.has(row.commentId)) continue;
           insertedCommentIds.add(row.commentId);
 
@@ -518,6 +537,14 @@ export async function commitUpload(
                       institutionId,
                     },
                   })) ?? undefined;
+
+                // In replace mode, update student info with the cleaner data
+                if (student && replaceMode) {
+                  student.firstName = row.authorFirstName || student.firstName;
+                  student.lastName = row.authorLastName || student.lastName;
+                  student.email = row.authorEmail || student.email;
+                  await manager.save(Student, student);
+                }
               }
               if (!student) {
                 student = await manager.save(Student, {
@@ -627,6 +654,7 @@ export async function commitUpload(
       toriTagsExtracted,
       courseAccessCreated: courseIdsForAccess.size > 0,
       newUserCommentIds,
+      updatedComments: updatedCommentsCount,
     };
   });
 }

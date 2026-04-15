@@ -10,6 +10,8 @@ import {
   TableBody,
   TableRow,
   TableCell,
+  FormControlLabel,
+  Checkbox,
 } from "@mui/material";
 import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
@@ -33,6 +35,7 @@ interface CommitResult extends PreviewResult {
   uploadLogId: string;
   toriTagsExtracted: number;
   courseAccessCreated: boolean;
+  updatedComments: number;
 }
 
 type Step = "pick" | "previewing" | "preview" | "committing" | "done";
@@ -43,6 +46,7 @@ export default function CsvUploadCard() {
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [commitResult, setCommitResult] = useState<CommitResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [replaceMode, setReplaceMode] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -98,6 +102,12 @@ export default function CsvUploadCard() {
         form.append("institutionId", preview.detectedInstitutionId);
       }
 
+      // When replace mode is on, existing comments will be updated with
+      // the new (cleaner) text instead of being skipped
+      if (replaceMode) {
+        form.append("replaceMode", "true");
+      }
+
       const res = await fetch(`${API_BASE}/api/upload/commit`, {
         method: "POST",
         body: form,
@@ -125,6 +135,7 @@ export default function CsvUploadCard() {
     setPreview(null);
     setCommitResult(null);
     setError(null);
+    setReplaceMode(false);
   };
 
   // Drag-and-drop event handlers
@@ -223,7 +234,7 @@ export default function CsvUploadCard() {
             </Alert>
           )}
 
-          <Table size="small" sx={{ mb: 3 }}>
+          <Table size="small" sx={{ mb: 2 }}>
             <TableBody>
               <TableRow>
                 <TableCell>Total rows in file</TableCell>
@@ -234,8 +245,14 @@ export default function CsvUploadCard() {
                 <TableCell align="right"><strong>{preview.newComments}</strong></TableCell>
               </TableRow>
               <TableRow>
-                <TableCell>Duplicate comments (already uploaded)</TableCell>
-                <TableCell align="right">{preview.duplicateComments}</TableCell>
+                <TableCell>
+                  {replaceMode
+                    ? "Existing comments to update"
+                    : "Duplicate comments (will be skipped)"}
+                </TableCell>
+                <TableCell align="right">
+                  <strong>{preview.duplicateComments}</strong>
+                </TableCell>
               </TableRow>
               <TableRow>
                 <TableCell>New threads</TableCell>
@@ -252,6 +269,19 @@ export default function CsvUploadCard() {
             </TableBody>
           </Table>
 
+          {preview.duplicateComments > 0 && (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={replaceMode}
+                  onChange={(e) => setReplaceMode(e.target.checked)}
+                />
+              }
+              label="Replace existing data with this file's version (use when re-uploading cleaner data)"
+              sx={{ mb: 2 }}
+            />
+          )}
+
           <Box sx={{ display: "flex", gap: 2 }}>
             <Button variant="outlined" onClick={handleReset}>
               Cancel
@@ -261,7 +291,7 @@ export default function CsvUploadCard() {
               onClick={handleCommit}
               disabled={!preview.detectedInstitutionId}
             >
-              Confirm Upload
+              {replaceMode ? "Confirm Upload & Replace" : "Confirm Upload"}
             </Button>
           </Box>
         </Box>
@@ -296,6 +326,12 @@ export default function CsvUploadCard() {
                 <TableCell>Comments imported</TableCell>
                 <TableCell align="right"><strong>{commitResult.newComments}</strong></TableCell>
               </TableRow>
+              {commitResult.updatedComments > 0 && (
+                <TableRow>
+                  <TableCell>Comments updated</TableCell>
+                  <TableCell align="right"><strong>{commitResult.updatedComments}</strong></TableCell>
+                </TableRow>
+              )}
               <TableRow>
                 <TableCell>Threads created</TableCell>
                 <TableCell align="right"><strong>{commitResult.newThreads}</strong></TableCell>
