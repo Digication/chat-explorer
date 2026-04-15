@@ -12,6 +12,7 @@ import { fromNodeHeaders } from "better-auth/node";
 import { AppDataSource } from "./data-source.js";
 import { auth } from "./auth.js";
 import { seedToriTags } from "./seeds/tori-tags.js";
+import { seedToriFrameworks } from "./services/evidence/seed-tori-framework.js";
 import {
   requireAuth,
   type AuthenticatedRequest,
@@ -19,6 +20,7 @@ import {
 import { User } from "./entities/User.js";
 import { previewUpload, commitUpload } from "./services/upload.js";
 import { classifyUserCommentsInBackground } from "./services/reflection/ingest-hook.js";
+import { generateEvidenceInBackground } from "./services/evidence/evidence-pipeline.js";
 import { typeDefs } from "./types/schema.js";
 import { resolvers } from "./resolvers/index.js";
 import type { GraphQLContext } from "./types/context.js";
@@ -164,6 +166,16 @@ app.post(
         }
       );
 
+      // Fire-and-forget narrative evidence generation (Phase 2).
+      // Runs after reflection classification kicks off — both are independent
+      // background tasks that don't block the upload response.
+      void generateEvidenceInBackground(
+        result.newUserCommentIds,
+        institutionId
+      ).catch((err) => {
+        console.error("[evidence] background generation failed:", err);
+      });
+
       res.json(result);
     } catch (err) {
       console.error("Upload commit error:", err);
@@ -275,6 +287,7 @@ async function main() {
     }
 
     await seedToriTags();
+    await seedToriFrameworks();
 
     // Bootstrap: promote a user to digication_admin if BOOTSTRAP_ADMIN_EMAIL
     // is set. This solves the chicken-and-egg problem where no admin exists

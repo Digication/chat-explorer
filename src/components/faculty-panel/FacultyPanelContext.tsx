@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer, useCallback, useMemo } from "react";
 
 // ── Types ───────────────────────────────────────────────────────
-export type PanelTab = "student" | "thread" | "chat";
+export type PanelTab = "student" | "thread" | "evidence" | "chat";
 
 interface HistoryEntry {
   tab: PanelTab;
@@ -50,6 +50,7 @@ export interface FacultyPanelActions {
   openStudentProfile: (studentId: string, studentName: string) => void;
   openThread: (threadId: string, studentName: string, studentId?: string, initialToriTag?: string) => void;
   openChat: () => void;
+  openEvidence: () => void;
   switchTab: (tab: PanelTab) => void;
   goBack: () => void;
   close: () => void;
@@ -63,6 +64,7 @@ type Action =
   | { type: "OPEN_STUDENT"; studentId: string; studentName: string }
   | { type: "OPEN_THREAD"; threadId: string; studentName: string; studentId?: string; initialToriTag?: string }
   | { type: "OPEN_CHAT" }
+  | { type: "OPEN_EVIDENCE" }
   | { type: "SWITCH_TAB"; tab: PanelTab }
   | { type: "GO_BACK" }
   | { type: "CLOSE" }
@@ -129,6 +131,14 @@ function reducer(state: FacultyPanelState, action: Action): FacultyPanelState {
         ...state,
         isOpen: true,
         activeTab: "chat",
+        history: state.isOpen ? [...state.history, snapshotEntry(state)] : [],
+      };
+
+    case "OPEN_EVIDENCE":
+      return {
+        ...state,
+        isOpen: true,
+        activeTab: "evidence",
         history: state.isOpen ? [...state.history, snapshotEntry(state)] : [],
       };
 
@@ -207,6 +217,7 @@ export function FacultyPanelProvider({ children }: { children: React.ReactNode }
   );
 
   const openChat = useCallback(() => dispatch({ type: "OPEN_CHAT" }), []);
+  const openEvidence = useCallback(() => dispatch({ type: "OPEN_EVIDENCE" }), []);
   const switchTab = useCallback(
     (tab: PanelTab) => dispatch({ type: "SWITCH_TAB", tab }),
     [],
@@ -236,6 +247,7 @@ export function FacultyPanelProvider({ children }: { children: React.ReactNode }
       openStudentProfile,
       openThread,
       openChat,
+      openEvidence,
       switchTab,
       goBack,
       close,
@@ -243,7 +255,7 @@ export function FacultyPanelProvider({ children }: { children: React.ReactNode }
       setPageContext,
       acknowledgeContextChange,
     }),
-    [state, openStudentProfile, openThread, openChat, switchTab, goBack, close, setActiveChatSession, setPageContext, acknowledgeContextChange],
+    [state, openStudentProfile, openThread, openChat, openEvidence, switchTab, goBack, close, setActiveChatSession, setPageContext, acknowledgeContextChange],
   );
 
   return (

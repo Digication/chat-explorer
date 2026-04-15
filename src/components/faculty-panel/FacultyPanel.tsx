@@ -13,13 +13,15 @@ import StudentProfilePage from "@/pages/StudentProfilePage";
 import StudentSearchAutocomplete from "./StudentSearchAutocomplete";
 import ThreadPanel from "@/components/insights/ThreadPanel";
 import AiChatPanel from "@/components/ai/AiChatPanel";
+import EvidenceTabPanel from "@/components/insights/EvidenceTabPanel";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
 import { useInsightsAnalytics } from "@/components/insights/InsightsAnalyticsContext";
 
-const TAB_ORDER: PanelTab[] = ["student", "thread", "chat"];
+const TAB_ORDER: PanelTab[] = ["student", "thread", "evidence", "chat"];
 const TAB_LABELS: Record<PanelTab, string> = {
   student: "Student",
   thread: "Thread",
+  evidence: "Evidence",
   chat: "AI Chat",
 };
 
@@ -50,6 +52,8 @@ export default function FacultyPanel() {
       panel.switchTab("student");
     } else if (tab === "thread" && panel.threadId) {
       panel.openThread(panel.threadId, panel.threadStudentName ?? "");
+    } else if (tab === "evidence") {
+      panel.openEvidence();
     } else if (tab === "chat") {
       panel.openChat();
     }
@@ -94,6 +98,7 @@ export default function FacultyPanel() {
         >
           {panel.activeTab === "student" && panel.studentName}
           {panel.activeTab === "thread" && panel.threadStudentName}
+          {panel.activeTab === "evidence" && "Evidence"}
           {panel.activeTab === "chat" && "AI Chat"}
         </Typography>
 
@@ -184,6 +189,8 @@ export default function FacultyPanel() {
             />
           </>
         )}
+
+        {panel.activeTab === "evidence" && <EvidenceTabPanel />}
 
         {panel.activeTab === "chat" && (
           <>
