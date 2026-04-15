@@ -543,6 +543,13 @@ export default function AiChatPanel({
           {isSending ? <CircularProgress size={20} /> : <SendIcon />}
         </IconButton>
       </Box>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ textAlign: "center", mt: -0.5, mb: 1 }}
+      >
+        Your content in Digication is never used as AI training data.
+      </Typography>
     </Box>
   );
 
