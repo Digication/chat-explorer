@@ -150,7 +150,7 @@ Normal workflow:
 
 ## Custom Domain Setup
 
-Not yet done, but the plan:
+Not yet done for production, but the plan:
 
 1. In Railway: **chat-explorer service → Settings → Networking → + Custom Domain** → enter `chat-explorer.digication.com`. Railway provides a CNAME target.
 2. Add a CNAME record in Digication's DNS provider: `chat-explorer` → the value Railway gave.
@@ -160,6 +160,137 @@ Not yet done, but the plan:
 6. (Optional) Set `ALLOWED_ORIGINS=https://chat-explorer.up.railway.app` during the transition to keep the old URL working.
 
 The old `*.up.railway.app` URL continues to work even after a custom domain is added, so there's no hard cutover.
+
+## Staging Environment
+
+A staging server at `https://chat-explorer.digistage.me` for testing new features (especially the outcomes/evidence phases) before they hit production.
+
+### Architecture
+
+```
+GitHub (staging branch)
+        │
+        │ auto-deploy on push
+        ▼
+┌──────────────────────────────┐    ┌─────────────────────────┐
+│  Railway: chat-explorer-stg  │◄──►│ Railway: Postgres (stg) │
+│  (Express + React bundle)    │    │ (managed DB)            │
+└──────────────────────────────┘    └─────────────────────────┘
+        ▲
+        │ HTTPS via chat-explorer.digistage.me
+        ▼
+      Testers
+```
+
+Same setup as production — Express serves the bundled React app and the API from one process. Its own database, its own env vars, its own deploy trigger (the `staging` branch).
+
+### Setup Steps
+
+#### 1. Create Railway service
+
+In the existing Railway project (keeps billing together):
+
+1. **+ New Service → GitHub Repo** → select `Digication/chat-explorer`
+2. **Settings → Source → Branch** → set to `staging`
+3. **Settings → Build** → Build command: `pnpm build`, Start command: `pnpm start`
+4. Rename the service to `chat-explorer-staging` in Railway
+
+#### 2. Add a staging database
+
+1. **+ New Service → Database → PostgreSQL**
+2. Rename it to `Postgres (staging)` to distinguish from production
+3. In the `chat-explorer-staging` service, reference the staging database:
+   - Set `DATABASE_URL` to `${{Postgres (staging).DATABASE_URL}}`
+
+#### 3. Set environment variables
+
+In **chat-explorer-staging → Variables**:
+
+| Variable | Value |
+|----------|-------|
+| `NODE_ENV` | `production` |
+| `PORT` | `3000` |
+| `DATABASE_URL` | `${{Postgres (staging).DATABASE_URL}}` |
+| `BETTER_AUTH_SECRET` | Generate new: `openssl rand -hex 32` (different from prod!) |
+| `BETTER_AUTH_URL` | `https://chat-explorer.digistage.me` |
+| `GOOGLE_CLIENT_ID` | Same as production (same Google OAuth app) |
+| `GOOGLE_CLIENT_SECRET` | Same as production |
+| `GOOGLE_AI_API_KEY` | Same as production (or a separate key with lower quota) |
+| `OPENAI_API_KEY` | Same as production |
+| `ANTHROPIC_API_KEY` | Same as production |
+| `SENDGRID_API_KEY` | Same as production (or omit — magic links will log to console) |
+| `SENDGRID_FROM_EMAIL` | `noreply@digication.com` |
+| `BOOTSTRAP_ADMIN_EMAIL` | Your email (to get notified of sign-in attempts) |
+
+**Important:** `BETTER_AUTH_SECRET` must be different from production. If they share the same secret, a session cookie from one environment could authenticate in the other.
+
+#### 4. Custom domain
+
+1. In Railway: **chat-explorer-staging → Settings → Networking → + Custom Domain** → enter `chat-explorer.digistage.me`
+2. Railway gives you a CNAME target (something like `abc123.up.railway.app`)
+3. In your DNS provider for `digistage.me`: add a CNAME record:
+   - Name: `chat-explorer`
+   - Target: the value Railway provided
+4. Wait for DNS propagation (5–30 min). Railway auto-provisions SSL via Let's Encrypt.
+
+#### 5. Google OAuth redirect URI
+
+In [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials), add to the existing OAuth client's **Authorized redirect URIs**:
+
+```
+https://chat-explorer.digistage.me/api/auth/callback/google
+```
+
+This is required for Google sign-in to work on the staging domain. Without it, sign-in silently fails.
+
+#### 6. Create the staging branch
+
+```bash
+git checkout main
+git checkout -b staging
+git push -u origin staging
+```
+
+Railway auto-deploys when this branch is pushed. To get new code to staging:
+
+```bash
+# Merge main into staging (or cherry-pick specific commits)
+git checkout staging
+git merge main
+git push
+```
+
+Or merge feature branches directly into `staging` for testing before they go to `main`.
+
+#### 7. Seed staging data
+
+The staging database starts empty. On first deploy, migrations run automatically and TORI tags are seeded. To test with realistic data:
+
+- Upload a CSV via the staging app's upload page, OR
+- Copy a subset of production data using `pg_dump`/`pg_restore` (selective — don't copy user sessions or auth tables)
+
+### Workflow
+
+| Action | Production | Staging |
+|--------|-----------|---------|
+| Deploy trigger | Push to `main` | Push to `staging` |
+| URL | `chat-explorer.up.railway.app` | `chat-explorer.digistage.me` |
+| Database | Shared with real users | Isolated, safe to reset |
+| Auth | Same Google OAuth app | Same Google OAuth app, different session secret |
+| Testing new features | Never | Always test here first |
+
+### Resetting the staging database
+
+If the staging database gets into a bad state (e.g., a failed migration during development), you can reset it:
+
+1. In Railway dashboard: open the staging Postgres service
+2. Delete the service and create a new one
+3. Update the `DATABASE_URL` reference in `chat-explorer-staging`
+4. Redeploy — migrations will run fresh on the empty database
+
+### Cost
+
+Railway Pro plan includes $20/month in credits. The staging service and its database share that allowance. A low-traffic staging environment typically costs $2–5/month (mostly the Postgres instance). If it goes unused, you can scale the staging service to zero in Railway settings.
 
 ## Key Decisions and History
 
