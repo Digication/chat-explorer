@@ -19,6 +19,7 @@ export interface StudentProfile {
   name: string;
   topToriTags: string[]; // top 3 tag names
   modalCategory: ReflectionCategory;
+  categoryDistribution: Record<ReflectionCategory, number>;
   commentCount: number;
   avgWordCount: number;
 }
@@ -142,6 +143,12 @@ export async function getInsights(
         name: studentLabel(sId),
         topToriTags: topTags,
         modalCategory: eng?.modalCategory ?? "DESCRIPTIVE_WRITING",
+        categoryDistribution: eng?.categoryDistribution ?? {
+          DESCRIPTIVE_WRITING: 0,
+          DESCRIPTIVE_REFLECTION: 0,
+          DIALOGIC_REFLECTION: 0,
+          CRITICAL_REFLECTION: 0,
+        },
         commentCount: sComments.length,
         avgWordCount,
       };

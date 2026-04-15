@@ -351,6 +351,7 @@ export const typeDefs = /* GraphQL */ `
     name: String!
     topToriTags: [String!]!
     modalCategory: ReflectionCategory!
+    categoryDistribution: ReflectionCategoryDistribution!
     commentCount: Int!
     avgWordCount: Float!
   }
