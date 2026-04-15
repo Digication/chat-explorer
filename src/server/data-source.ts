@@ -17,6 +17,7 @@ import {
   ChatMessage,
   UserState,
   CommentReflectionClassification,
+  TelemetryEvent,
 } from "./entities/index.js";
 import { Initial1775574106489 } from "./migrations/1775574106489-Initial.js";
 import { AddBetterAuthTables1775574200000 } from "./migrations/1775574200000-AddBetterAuthTables.js";
@@ -25,6 +26,7 @@ import { AddInstitutionIdToChatSession1775574400000 } from "./migrations/1775574
 import { AddInvitationTracking1775574500000 } from "./migrations/1775574500000-AddInvitationTracking.js";
 import { AddUserDeactivated1775574600000 } from "./migrations/1775574600000-AddUserDeactivated.js";
 import { RemoveDoneMessageClassifications1775574700000 } from "./migrations/1775574700000-RemoveDoneMessageClassifications.js";
+import { AddTelemetryEvent1775574800000 } from "./migrations/1775574800000-AddTelemetryEvent.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -52,6 +54,7 @@ export const AppDataSource = new DataSource({
     ChatMessage,
     UserState,
     CommentReflectionClassification,
+    TelemetryEvent,
   ],
   migrations: [
     Initial1775574106489,
@@ -61,5 +64,6 @@ export const AppDataSource = new DataSource({
     AddInvitationTracking1775574500000,
     AddUserDeactivated1775574600000,
     RemoveDoneMessageClassifications1775574700000,
+    AddTelemetryEvent1775574800000,
   ],
 });

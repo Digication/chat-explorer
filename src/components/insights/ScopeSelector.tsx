@@ -7,6 +7,7 @@ import React, {
   type ReactNode,
 } from "react";
 import { useQuery } from "@apollo/client/react";
+import { useTrackEvent } from "@/lib/hooks/useTrackEvent";
 import Box from "@mui/material/Box";
 import Breadcrumbs from "@mui/material/Breadcrumbs";
 import Button from "@mui/material/Button";
@@ -101,6 +102,7 @@ interface ScopeSelectorProps {
 /** Breadcrumb-style picker for Institution > Course > Assignment. */
 export default function ScopeSelector({ compact = false }: ScopeSelectorProps) {
   const { scope, setScope } = useInsightsScope();
+  const trackEvent = useTrackEvent();
 
   // Current user role
   const { data: meData } = useQuery<any>(GET_ME);
@@ -142,27 +144,30 @@ export default function ScopeSelector({ compact = false }: ScopeSelectorProps) {
   const handleInstSelect = useCallback(
     (institutionId: string) => {
       setScope({ institutionId });
+      trackEvent("SCOPE", "change", { level: "institution", id: institutionId });
       setInstAnchor(null);
     },
-    [setScope],
+    [setScope, trackEvent],
   );
 
   const handleCourseSelect = useCallback(
     (courseId: string) => {
       if (!scope) return;
       setScope({ institutionId: scope.institutionId, courseId });
+      trackEvent("SCOPE", "change", { level: "course", id: courseId });
       setCourseAnchor(null);
     },
-    [scope, setScope],
+    [scope, setScope, trackEvent],
   );
 
   const handleAssignSelect = useCallback(
     (assignmentId: string) => {
       if (!scope) return;
       setScope({ ...scope, assignmentId });
+      trackEvent("SCOPE", "change", { level: "assignment", id: assignmentId });
       setAssignAnchor(null);
     },
-    [scope, setScope],
+    [scope, setScope, trackEvent],
   );
 
   const handleClearCourse = useCallback(() => {

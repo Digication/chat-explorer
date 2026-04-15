@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from "react";
+import { useTrackEvent } from "@/lib/hooks/useTrackEvent";
 import {
   Box,
   Paper,
@@ -41,6 +42,7 @@ interface CommitResult extends PreviewResult {
 type Step = "pick" | "previewing" | "preview" | "committing" | "done";
 
 export default function CsvUploadCard() {
+  const trackEvent = useTrackEvent();
   const [step, setStep] = useState<Step>("pick");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<PreviewResult | null>(null);
@@ -121,8 +123,10 @@ export default function CsvUploadCard() {
 
       const data: CommitResult = await res.json();
       setCommitResult(data);
+      trackEvent("UPLOAD", "complete", { rowCount: data.newComments ?? 0 });
       setStep("done");
     } catch (err: unknown) {
+      trackEvent("UPLOAD", "fail", { error: err instanceof Error ? err.message : "Upload failed" });
       setError(err instanceof Error ? err.message : "Upload failed");
       setStep("preview"); // let them retry
     }

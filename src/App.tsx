@@ -20,6 +20,7 @@ import CrossCourseComparisonPage from "@/pages/CrossCourseComparisonPage";
 import { InsightsScopeProvider } from "@/components/insights/ScopeSelector";
 import { InsightsAnalyticsProvider } from "@/components/insights/InsightsAnalyticsContext";
 import { FacultyPanelProvider } from "@/components/faculty-panel/FacultyPanelContext";
+import PageViewTracker from "@/components/tracking/PageViewTracker";
 
 function DashboardPage() {
   return (
@@ -125,6 +126,7 @@ export default function App() {
                 path="/"
                 element={
                   <ProtectedRoute>
+                    <PageViewTracker />
                     <UserSettingsProvider>
                       <InsightsScopeProvider>
                         <InsightsAnalyticsProvider>

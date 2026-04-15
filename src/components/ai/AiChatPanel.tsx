@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useQuery, useMutation } from "@apollo/client/react";
+import { useTrackEvent } from "@/lib/hooks/useTrackEvent";
 import {
   Box,
   Collapse,
@@ -85,6 +86,7 @@ export default function AiChatPanel({
   anchor = "right",
 }: AiChatPanelProps) {
   const { getDisplayName } = useUserSettings();
+  const trackEvent = useTrackEvent();
   // ── State ──────────────────────────────────────────────────────────
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
@@ -195,13 +197,14 @@ export default function AiChatPanel({
       });
       if (data?.createChatSession?.id) {
         setActiveSessionId(data.createChatSession.id);
+        trackEvent("AI_CHAT", "create_session", { scope: chatScope });
         await refetchSessions();
       }
     } catch (err) {
       // Error will show via sessionsError on next render
       console.error("Failed to create session:", err);
     }
-  }, [institutionId, courseId, assignmentId, studentId, chatScope, selectedToriTags, createSession, refetchSessions]);
+  }, [institutionId, courseId, assignmentId, studentId, chatScope, selectedToriTags, createSession, refetchSessions, trackEvent]);
 
   /** Send a message (either typed or from a suggestion chip). */
   const handleSend = useCallback(
@@ -243,6 +246,7 @@ export default function AiChatPanel({
 
       try {
         await sendMessage({ variables: { sessionId, content, analyticsContext: analyticsContext || undefined } });
+        trackEvent("AI_CHAT", "send_message", { scope: chatScope });
         // Refetch session to get both the user message and assistant reply
         await refetchSession();
         await refetchSessions(); // Update the session list (updatedAt changes)
@@ -266,6 +270,7 @@ export default function AiChatPanel({
       sendMessage,
       refetchSession,
       refetchSessions,
+      trackEvent,
     ]
   );
 

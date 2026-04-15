@@ -607,6 +607,48 @@ export const typeDefs = /* GraphQL */ `
     updated: Int!
   }
 
+  # ── Telemetry Types ───────────────────────────────────────────
+
+  input TelemetryEventInput {
+    eventCategory: String!
+    eventAction: String!
+    metadata: String
+    pageUrl: String
+    sessionId: String!
+    timestamp: String
+  }
+
+  type TelemetrySummary {
+    activeUsers: ActiveUsersData!
+    topFeatures: [FeatureUsage!]!
+    aiChatAdoption: AdoptionData!
+    dailyEvents: [DailyEventCount!]!
+  }
+
+  type ActiveUsersData {
+    daily: Int!
+    weekly: Int!
+    monthly: Int!
+  }
+
+  type FeatureUsage {
+    category: String!
+    action: String!
+    count: Int!
+    uniqueUsers: Int!
+  }
+
+  type AdoptionData {
+    totalUsers: Int!
+    usersWhoUsedFeature: Int!
+    rate: Float!
+  }
+
+  type DailyEventCount {
+    date: String!
+    count: Int!
+  }
+
   # ── Input Types ───────────────────────────────────────────────
 
   input AnalyticsScopeInput {
@@ -723,6 +765,9 @@ export const typeDefs = /* GraphQL */ `
 
     # Current user
     me: User
+
+    # Telemetry (admin only)
+    telemetrySummary(institutionId: ID, startDate: String!, endDate: String!): TelemetrySummary!
   }
 
   type Mutation {
@@ -755,5 +800,9 @@ export const typeDefs = /* GraphQL */ `
     updateUserInstitution(userId: ID!, institutionId: ID): User!
     createInstitution(name: String!, domain: String, slug: String): Institution!
     updateInstitution(id: ID!, name: String, domain: String, slug: String): Institution!
+
+    # Telemetry
+    trackEvents(events: [TelemetryEventInput!]!): Boolean!
+    purgeOldTelemetry(olderThanDays: Int!): Int!
   }
 `;

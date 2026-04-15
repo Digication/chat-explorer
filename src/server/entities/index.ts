@@ -17,3 +17,4 @@ export {
   CommentReflectionClassification,
   ReflectionCategory,
 } from "./CommentReflectionClassification.js";
+export { TelemetryEvent } from "./TelemetryEvent.js";

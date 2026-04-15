@@ -10,6 +10,7 @@ import { chatResolvers } from "./chat.js";
 import { consentResolvers } from "./consent.js";
 import { exportResolvers } from "./export.js";
 import { adminResolvers } from "./admin.js";
+import { telemetryResolvers } from "./telemetry.js";
 
 /**
  * Merges all resolver groups into a single resolver map.
@@ -24,6 +25,7 @@ export const resolvers = {
     ...consentResolvers.Query,
     ...exportResolvers.Query,
     ...adminResolvers.Query,
+    ...telemetryResolvers.Query,
 
     // Reference data
     toriTags: async () => {
@@ -47,6 +49,7 @@ export const resolvers = {
     ...exportResolvers.Mutation,
     ...adminResolvers.Mutation,
     ...institutionResolvers.Mutation,
+    ...telemetryResolvers.Mutation,
   },
 
   // Field resolvers

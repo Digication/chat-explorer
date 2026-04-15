@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQuery } from "@apollo/client/react";
+import { useTrackEvent } from "@/lib/hooks/useTrackEvent";
 import { Box, Typography, Skeleton } from "@mui/material";
 import {
   GET_STUDENT_PROFILES,
@@ -22,6 +23,7 @@ import StudentListPanel from "@/components/explorer/StudentListPanel";
 export default function ChatExplorerPage() {
   // ── Shared scope (persists across page navigation) ──���──────────────
   const { scope, setScope } = useInsightsScope();
+  const trackEvent = useTrackEvent();
   const courseId = scope?.courseId;
   const assignmentId = scope?.assignmentId;
   const panel = useFacultyPanel();
@@ -56,10 +58,11 @@ export default function ChatExplorerPage() {
 
   /** Select a single student (replaces current selection). */
   const handleSelectStudent = useCallback((id: string) => {
+    trackEvent("CHAT_EXPLORER", "select_student", { studentId: id });
     setSelectedStudentIds((prev) =>
       prev.length === 1 && prev[0] === id ? [] : [id]
     );
-  }, []);
+  }, [trackEvent]);
 
   // ── Queries ────────────────────────────────────────────────────────
 
@@ -167,12 +170,13 @@ export default function ChatExplorerPage() {
   // ── Handlers ───────────────────────────────────────────────────────
 
   const handleToggleToriFilter = useCallback((tagName: string) => {
+    trackEvent("CHAT_EXPLORER", "filter_tori", { tagName });
     setToriFilters((prev) =>
       prev.includes(tagName)
         ? prev.filter((t) => t !== tagName)
         : [...prev, tagName]
     );
-  }, []);
+  }, [trackEvent]);
 
   const handleClearToriFilters = useCallback(() => {
     setToriFilters([]);

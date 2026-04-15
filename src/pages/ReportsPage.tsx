@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@apollo/client/react";
+import { useTrackEvent } from "@/lib/hooks/useTrackEvent";
 import {
   Box,
   Typography,
@@ -50,6 +51,7 @@ const REPORT_TYPES: ReportType[] = [
 ];
 
 export default function ReportsPage() {
+  const trackEvent = useTrackEvent();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedFormat, setSelectedFormat] = useState<"PDF" | "CSV">("CSV");
 
@@ -70,6 +72,7 @@ export default function ReportsPage() {
     : userInstitutionId;
 
   const handleGenerate = (format: "PDF" | "CSV") => {
+    trackEvent("REPORT", "generate", { format });
     setSelectedFormat(format);
     setDialogOpen(true);
   };
