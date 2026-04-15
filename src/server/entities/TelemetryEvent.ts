@@ -22,7 +22,7 @@ export class TelemetryEvent {
   @Column({ type: "varchar" })
   userId!: string;
 
-  @Column({ type: "varchar", nullable: true })
+  @Column({ type: "uuid", nullable: true })
   institutionId!: string | null;
 
   // Plain strings (not Postgres enums) so new event types don't need a migration

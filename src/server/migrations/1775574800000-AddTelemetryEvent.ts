@@ -9,7 +9,7 @@ export class AddTelemetryEvent1775574800000 implements MigrationInterface {
       CREATE TABLE "telemetry_event" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
         "userId" varchar NOT NULL,
-        "institutionId" varchar,
+        "institutionId" uuid,
         "eventCategory" varchar(50) NOT NULL,
         "eventAction" varchar(100) NOT NULL,
         "metadata" jsonb,
