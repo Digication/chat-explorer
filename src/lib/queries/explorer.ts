@@ -34,7 +34,8 @@ export const GET_EXPLORER_ASSIGNMENTS = gql`
 
 /**
  * Fetch student profiles for the selected scope via instructionalInsights.
- * Returns studentId, name, topToriTags, commentCount, and modalCategory.
+ * Returns studentId, name, topToriTags, commentCount, modalCategory,
+ * and the full categoryDistribution so the UI can show all depth levels.
  */
 export const GET_STUDENT_PROFILES = gql`
   query StudentProfiles($scope: AnalyticsScopeInput!) {
@@ -46,6 +47,12 @@ export const GET_STUDENT_PROFILES = gql`
           topToriTags
           commentCount
           modalCategory
+          categoryDistribution {
+            DESCRIPTIVE_WRITING
+            DESCRIPTIVE_REFLECTION
+            DIALOGIC_REFLECTION
+            CRITICAL_REFLECTION
+          }
         }
       }
     }

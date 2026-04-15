@@ -270,6 +270,12 @@ export const GET_STUDENT_ENGAGEMENT = gql`
           studentId
           name
           modalCategory
+          categoryDistribution {
+            DESCRIPTIVE_WRITING
+            DESCRIPTIVE_REFLECTION
+            DIALOGIC_REFLECTION
+            CRITICAL_REFLECTION
+          }
           commentCount
           topToriTags
         }

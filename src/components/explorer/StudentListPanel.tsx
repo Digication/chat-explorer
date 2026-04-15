@@ -13,10 +13,17 @@ import SearchIcon from "@mui/icons-material/Search";
 import UserAvatar from "@/components/shared/UserAvatar";
 import ToriChip from "@/components/shared/ToriChip";
 import { useUserSettings } from "@/lib/UserSettingsContext";
-import { CATEGORY_COLORS, CATEGORY_LABELS } from "@/lib/reflection-categories";
+import { CATEGORY_CONFIG, CATEGORY_COLORS, CATEGORY_LABELS } from "@/lib/reflection-categories";
 
 /** Width of the student list panel. */
 const PANEL_WIDTH = 360;
+
+interface CategoryDistribution {
+  DESCRIPTIVE_WRITING: number;
+  DESCRIPTIVE_REFLECTION: number;
+  DIALOGIC_REFLECTION: number;
+  CRITICAL_REFLECTION: number;
+}
 
 interface StudentProfile {
   studentId: string;
@@ -24,6 +31,7 @@ interface StudentProfile {
   topToriTags: string[];
   commentCount: number;
   modalCategory: string;
+  categoryDistribution?: CategoryDistribution;
 }
 
 interface StudentListPanelProps {
@@ -138,19 +146,40 @@ export default function StudentListPanel({
                   {s.topToriTags.slice(0, 2).map((tag) => (
                     <ToriChip key={tag} tag={tag} size="small" />
                   ))}
-                  {s.modalCategory && (
-                    <Chip
-                      label={CATEGORY_LABELS[s.modalCategory] ?? s.modalCategory}
-                      size="small"
-                      sx={{
-                        fontSize: "0.65rem",
-                        height: 18,
-                        color: CATEGORY_COLORS[s.modalCategory] ?? "#757575",
-                        borderColor: CATEGORY_COLORS[s.modalCategory] ?? "#757575",
-                      }}
-                      variant="outlined"
-                    />
-                  )}
+                  {/* Show a chip for each reflection level the student demonstrated,
+                      ordered from highest (Critical) to lowest so the strongest
+                      evidence stands out first. */}
+                  {s.categoryDistribution
+                    ? [...CATEGORY_CONFIG]
+                        .reverse() // highest level first
+                        .filter((cat) => (s.categoryDistribution as CategoryDistribution)[cat.key] > 0)
+                        .map((cat) => (
+                          <Chip
+                            key={cat.key}
+                            label={`${cat.shortLabel} (${(s.categoryDistribution as CategoryDistribution)[cat.key]})`}
+                            size="small"
+                            sx={{
+                              fontSize: "0.65rem",
+                              height: 18,
+                              color: cat.color,
+                              borderColor: cat.color,
+                            }}
+                            variant="outlined"
+                          />
+                        ))
+                    : s.modalCategory && (
+                        <Chip
+                          label={CATEGORY_LABELS[s.modalCategory] ?? s.modalCategory}
+                          size="small"
+                          sx={{
+                            fontSize: "0.65rem",
+                            height: 18,
+                            color: CATEGORY_COLORS[s.modalCategory] ?? "#757575",
+                            borderColor: CATEGORY_COLORS[s.modalCategory] ?? "#757575",
+                          }}
+                          variant="outlined"
+                        />
+                      )}
                 </Box>
               </Box>
             </Box>
