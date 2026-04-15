@@ -145,15 +145,15 @@ Add `UserRole.STUDENT = "student"`. Same auth flow as faculty/admin:
 
 ## Implementation Phases
 
-### Phase 1: Student Auth
+### Phase 1: Student Auth — COMPLETE (2026-04-15)
 **Add `student` role and routing. Same flow as faculty/admin.**
 
-~1 week.
+~1 week. See `outcomes-progress.md` for full details.
 
-### Phase 2: Narrative Evidence on Existing Comments
+### Phase 2: Narrative Evidence on Existing Comments — COMPLETE (2026-04-15)
 **Add AI-generated narrative evidence to existing comment analysis.**
 
-~2-3 weeks.
+~2-3 weeks. See `outcomes-progress.md` for full details.
 
 ### Phase 3: Artifacts & Section-Level Analysis
 **Upload documents, split into sections, analyze each section.**
