@@ -122,23 +122,54 @@ When models improve and we re-generate evidence, old moments get `isLatest = fal
 
 ---
 
-## What's Next: Phase 3 — Artifacts & Section-Level Analysis
+## Phase 3: Artifacts & Section-Level Analysis — COMPLETE
 
-Per the implementation plan, Phase 3 adds:
-- Document upload (PDF, DOCX) with section splitting
-- Section-level evidence analysis
-- New sidebar item: "Artifacts" with list/detail views
-- FacultyPanel Thread tab evolves into "Artifact" tab
+**Commits:**
+- `5c4b084 feat(artifacts): add Artifact + ArtifactSection entities and migration`
+- `0a5260d feat(artifacts): add document parser for PDF and DOCX`
+- `530ea8b feat(artifacts): add upload and download endpoints`
+- `7336749 feat(artifacts): add background analyzer for artifact sections`
+- `54feaf5 feat(artifacts): wrap chat threads as CONVERSATION artifacts`
+- `9eeab32 feat(artifacts): add GraphQL layer for artifacts`
+- `cd53fd7 feat(artifacts): add faculty and student UI for artifacts`
 
-Key files from the spec to reference:
-- `outcomes-technical-spec.md` Phase 3 section for entity definitions and service specs
-- `outcomes-implementation-plan.md` "Phase 3" section for integration map
+### What was built
 
-### Prerequisites satisfied by Phase 2
-- OutcomeFramework and OutcomeDefinition entities exist
-- EvidenceMoment already has `artifactSectionId` column (nullable, ready for Phase 3)
-- Narrative generator can be reused for section-level analysis
-- Evidence analytics service can be extended for artifact-scoped queries
+| Area | Files | Summary |
+|------|-------|---------|
+| **Entities** | `src/server/entities/Artifact.ts`, `src/server/entities/ArtifactSection.ts` | `Artifact` with type (PAPER/PRESENTATION/CODE/PORTFOLIO/CONVERSATION), status (UPLOADED/PROCESSING/ANALYZED/FAILED/DELETED), thread backlink; `ArtifactSection` with sequenceOrder, title, content, wordCount, commentId backlink for CONVERSATION sections |
+| **Migration** | `src/server/migrations/…-AddArtifactEntities.ts` | Adds `artifact` + `artifact_section` tables with FKs to student/course/assignment/thread (and optional comment for wrapped-conversation sections) |
+| **Document parser** | `src/server/services/artifact/document-parser.ts` | `parseDocument(buffer, mimeType)` → splits into typed sections (PDF via `pdf-parse`, DOCX via `mammoth`); heading detection uses font-size cues for PDFs and `<h*>` tags for DOCX; title-case heuristic excludes common stop-words |
+| **Storage** | `src/server/services/artifact/artifact-storage.ts` | Files saved to `data/artifacts/{institutionId}/{artifactId}/{safeName}`; path traversal guard on read |
+| **Upload service** | `src/server/services/artifact/artifact-service.ts` | `createArtifactFromUpload()` — 20 MB cap, PDF/DOCX allow-list, PPTX explicit reject, role-based auth (uploader + institution admin + digication admin + course-access instructors), transactional section save, file write after commit |
+| **Background analyzer** | `src/server/services/artifact/artifact-analyzer.ts` | Runs after upload; filters sections by `MIN_CONTENT_CHARS=40` and skips HEADING; reuses Phase 2 `generateNarrativeBatch` by threading section ids through the `commentId` field (opaque-handle trick); flips status to ANALYZED or FAILED |
+| **Conversation wrapper** | `src/server/services/artifact/conversation-wrapper.ts` | `wrapThreadAsArtifact()` — idempotent, creates CONVERSATION artifact with status=ANALYZED (no re-analysis — Phase 2 moments already keyed on commentId), one COMMENT section per USER comment, tops up missing sections on re-call |
+| **REST endpoints** | `src/server/index.ts` | `POST /api/artifacts/upload` (multer 20 MB), `GET /api/artifacts/:id/download` with role-based auth; students auto-resolve their studentId from session |
+| **GraphQL** | `src/server/types/schema.ts`, `src/server/resolvers/artifact.ts` | `Artifact`, `ArtifactSection`, `ArtifactEvidenceMoment` types; `artifacts(filter)` (role-scoped) and `artifact(id)` queries; `deleteArtifact` (soft) and `wrapThreadAsArtifact` mutations; `ArtifactSection.evidenceMoments` joins on both `artifactSectionId` and `commentId` so conversation sections surface Phase 2 moments |
+| **Faculty & student UI** | `src/pages/ArtifactsListPage.tsx`, `src/pages/ArtifactDetailPage.tsx`, `src/components/artifacts/UploadArtifactDialog.tsx` | List view with status chips + poll on PROCESSING; detail view with section list + evidence moments + download + soft-delete; upload dialog with file picker, course/assignment/student/type selectors (student picker hidden for students) |
+| **Sidebar & routes** | `src/components/layout/Sidebar.tsx`, `src/App.tsx` | "Artifacts" entry for faculty, "My Artifacts" for students; `/artifacts` and `/artifacts/:id` routes under ProtectedRoute |
+| **Thread → Artifact** | `src/components/insights/ThreadPanel.tsx` | "Save as artifact" icon button that wraps a thread via the GraphQL mutation and navigates to the new artifact detail page |
+| **Tests** | `src/server/services/artifact/__tests__/{document-parser,artifact-service,artifact-analyzer}.test.ts`, `e2e/artifacts.spec.ts` | Unit tests for section splitting, upload validation (empty/oversized/PPTX/unknown mime), analyzer helper; e2e smoke test for unauth redirect |
+
+### Deviations from spec
+
+- **Both faculty and students can upload.** Spec was ambiguous; we chose to allow students to upload their own artifacts. Server enforces: students can only set studentId = their own via session lookup.
+- **20 MB upload cap** — per user confirmation; spec mentioned "reasonable limit" without a number.
+- **PPTX deferred.** Spec listed PPTX as a future format; we explicitly reject it at the upload boundary with a helpful message.
+- **No inline PDF/DOCX viewer.** Display is parsed sections + "Download original" link per user confirmation. The rendered sections serve as a preview; users can always grab the original file if they need exact fidelity.
+- **Re-upload keeps both artifacts** (no versioning UI) — per user confirmation. Users can soft-delete old versions.
+- **CONVERSATION artifacts do not re-run the analyzer.** Phase 2 already produced `EvidenceMoment` rows keyed on `commentId`; re-analyzing would duplicate narratives and burn LLM tokens. Instead the section.evidenceMoments GraphQL resolver joins on both keys.
+- **Students get "My Artifacts" in their sidebar.** Spec didn't call for this but it's the natural counterpart of faculty's Artifacts entry, and the server already supports role-scoped listing.
+- **FacultyPanel Thread tab was NOT replaced by an "Artifact" tab.** Instead ThreadPanel gained a "Save as artifact" button which jumps to the artifact detail page. Less disruptive to the existing Thread UX.
+
+### Browser verified
+
+**Not verified this session** — Chrome MCP extension was not connected. All 421 unit tests pass, typecheck clean, GraphQL introspection confirms the new types load at runtime. Recommend manual verification of:
+1. `/artifacts` list renders for faculty and student
+2. Upload dialog — file picker, course/assignment/student dropdowns, 20 MB cap
+3. Detail page sections render + Download button works
+4. "Save as artifact" button in ThreadPanel navigates to the new artifact
+5. No console errors on any of the above
 
 ---
 
@@ -147,9 +178,33 @@ Key files from the spec to reference:
 ```
 Branch: feat/outcomes-evidence-trees (rebased onto main 2026-04-15)
 
+cd53fd7 feat(artifacts): add faculty and student UI for artifacts
+9eeab32 feat(artifacts): add GraphQL layer for artifacts
+54feaf5 feat(artifacts): wrap chat threads as CONVERSATION artifacts
+7336749 feat(artifacts): add background analyzer for artifact sections
+530ea8b feat(artifacts): add upload and download endpoints
+0a5260d feat(artifacts): add document parser for PDF and DOCX
+5c4b084 feat(artifacts): add Artifact + ArtifactSection entities and migration
+8732e7e fix(evidence): use uuid type for FK columns to match referenced PKs
+dd9e182 docs(outcomes): add progress tracker and mark Phases 1-2 complete
 01767be test(evidence): add unit tests for narrative generator and evidence pipeline
 e8a1535 feat(evidence): add narrative evidence pipeline and outcomes framework (Phase 2)
 2fa0bbe feat(student-auth): add student role, auth, invites, and dashboard (Phase 1)
 ```
 
-3 commits, 40 files changed, +3,751 lines / -17 lines.
+12 commits (9 Phase-3 commits).
+
+---
+
+## What's Next: Phase 4+ — Conceptual Trees, Outcomes Hub, Guided Reflection
+
+Per the implementation plan, upcoming phases add:
+- **Phase 4:** Conceptual Trees — institution-level tag hierarchy, tree-based navigation
+- **Phase 5:** Outcomes Hub — cross-framework dashboard for admins (TORI + custom rubrics)
+- **Phase 6:** Guided Reflection — AI-assisted reflection flows triggered by low-depth detection
+- **Phase 7:** Student-facing evidence browser — students see their own moments + outcome progress
+
+### Prerequisites satisfied by Phase 3
+- Artifact + ArtifactSection data model is stable
+- EvidenceMoment supports both commentId and artifactSectionId keys
+- Section-level analysis pipeline is reusable (pure helpers + idempotent wrapper pattern)
