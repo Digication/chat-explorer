@@ -21,7 +21,7 @@ export class AddEvidenceEntities1775575000000 implements MigrationInterface {
     await queryRunner.query(`
       CREATE TABLE "outcome_framework" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
-        "institutionId" varchar NOT NULL,
+        "institutionId" uuid NOT NULL,
         "name" varchar NOT NULL,
         "description" text,
         "type" "public"."framework_type_enum" NOT NULL,
@@ -40,11 +40,11 @@ export class AddEvidenceEntities1775575000000 implements MigrationInterface {
     await queryRunner.query(`
       CREATE TABLE "outcome_definition" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
-        "frameworkId" varchar NOT NULL,
+        "frameworkId" uuid NOT NULL,
         "code" varchar NOT NULL,
         "name" varchar NOT NULL,
         "description" text,
-        "parentId" varchar,
+        "parentId" uuid,
         "sortOrder" integer NOT NULL DEFAULT 0,
         CONSTRAINT "PK_outcome_definition" PRIMARY KEY ("id"),
         CONSTRAINT "FK_outcome_definition_framework" FOREIGN KEY ("frameworkId")
@@ -58,18 +58,20 @@ export class AddEvidenceEntities1775575000000 implements MigrationInterface {
     );
 
     // evidence_moment
+    // NOTE: artifactSectionId left without an FK here — Phase 3 adds the
+    // artifact_section table and wires the FK in its migration.
     await queryRunner.query(`
       CREATE TABLE "evidence_moment" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
-        "studentId" varchar NOT NULL,
-        "commentId" varchar,
-        "artifactSectionId" varchar,
+        "studentId" uuid NOT NULL,
+        "commentId" uuid,
+        "artifactSectionId" uuid,
         "narrative" text NOT NULL,
         "sourceText" text NOT NULL,
         "type" "public"."evidence_type_enum" NOT NULL,
         "modelVersion" varchar NOT NULL,
         "processedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
-        "parentMomentId" varchar,
+        "parentMomentId" uuid,
         "isLatest" boolean NOT NULL DEFAULT true,
         CONSTRAINT "PK_evidence_moment" PRIMARY KEY ("id"),
         CONSTRAINT "FK_evidence_moment_student" FOREIGN KEY ("studentId")
@@ -94,8 +96,8 @@ export class AddEvidenceEntities1775575000000 implements MigrationInterface {
     await queryRunner.query(`
       CREATE TABLE "evidence_outcome_link" (
         "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
-        "evidenceMomentId" varchar NOT NULL,
-        "outcomeDefinitionId" varchar NOT NULL,
+        "evidenceMomentId" uuid NOT NULL,
+        "outcomeDefinitionId" uuid NOT NULL,
         "strengthLevel" "public"."strength_level_enum" NOT NULL,
         "rationale" text,
         CONSTRAINT "PK_evidence_outcome_link" PRIMARY KEY ("id"),

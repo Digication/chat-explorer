@@ -25,7 +25,7 @@ export class OutcomeFramework {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column({ type: "varchar" })
+  @Column({ type: "uuid" })
   institutionId!: string;
 
   @Column({ type: "varchar" })

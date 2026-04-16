@@ -28,13 +28,13 @@ export class EvidenceMoment {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column({ type: "varchar" })
+  @Column({ type: "uuid" })
   studentId!: string;
 
-  @Column({ type: "varchar", nullable: true })
+  @Column({ type: "uuid", nullable: true })
   commentId!: string | null;
 
-  @Column({ type: "varchar", nullable: true })
+  @Column({ type: "uuid", nullable: true })
   artifactSectionId!: string | null;
 
   @Column({ type: "text" })
@@ -52,7 +52,7 @@ export class EvidenceMoment {
   @CreateDateColumn({ type: "timestamptz" })
   processedAt!: Date;
 
-  @Column({ type: "varchar", nullable: true })
+  @Column({ type: "uuid", nullable: true })
   parentMomentId!: string | null;
 
   @Column({ type: "boolean", default: true })

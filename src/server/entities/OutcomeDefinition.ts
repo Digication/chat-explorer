@@ -17,7 +17,7 @@ export class OutcomeDefinition {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column({ type: "varchar" })
+  @Column({ type: "uuid" })
   frameworkId!: string;
 
   @Column({ type: "varchar" })
@@ -29,7 +29,7 @@ export class OutcomeDefinition {
   @Column({ type: "text", nullable: true })
   description!: string | null;
 
-  @Column({ type: "varchar", nullable: true })
+  @Column({ type: "uuid", nullable: true })
   parentId!: string | null;
 
   @Column({ type: "int", default: 0 })

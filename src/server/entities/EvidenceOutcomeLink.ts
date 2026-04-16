@@ -23,10 +23,10 @@ export class EvidenceOutcomeLink {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column({ type: "varchar" })
+  @Column({ type: "uuid" })
   evidenceMomentId!: string;
 
-  @Column({ type: "varchar" })
+  @Column({ type: "uuid" })
   outcomeDefinitionId!: string;
 
   @Column({ type: "enum", enum: StrengthLevel })
