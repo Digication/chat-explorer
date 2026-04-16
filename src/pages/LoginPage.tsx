@@ -46,17 +46,7 @@ export default function LoginPage() {
       setError(
         "No account found for this email. Contact your administrator to get an invitation."
       );
-      // Notify admin about the blocked attempt
-      fetch(`${API_BASE}/api/notify-blocked-signin`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: params.get("email") || "unknown",
-          name: params.get("name") || "Unknown",
-        }),
-      }).catch(() => {
-        // Best-effort notification
-      });
+      // Admin notification is handled server-side via databaseHooks
     }
   }, []);
 

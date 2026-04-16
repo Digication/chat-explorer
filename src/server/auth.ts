@@ -25,12 +25,33 @@ export const auth = betterAuth({
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      disableSignUp: true, // Only pre-created (invited) users can sign in
+      // Sign-up is blocked via databaseHooks below instead of disableSignUp,
+      // so that we have the user's real email/name for admin notifications.
+    },
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (user) => {
+          // Only pre-invited users (already in the DB) should sign in.
+          // If Better Auth tries to create a new user, it means an
+          // uninvited person attempted Google sign-in.  Notify the admin
+          // with their real name/email, then block the creation.
+          const email = user.email as string;
+          const name = (user.name as string) || "Unknown";
+          notifyAdminOfBlockedSignIn(name, email).catch((err) => {
+            console.error("[auth] Failed to send blocked sign-in notification:", err);
+          });
+          console.log(`[auth] Blocked sign-in attempt from ${email} (${name})`);
+          return false; // prevent user creation
+        },
+      },
     },
   },
   plugins: [
     magicLink({
-      disableSignUp: true, // Only existing users can request magic links
+      // Sign-up is blocked via databaseHooks above instead of disableSignUp,
+      // so that we have the user's email for admin notifications.
       expiresIn: 3600, // 1 hour (in seconds)
       sendMagicLink: async ({ email, url }) => {
         if (!process.env.SENDGRID_API_KEY) {
