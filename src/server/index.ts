@@ -29,6 +29,7 @@ import {
   UploadValidationError,
 } from "./services/artifact/artifact-service.js";
 import { resolveArtifactPath } from "./services/artifact/artifact-storage.js";
+import { analyzeArtifactInBackground } from "./services/artifact/artifact-analyzer.js";
 import { Artifact, ArtifactType } from "./entities/Artifact.js";
 import { Student } from "./entities/Student.js";
 import { typeDefs } from "./types/schema.js";
@@ -267,7 +268,16 @@ app.post(
         title,
       });
 
-      // TODO (Step 4): kick off the background analyzer with result.id.
+      // Fire-and-forget analysis (same pattern as CSV upload's
+      // reflection/evidence hooks). The artifact is already in PROCESSING;
+      // the analyzer flips it to ANALYZED or FAILED when done.
+      void analyzeArtifactInBackground(result.id).catch((err) => {
+        console.error(
+          `[artifact] background analysis crashed for ${result.id}:`,
+          err
+        );
+      });
+
       res.json(result);
     } catch (err) {
       if (err instanceof UploadValidationError) {
