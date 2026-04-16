@@ -36,7 +36,7 @@ interface ArtifactRow {
   sectionCount: number;
   uploadedAt: string;
   errorMessage: string | null;
-  student: { id: string; name: string } | null;
+  student: { id: string; displayName: string } | null;
   course: { id: string; name: string } | null;
   assignment: { id: string; name: string } | null;
 }
@@ -183,7 +183,7 @@ export default function ArtifactsListPage() {
                       </Typography>
                     )}
                   </TableCell>
-                  <TableCell>{row.student?.name ?? "—"}</TableCell>
+                  <TableCell>{row.student?.displayName ?? "—"}</TableCell>
                   <TableCell>{row.course?.name ?? "—"}</TableCell>
                   <TableCell>{row.type.toLowerCase()}</TableCell>
                   <TableCell>{row.sectionCount}</TableCell>

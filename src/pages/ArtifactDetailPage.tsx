@@ -62,7 +62,7 @@ interface ArtifactDetail {
   hasStoredFile: boolean;
   uploadedAt: string;
   errorMessage: string | null;
-  student: { id: string; name: string } | null;
+  student: { id: string; displayName: string } | null;
   course: { id: string; name: string } | null;
   assignment: { id: string; name: string } | null;
   sections: Section[];
@@ -192,7 +192,10 @@ export default function ArtifactDetailPage() {
       {/* Metadata line */}
       <Paper variant="outlined" sx={{ p: 2, mb: 3 }}>
         <Stack direction="row" gap={3} flexWrap="wrap">
-          <MetaField label="Student" value={artifact.student?.name ?? "—"} />
+          <MetaField
+            label="Student"
+            value={artifact.student?.displayName ?? "—"}
+          />
           <MetaField label="Course" value={artifact.course?.name ?? "—"} />
           <MetaField
             label="Assignment"

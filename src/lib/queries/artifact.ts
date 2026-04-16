@@ -19,7 +19,7 @@ export const GET_ARTIFACTS = gql`
       errorMessage
       student {
         id
-        name
+        displayName
       }
       course {
         id
@@ -48,7 +48,7 @@ export const GET_ARTIFACT = gql`
       errorMessage
       student {
         id
-        name
+        displayName
       }
       course {
         id
