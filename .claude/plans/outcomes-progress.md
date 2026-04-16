@@ -162,14 +162,22 @@ When models improve and we re-generate evidence, old moments get `isLatest = fal
 - **Students get "My Artifacts" in their sidebar.** Spec didn't call for this but it's the natural counterpart of faculty's Artifacts entry, and the server already supports role-scoped listing.
 - **FacultyPanel Thread tab was NOT replaced by an "Artifact" tab.** Instead ThreadPanel gained a "Save as artifact" button which jumps to the artifact detail page. Less disruptive to the existing Thread UX.
 
-### Browser verified
+### Browser verified (2026-04-16)
 
-**Not verified this session** — Chrome MCP extension was not connected. All 421 unit tests pass, typecheck clean, GraphQL introspection confirms the new types load at runtime. Recommend manual verification of:
-1. `/artifacts` list renders for faculty and student
-2. Upload dialog — file picker, course/assignment/student dropdowns, 20 MB cap
-3. Detail page sections render + Download button works
-4. "Save as artifact" button in ThreadPanel navigates to the new artifact
-5. No console errors on any of the above
+Chrome MCP verification round-trip confirmed:
+
+- `/artifacts` list renders — empty state and populated row both work; student column uses `displayName` correctly
+- `/artifacts/:id` detail page renders metadata + sections cleanly
+- `/artifacts/<bad-id>` shows "Artifact not found" alert (graceful)
+- Upload dialog opens with file picker + course/assignment/student/type/title fields
+- "Save as artifact" button in ThreadPanel wraps a chat thread and navigates to the new CONVERSATION artifact with one COMMENT section per user message
+- No console errors (aside from unrelated Chrome extension noise)
+
+**Known limitation, not a regression:** a `digication_admin` user (no `institutionId`) cannot exercise the full upload round-trip because `artifact-service.ts` requires `user.institutionId`. An institution-scoped user (instructor or institution admin) would be needed to verify the upload → PROCESSING → ANALYZED flow end-to-end.
+
+### Bug fix post-merge
+
+`fix(artifacts): use Student.displayName in artifact UI queries` (`e21b5b8`) — UI queries asked for `student { name }`, but the `Student` GraphQL type exposes `displayName`. Validation failed, Apollo surfaced the whole `artifacts` field as null, which made the list page break. Fixed by renaming the field on the client.
 
 ---
 
