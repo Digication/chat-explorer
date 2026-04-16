@@ -8,6 +8,7 @@ build/
 uploads/*
 !uploads/.gitkeep
 data/uploads/
+data/artifacts/
 coverage/
 playwright-report/
 test-results/
