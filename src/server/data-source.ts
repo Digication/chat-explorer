@@ -22,6 +22,8 @@ import {
   OutcomeDefinition,
   EvidenceMoment,
   EvidenceOutcomeLink,
+  Artifact,
+  ArtifactSection,
 } from "./entities/index.js";
 import { Initial1775574106489 } from "./migrations/1775574106489-Initial.js";
 import { AddBetterAuthTables1775574200000 } from "./migrations/1775574200000-AddBetterAuthTables.js";
@@ -33,6 +35,7 @@ import { RemoveDoneMessageClassifications1775574700000 } from "./migrations/1775
 import { AddTelemetryEvent1775574800000 } from "./migrations/1775574800000-AddTelemetryEvent.js";
 import { AddStudentRole1775574900000 } from "./migrations/1775574900000-AddStudentRole.js";
 import { AddEvidenceEntities1775575000000 } from "./migrations/1775575000000-AddEvidenceEntities.js";
+import { AddArtifacts1775575100000 } from "./migrations/1775575100000-AddArtifacts.js";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -65,6 +68,8 @@ export const AppDataSource = new DataSource({
     OutcomeDefinition,
     EvidenceMoment,
     EvidenceOutcomeLink,
+    Artifact,
+    ArtifactSection,
   ],
   migrations: [
     Initial1775574106489,
@@ -77,5 +82,6 @@ export const AppDataSource = new DataSource({
     AddTelemetryEvent1775574800000,
     AddStudentRole1775574900000,
     AddEvidenceEntities1775575000000,
+    AddArtifacts1775575100000,
   ],
 });

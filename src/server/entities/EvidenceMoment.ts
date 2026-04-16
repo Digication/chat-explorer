@@ -11,6 +11,7 @@ import {
 } from "typeorm";
 import type { Student } from "./Student.js";
 import type { Comment } from "./Comment.js";
+import type { ArtifactSection } from "./ArtifactSection.js";
 import type { EvidenceOutcomeLink } from "./EvidenceOutcomeLink.js";
 
 export enum EvidenceType {
@@ -23,6 +24,7 @@ export enum EvidenceType {
 @Entity()
 @Index(["studentId"])
 @Index(["commentId"])
+@Index(["artifactSectionId"])
 @Index(["processedAt"])
 export class EvidenceMoment {
   @PrimaryGeneratedColumn("uuid")
@@ -65,6 +67,13 @@ export class EvidenceMoment {
   @ManyToOne("Comment", { nullable: true, onDelete: "CASCADE" })
   @JoinColumn({ name: "commentId" })
   comment!: Relation<Comment> | null;
+
+  @ManyToOne("ArtifactSection", "evidenceMoments", {
+    nullable: true,
+    onDelete: "CASCADE",
+  })
+  @JoinColumn({ name: "artifactSectionId" })
+  artifactSection!: Relation<ArtifactSection> | null;
 
   @ManyToOne("EvidenceMoment", { nullable: true, onDelete: "SET NULL" })
   @JoinColumn({ name: "parentMomentId" })

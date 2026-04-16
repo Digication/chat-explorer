@@ -22,3 +22,5 @@ export { OutcomeFramework, FrameworkType } from "./OutcomeFramework.js";
 export { OutcomeDefinition } from "./OutcomeDefinition.js";
 export { EvidenceMoment, EvidenceType } from "./EvidenceMoment.js";
 export { EvidenceOutcomeLink, StrengthLevel } from "./EvidenceOutcomeLink.js";
+export { Artifact, ArtifactType, ArtifactStatus } from "./Artifact.js";
+export { ArtifactSection, SectionType } from "./ArtifactSection.js";
