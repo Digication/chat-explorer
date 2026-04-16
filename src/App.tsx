@@ -17,6 +17,8 @@ import SettingsPage from "@/pages/SettingsPage";
 import AdminPage from "@/pages/AdminPage";
 import StudentProfilePage from "@/pages/StudentProfilePage";
 import CrossCourseComparisonPage from "@/pages/CrossCourseComparisonPage";
+import ArtifactsListPage from "@/pages/ArtifactsListPage";
+import ArtifactDetailPage from "@/pages/ArtifactDetailPage";
 import { InsightsScopeProvider } from "@/components/insights/ScopeSelector";
 import { InsightsAnalyticsProvider } from "@/components/insights/InsightsAnalyticsContext";
 import { FacultyPanelProvider } from "@/components/faculty-panel/FacultyPanelContext";
@@ -153,6 +155,8 @@ export default function App() {
                 {/* AI Chat is now embedded in Chat Explorer — redirect old URL */}
                 <Route path="ai-chat" element={<Navigate to="/chat" replace />} />
                 <Route path="reports" element={<ReportsPage />} />
+                <Route path="artifacts" element={<ArtifactsListPage />} />
+                <Route path="artifacts/:id" element={<ArtifactDetailPage />} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route
                   path="admin"

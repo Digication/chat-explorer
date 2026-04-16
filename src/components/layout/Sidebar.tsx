@@ -16,6 +16,7 @@ import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
 import ChatOutlinedIcon from "@mui/icons-material/ChatOutlined";
 import CloudUploadOutlinedIcon from "@mui/icons-material/CloudUploadOutlined";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
+import FolderOutlinedIcon from "@mui/icons-material/FolderOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
@@ -33,6 +34,7 @@ const EXPANDED_WIDTH = 280;
 const FACULTY_NAV_ITEMS = [
   { label: "Insights", icon: <InsightsOutlinedIcon />, path: "/insights" },
   { label: "Chat Explorer", icon: <ChatOutlinedIcon />, path: "/chat" },
+  { label: "Artifacts", icon: <FolderOutlinedIcon />, path: "/artifacts" },
   { label: "Upload", icon: <CloudUploadOutlinedIcon />, path: "/upload" },
   { label: "Reports", icon: <DescriptionOutlinedIcon />, path: "/reports" },
   { label: "Settings", icon: <SettingsOutlinedIcon />, path: "/settings" },
@@ -43,6 +45,7 @@ const STUDENT_NAV_ITEMS = [
   { label: "My Learning Map", icon: <AccountTreeOutlinedIcon />, path: "/student/tree" },
   { label: "My Growth", icon: <TrendingUpOutlinedIcon />, path: "/student/growth" },
   { label: "My Outcomes", icon: <EmojiEventsOutlinedIcon />, path: "/student/outcomes" },
+  { label: "My Artifacts", icon: <FolderOutlinedIcon />, path: "/artifacts" },
 ];
 
 function SidebarContent({
