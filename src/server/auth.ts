@@ -50,7 +50,8 @@ export const auth = betterAuth({
   },
   plugins: [
     magicLink({
-      disableSignUp: true, // Only existing users can request magic links
+      // Sign-up is blocked via databaseHooks above instead of disableSignUp,
+      // so that we have the user's email for admin notifications.
       expiresIn: 3600, // 1 hour (in seconds)
       sendMagicLink: async ({ email, url }) => {
         if (!process.env.SENDGRID_API_KEY) {
