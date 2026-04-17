@@ -204,13 +204,40 @@ e8a1535 feat(evidence): add narrative evidence pipeline and outcomes framework (
 
 ---
 
+## Phase 7: Student Dashboard & Views — IN DESIGN
+
+**Status:** Design exploration. No production code written.
+**Handoff doc:** `.claude/plans/outcomes-phase-7-growth-design-2026-04-17.md`
+**Earlier critique:** `.claude/plans/outcomes-phase-7-critique-2026-04-16.md`
+**Prototype:** `prototype-student-growth.html` (project root, untracked)
+
+### Design decisions locked
+- Stacked strength-level bar rejected — misleads about durable skill regression
+- Three honest dimensions adopted: envelope/reach, breadth of evidence, recency
+- Personalized AI narrative per student per outcome as primary copy
+- Faculty-written OutcomeDefinition.description as collapsible disclosure
+- Strength levels hidden from student UI; faculty bar acknowledged as needing rethink
+- "Coming soon" stubs for unbuilt pages (tree, outcomes hub)
+- `reflectionCount` dropped from v1 (Phase 6 entity not built)
+
+### What's open
+- Visual form of the growth page (prototype concept OK, visuals need rework)
+- Dashboard page layout details (stats, recent evidence, artifact cards, empty states)
+- Navigation/routing decisions
+- One page vs. progressive disclosure
+
+### Prototype feedback (2026-04-17)
+User: "Concept seems good. Visuals aren't working. Taking a break for a couple of days."
+
+---
+
 ## What's Next: Phase 4+ — Conceptual Trees, Outcomes Hub, Guided Reflection
 
 Per the implementation plan, upcoming phases add:
 - **Phase 4:** Conceptual Trees — institution-level tag hierarchy, tree-based navigation
 - **Phase 5:** Outcomes Hub — cross-framework dashboard for admins (TORI + custom rubrics)
 - **Phase 6:** Guided Reflection — AI-assisted reflection flows triggered by low-depth detection
-- **Phase 7:** Student-facing evidence browser — students see their own moments + outcome progress
+- **Phase 7:** Student-facing evidence browser — currently in design (see above)
 
 ### Prerequisites satisfied by Phase 3
 - Artifact + ArtifactSection data model is stable

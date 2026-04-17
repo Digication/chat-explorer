@@ -1,0 +1,1474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Student Growth — Concept Prototype</title>
+<style>
+  /* === Chat Explorer Design Tokens === */
+  :root {
+    --header-bg: #26282b;
+    --sidebar-bg: #191a1b;
+    --sidebar-text: #e0e0e0;
+    --content-bg: #f5f7fa;
+    --paper: #ffffff;
+    --text-primary: #333333;
+    --text-secondary: #666666;
+    --text-tertiary: #999999;
+    --primary: #1976d2;
+    --primary-light: #e3f2fd;
+
+    /* TORI domain colors — from existing prototype */
+    --cognitive: #0288D1;   /* Domain 1 */
+    --emotional: #c62828;   /* Domain 2 */
+    --social: #2e7d32;      /* Domain 3 */
+    --personal: #7b1fa2;    /* Domain 4 */
+    --cultural: #e65100;    /* Domain 5 */
+    --life: #00695c;        /* Domain 6 */
+
+    --border: #e0e0e0;
+    --radius: 6px;
+    --radius-sm: 3px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: var(--text-primary);
+    background: var(--content-bg);
+    line-height: 1.55;
+    font-size: 14px;
+  }
+
+  /* === Header === */
+  .header {
+    height: 52px;
+    background: var(--header-bg);
+    color: white;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 1300;
+    gap: 16px;
+  }
+  .header-logo { font-size: 15px; font-weight: 600; letter-spacing: 0.3px; }
+  .header-sep { color: #555; }
+  .header-section { font-size: 14px; color: #bbb; }
+  .header-section.active { color: white; }
+
+  /* === Sidebar === */
+  .sidebar {
+    width: 60px;
+    background: var(--sidebar-bg);
+    position: fixed;
+    top: 52px; bottom: 0; left: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 20px;
+    gap: 8px;
+    z-index: 1200;
+  }
+  .sidebar-item {
+    width: 44px; height: 44px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--sidebar-text);
+    font-size: 20px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .sidebar-item:hover { background: #333; }
+  .sidebar-item.active { background: var(--primary); color: white; }
+
+  /* === Main layout === */
+  .main {
+    margin-left: 60px;
+    margin-top: 52px;
+    padding: 32px 40px 80px;
+    max-width: 1200px;
+  }
+
+  .page-header {
+    margin-bottom: 24px;
+  }
+  .page-title {
+    font-size: 28px;
+    font-weight: 400;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+  }
+  .page-sub {
+    font-size: 15px;
+    color: var(--text-secondary);
+    max-width: 700px;
+  }
+
+  /* === Tabs === */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 28px;
+  }
+  .tab {
+    padding: 10px 18px;
+    background: transparent;
+    border: none;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .tab:hover { color: var(--text-primary); }
+  .tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    font-weight: 500;
+  }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* === Section titles === */
+  .section-title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+  }
+
+  /* === Domain cluster (the "territory" map) === */
+  .domain-cluster {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    border-left: 4px solid var(--border);
+  }
+  .domain-cluster.cog { border-left-color: var(--cognitive); }
+  .domain-cluster.emo { border-left-color: var(--emotional); }
+  .domain-cluster.soc { border-left-color: var(--social); }
+  .domain-cluster.per { border-left-color: var(--personal); }
+  .domain-cluster.cul { border-left-color: var(--cultural); }
+  .domain-cluster.lif { border-left-color: var(--life); }
+
+  .domain-cluster.untouched { opacity: 0.6; }
+
+  .domain-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 14px;
+  }
+  .domain-name {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+  .domain-name .domain-num {
+    color: var(--text-tertiary);
+    font-weight: 400;
+    margin-right: 6px;
+  }
+  .domain-meta {
+    font-size: 12px;
+    color: var(--text-tertiary);
+  }
+
+  .outcomes-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  /* === Outcome pills (inside a domain) === */
+  .outcome-pill {
+    background: #fafbfc;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
+    min-width: 200px;
+    flex: 0 0 auto;
+    position: relative;
+  }
+  .outcome-pill:hover {
+    background: #fff;
+    border-color: #bbb;
+    transform: translateY(-1px);
+  }
+  .outcome-pill.expanded {
+    background: #fff;
+    border-color: var(--primary);
+    box-shadow: 0 1px 4px rgba(25, 118, 210, 0.15);
+  }
+  .outcome-pill-name {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    color: var(--text-primary);
+  }
+  .outcome-pill-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+  .breadth-dots {
+    display: inline-flex;
+    gap: 2px;
+  }
+  .breadth-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .breadth-dot.cog { color: var(--cognitive); }
+  .breadth-dot.emo { color: var(--emotional); }
+  .breadth-dot.soc { color: var(--social); }
+  .breadth-dot.per { color: var(--personal); }
+  .breadth-dot.cul { color: var(--cultural); }
+  .breadth-dot.lif { color: var(--life); }
+
+  .recency-chip {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 500;
+    background: #e8f4fd;
+    color: var(--primary);
+  }
+  .recency-chip.older {
+    background: #f0f0f0;
+    color: var(--text-tertiary);
+  }
+
+  .outcome-pill-untouched {
+    opacity: 0.4;
+    font-style: italic;
+    background: transparent;
+    border-style: dashed;
+    cursor: default;
+  }
+  .outcome-pill-untouched:hover {
+    transform: none;
+    background: transparent;
+  }
+
+  /* === Outcome detail card (expanded) === */
+  .outcome-detail {
+    grid-column: 1 / -1;
+    flex-basis: 100%;
+    margin-top: 14px;
+    padding: 20px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    border-top: 4px solid var(--primary);
+    display: none;
+  }
+  .outcome-detail.open { display: block; }
+  .outcome-detail.cog { border-top-color: var(--cognitive); }
+  .outcome-detail.emo { border-top-color: var(--emotional); }
+  .outcome-detail.soc { border-top-color: var(--social); }
+  .outcome-detail.per { border-top-color: var(--personal); }
+  .outcome-detail.cul { border-top-color: var(--cultural); }
+
+  .detail-outcome-title {
+    font-size: 20px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .detail-outcome-sub {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    margin-bottom: 20px;
+  }
+
+  .personalized-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-tertiary);
+    margin-bottom: 6px;
+  }
+  .personalized-narrative {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    background: #fafbfc;
+    padding: 14px 16px;
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--primary);
+    margin-bottom: 16px;
+    font-style: normal;
+  }
+  .personalized-synth {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-top: 6px;
+  }
+
+  .disclosure {
+    font-size: 12px;
+    color: var(--primary);
+    cursor: pointer;
+    user-select: none;
+    padding: 6px 0;
+  }
+  .disclosure:hover { text-decoration: underline; }
+  .disclosure-content {
+    display: none;
+    font-size: 13px;
+    color: var(--text-secondary);
+    background: #f5f7fa;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    margin-top: 6px;
+    border: 1px dashed var(--border);
+  }
+  .disclosure-content.open { display: block; }
+
+  /* Three dimensions row */
+  .dimensions-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin: 18px 0;
+  }
+  .dim-card {
+    background: #fafbfc;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+  }
+  .dim-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-tertiary);
+    margin-bottom: 4px;
+  }
+  .dim-value {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+  }
+  .dim-note {
+    font-size: 11px;
+    color: var(--text-secondary);
+  }
+
+  /* Evidence moment list */
+  .moments-heading {
+    margin-top: 18px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .moments-heading-title {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-secondary);
+  }
+  .moments-heading-hint {
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+
+  .moment {
+    padding: 12px 14px;
+    border-left: 3px solid var(--border);
+    background: #fafbfc;
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+  }
+  .moment.peak {
+    border-left-color: var(--primary);
+    background: #f4f9fd;
+  }
+  .moment-header {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 11px;
+    color: var(--text-tertiary);
+  }
+  .peak-badge {
+    background: var(--primary);
+    color: white;
+    font-size: 10px;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+  }
+  .moment-source {
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+  .moment-quote {
+    font-size: 13px;
+    font-style: italic;
+    color: var(--text-primary);
+    margin: 6px 0;
+    line-height: 1.55;
+  }
+  .moment-narrative {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 4px;
+    line-height: 1.55;
+  }
+  .moment-tags {
+    margin-top: 8px;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .tag {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: #eef3f8;
+    color: var(--text-secondary);
+  }
+
+  /* === Recent reflections (tab 2) === */
+  .recent-moment {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 20px;
+    padding: 18px 20px;
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+  }
+  .recent-date {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    padding-top: 2px;
+  }
+  .recent-date strong {
+    display: block;
+    font-size: 14px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+  .recent-body {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-primary);
+  }
+  .recent-narrative {
+    margin-bottom: 6px;
+  }
+  .recent-quote {
+    font-style: italic;
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin: 6px 0;
+    padding-left: 10px;
+    border-left: 2px solid var(--border);
+  }
+  .recent-meta {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-tertiary);
+  }
+
+  /* === Then vs. Now (tab 3) === */
+  .thennow-intro {
+    font-size: 14px;
+    color: var(--text-secondary);
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    max-width: 800px;
+    line-height: 1.65;
+  }
+  .thennow-pair {
+    display: grid;
+    grid-template-columns: 1fr 40px 1fr;
+    gap: 16px;
+    align-items: stretch;
+    margin-bottom: 24px;
+  }
+  .thennow-card {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+  }
+  .thennow-card.then {
+    border-color: #d0d0d0;
+  }
+  .thennow-card.now {
+    border-color: var(--primary);
+    border-width: 2px;
+  }
+  .thennow-header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .thennow-period {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+  .thennow-source {
+    font-size: 12px;
+    color: var(--text-tertiary);
+  }
+  .thennow-situation {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .thennow-quote {
+    font-style: italic;
+    font-size: 14px;
+    margin: 8px 0;
+    color: var(--text-primary);
+    line-height: 1.6;
+  }
+  .thennow-narrative {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 10px;
+    line-height: 1.6;
+  }
+  .thennow-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    font-size: 24px;
+  }
+  .thennow-pair-outcome {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+  .thennow-pair-outcome .dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--primary);
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+
+  /* Untouched section */
+  .untouched-note {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    font-style: italic;
+    margin-top: 8px;
+  }
+
+  /* Domain legend */
+  .domain-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+  }
+
+  /* Prototype note banner */
+  .proto-note {
+    background: #fff8e1;
+    border: 1px solid #ffe082;
+    border-radius: var(--radius);
+    padding: 10px 16px;
+    font-size: 12px;
+    color: #795548;
+    margin-bottom: 24px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-logo">Chat Explorer</div>
+  <div class="header-sep">/</div>
+  <div class="header-section active">Student</div>
+  <div class="header-sep">›</div>
+  <div class="header-section">Maya Rodriguez</div>
+</div>
+
+<!-- Sidebar -->
+<div class="sidebar">
+  <div class="sidebar-item">⌂</div>
+  <div class="sidebar-item active">◎</div>
+  <div class="sidebar-item">✎</div>
+  <div class="sidebar-item">⌘</div>
+</div>
+
+<!-- Main -->
+<div class="main">
+
+  <div class="proto-note">
+    <strong>Prototype.</strong> Fictitious student data (Maya Rodriguez, junior mechanical engineering). All narratives are hand-written examples of what the AI would generate. Not connected to any real data.
+  </div>
+
+  <div class="page-header">
+    <div class="page-title">Your growth, Maya</div>
+    <div class="page-sub">
+      Every reflection you've written is a moment of turning experience into a durable skill. This page maps the skills you've been cementing — what they look like for <em>you</em>, how widely you've exercised them, and what you've been working on lately.
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" data-tab="territory">Your Territory</button>
+    <button class="tab" data-tab="recent">Recent Reflections</button>
+    <button class="tab" data-tab="thennow">Then vs. Now</button>
+  </div>
+
+  <!-- ================================================== -->
+  <!-- TAB 1: Your Territory (domain map)                 -->
+  <!-- ================================================== -->
+  <div class="tab-panel active" id="panel-territory">
+
+    <div class="domain-legend">
+      <div class="legend-item"><span class="legend-swatch" style="background:var(--cognitive)"></span>Cognitive &amp; Analytical</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:var(--emotional)"></span>Emotional &amp; Affective</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:var(--social)"></span>Social &amp; Interpersonal</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:var(--personal)"></span>Personal Growth</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:var(--cultural)"></span>Cultural &amp; Ethical</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:var(--life)"></span>Life Transitions</div>
+    </div>
+
+    <!-- Domain 1: Cognitive -->
+    <div class="domain-cluster cog">
+      <div class="domain-header">
+        <div class="domain-name"><span class="domain-num">1.</span>Cognitive &amp; Analytical Reflection</div>
+        <div class="domain-meta">4 of 15 outcomes touched · 7 moments this semester</div>
+      </div>
+      <div class="outcomes-row" id="domain-1">
+
+        <div class="outcome-pill" data-outcome="perspective-shifting" data-domain="cog">
+          <div class="outcome-pill-name">Perspective Shifting</div>
+          <div class="outcome-pill-meta">
+            <span class="breadth-dots"><span class="breadth-dot cog"></span><span class="breadth-dot cog"></span><span class="breadth-dot cog"></span><span class="breadth-dot cog"></span></span>
+            <span>4 contexts</span>
+            <span class="recency-chip">4 days ago</span>
+          </div>
+        </div>
+
+        <div class="outcome-pill" data-outcome="problem-solving" data-domain="cog">
+          <div class="outcome-pill-name">Problem-Solving</div>
+          <div class="outcome-pill-meta">
+            <span class="breadth-dots"><span class="breadth-dot cog"></span><span class="breadth-dot cog"></span><span class="breadth-dot cog"></span></span>
+            <span>3 contexts</span>
+            <span class="recency-chip">11 days ago</span>
+          </div>
+        </div>
+
+        <div class="outcome-pill" data-outcome="integrative-thinking" data-domain="cog">
+          <div class="outcome-pill-name">Integrative Thinking</div>
+          <div class="outcome-pill-meta">
+            <span class="breadth-dots"><span class="breadth-dot cog"></span><span class="breadth-dot cog"></span></span>
+            <span>2 contexts</span>
+            <span class="recency-chip">6 days ago</span>
+          </div>
+        </div>
+
+        <div class="outcome-pill" data-outcome="critical-thinking" data-domain="cog">
+          <div class="outcome-pill-name">Critical Thinking</div>
+          <div class="outcome-pill-meta">
+            <span class="breadth-dots"><span class="breadth-dot cog"></span><span class="breadth-dot cog"></span></span>
+            <span>2 contexts</span>
+            <span class="recency-chip older">5 weeks ago</span>
+          </div>
+        </div>
+
+        <div class="outcome-pill outcome-pill-untouched">
+          <div class="outcome-pill-name">+ 11 more you haven't touched</div>
+        </div>
+
+      </div>
+      <div class="outcome-detail" id="detail-cog"></div>
+    </div>
+
+    <!-- Domain 2: Emotional -->
+    <div class="domain-cluster emo">
+      <div class="domain-header">
+        <div class="domain-name"><span class="domain-num">2.</span>Emotional &amp; Affective Reflection</div>
+        <div class="domain-meta">2 of 8 outcomes touched · 3 moments this semester</div>
+      </div>
+      <div class="outcomes-row" id="domain-2">
+
+        <div class="outcome-pill" data-outcome="emotional-differentiation" data-domain="emo">
+          <div class="outcome-pill-name">Emotional Differentiation</div>
+          <div class="outcome-pill-meta">
+            <span class="breadth-dots"><span class="breadth-dot emo"></span><span class="breadth-dot emo"></span></span>
+            <span>2 contexts</span>
+            <span class="recency-chip">9 days ago</span>
+          </div>
+        </div>
+
+        <div class="outcome-pill" data-outcome="resilience" data-domain="emo">
+          <div class="outcome-pill-name">Resilience &amp; Failure Adaptation</div>
+          <div class="outcome-pill-meta">
+            <span class="breadth-dots"><span class="breadth-dot emo"></span><span class="breadth-dot emo"></span><span class="breadth-dot emo"></span></span>
+            <span>3 contexts</span>
+            <span class="recency-chip">2 weeks ago</span>
+          </div>
+        </div>
+
+        <div class="outcome-pill outcome-pill-untouched">
+          <div class="outcome-pill-name">+ 6 more you haven't touched</div>
+        </div>
+
+      </div>
+      <div class="outcome-detail" id="detail-emo"></div>
+    </div>
+
+    <!-- Domain 3: Social -->
+    <div class="domain-cluster soc">
+      <div class="domain-header">
+        <div class="domain-name"><span class="domain-num">3.</span>Social &amp; Interpersonal Reflection</div>
+        <div class="domain-meta">3 of 14 outcomes touched · 5 moments this semester</div>
+      </div>
+      <div class="outcomes-row" id="domain-3">
+
+        <div class="outcome-pill" data-outcome="feedback-processing" data-domain="soc">
+          <div class="outcome-pill-name">Feedback Processing</div>
+          <div class="outcome-pill-meta">
+            <span class="breadth-dots"><span class="breadth-dot soc"></span><span class="breadth-dot soc"></span><span class="breadth-dot soc"></span></span>
+            <span>3 contexts</span>
+            <span class="recency-chip">2 days ago</span>
+          </div>
+        </div>
+
+        <div class="outcome-pill" data-outcome="conflict-management" data-domain="soc">
+          <div class="outcome-pill-name">Conflict Management &amp; Resolution</div>
+          <div class="outcome-pill-meta">
+            <span class="breadth-dots"><span class="breadth-dot soc"></span><span class="breadth-dot soc"></span></span>
+            <span>2 contexts</span>
+            <span class="recency-chip">8 days ago</span>
+          </div>
+        </div>
+
+        <div class="outcome-pill" data-outcome="learning-from-others" data-domain="soc">
+          <div class="outcome-pill-name">Learning from Others</div>
+          <div class="outcome-pill-meta">
+            <span class="breadth-dots"><span class="breadth-dot soc"></span><span class="breadth-dot soc"></span></span>
+            <span>2 contexts</span>
+            <span class="recency-chip older">3 weeks ago</span>
+          </div>
+        </div>
+
+        <div class="outcome-pill outcome-pill-untouched">
+          <div class="outcome-pill-name">+ 11 more you haven't touched</div>
+        </div>
+
+      </div>
+      <div class="outcome-detail" id="detail-soc"></div>
+    </div>
+
+    <!-- Domain 4: Personal Growth -->
+    <div class="domain-cluster per">
+      <div class="domain-header">
+        <div class="domain-name"><span class="domain-num">4.</span>Personal Growth &amp; Self-Development</div>
+        <div class="domain-meta">3 of 13 outcomes touched · 4 moments this semester</div>
+      </div>
+      <div class="outcomes-row" id="domain-4">
+
+        <div class="outcome-pill" data-outcome="mindset" data-domain="per">
+          <div class="outcome-pill-name">Mindset Development</div>
+          <div class="outcome-pill-meta">
+            <span class="breadth-dots"><span class="breadth-dot per"></span><span class="breadth-dot per"></span></span>
+            <span>2 contexts</span>
+            <span class="recency-chip">1 week ago</span>
+          </div>
+        </div>
+
+        <div class="outcome-pill" data-outcome="self-efficacy" data-domain="per">
+          <div class="outcome-pill-name">Self-Efficacy</div>
+          <div class="outcome-pill-meta">
+            <span class="breadth-dots"><span class="breadth-dot per"></span><span class="breadth-dot per"></span></span>
+            <span>2 contexts</span>
+            <span class="recency-chip">13 days ago</span>
+          </div>
+        </div>
+
+        <div class="outcome-pill" data-outcome="goals-motivation" data-domain="per">
+          <div class="outcome-pill-name">Goals &amp; Motivation</div>
+          <div class="outcome-pill-meta">
+            <span class="breadth-dots"><span class="breadth-dot per"></span></span>
+            <span>1 context</span>
+            <span class="recency-chip older">6 weeks ago</span>
+          </div>
+        </div>
+
+        <div class="outcome-pill outcome-pill-untouched">
+          <div class="outcome-pill-name">+ 10 more you haven't touched</div>
+        </div>
+
+      </div>
+      <div class="outcome-detail" id="detail-per"></div>
+    </div>
+
+    <!-- Domain 5: Cultural / Ethical -->
+    <div class="domain-cluster cul">
+      <div class="domain-header">
+        <div class="domain-name"><span class="domain-num">5.</span>Cultural, Ethical &amp; Contextual</div>
+        <div class="domain-meta">1 of 9 outcomes touched · 1 moment this semester</div>
+      </div>
+      <div class="outcomes-row" id="domain-5">
+
+        <div class="outcome-pill" data-outcome="ethics" data-domain="cul">
+          <div class="outcome-pill-name">Ethics</div>
+          <div class="outcome-pill-meta">
+            <span class="breadth-dots"><span class="breadth-dot cul"></span></span>
+            <span>1 context</span>
+            <span class="recency-chip">10 days ago</span>
+          </div>
+        </div>
+
+        <div class="outcome-pill outcome-pill-untouched">
+          <div class="outcome-pill-name">+ 8 more you haven't touched</div>
+        </div>
+
+      </div>
+      <div class="outcome-detail" id="detail-cul"></div>
+    </div>
+
+    <!-- Domain 6: Life Transitions (completely untouched) -->
+    <div class="domain-cluster lif untouched">
+      <div class="domain-header">
+        <div class="domain-name"><span class="domain-num">6.</span>Life Transitions &amp; Broader Development</div>
+        <div class="domain-meta">No evidence yet</div>
+      </div>
+      <div class="untouched-note">
+        Nothing you've reflected on so far has surfaced this domain. That's normal — this domain may become relevant around graduation, career transitions, or major life changes.
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================================================== -->
+  <!-- TAB 2: Recent Reflections                          -->
+  <!-- ================================================== -->
+  <div class="tab-panel" id="panel-recent">
+
+    <div class="section-title">Last 5 reflections across all outcomes</div>
+
+    <div class="recent-moment">
+      <div class="recent-date">
+        <strong>Apr 14</strong>
+        2 days ago
+      </div>
+      <div class="recent-body">
+        <div class="recent-quote">"I kept calling the disagreement 'a communication issue' but reading Dr. Chen's feedback back, the real thing was that I hadn't actually engaged with the critique — I'd just restated my original point more carefully."</div>
+        <div class="recent-narrative">You're starting to distinguish defending your design from understanding the feedback. That's the move that turns critique into signal instead of noise.</div>
+        <div class="recent-meta">
+          <span>ME 495 Capstone — Week 11 Reflection</span>
+          <span>·</span>
+          <span class="tag" style="background:#eaf4ea;color:var(--social)">Feedback Processing</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="recent-moment">
+      <div class="recent-date">
+        <strong>Apr 12</strong>
+        4 days ago
+      </div>
+      <div class="recent-body">
+        <div class="recent-quote">"When Priya explained how the patient actually holds the device, I realized the entire load analysis I'd done was based on the clinician's grip, not the patient's. I'd been designing for the wrong user without knowing it."</div>
+        <div class="recent-narrative">You caught a structural assumption hiding inside your engineering work — the user in your head wasn't the user the product serves. Noticing assumptions you didn't know you had is the core move of perspective shifting.</div>
+        <div class="recent-meta">
+          <span>Capstone Team Journal — Entry 14</span>
+          <span>·</span>
+          <span class="tag" style="background:#e3f0fa;color:var(--cognitive)">Perspective Shifting</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="recent-moment">
+      <div class="recent-date">
+        <strong>Apr 10</strong>
+        6 days ago
+      </div>
+      <div class="recent-body">
+        <div class="recent-quote">"The thermodynamics and fluid dynamics pieces used to feel like separate chapters I had to switch between. Writing this up I noticed I was using them in the same sentence without translating between them."</div>
+        <div class="recent-narrative">Your disciplines are beginning to talk to each other without an interpreter. This kind of integrative thinking is the thing the senior design course is supposed to trigger — and it's showing up in your writing.</div>
+        <div class="recent-meta">
+          <span>ME 495 Technical Memo #3</span>
+          <span>·</span>
+          <span class="tag" style="background:#e3f0fa;color:var(--cognitive)">Integrative Thinking</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="recent-moment">
+      <div class="recent-date">
+        <strong>Apr 7</strong>
+        9 days ago
+      </div>
+      <div class="recent-body">
+        <div class="recent-quote">"I called it 'being frustrated with the team' but when I wrote it out I noticed it was two different feelings. The frustration was about the pace. The harder thing — which I didn't want to name — was feeling like I was in over my head."</div>
+        <div class="recent-narrative">You're separating feelings that used to travel together as one lump. Naming frustration and imposter-feeling as distinct lets you respond to each differently — the first is about the team, the second is about your story about yourself.</div>
+        <div class="recent-meta">
+          <span>Weekly Journal — Week 10</span>
+          <span>·</span>
+          <span class="tag" style="background:#f7e6e6;color:var(--emotional)">Emotional Differentiation</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="recent-moment">
+      <div class="recent-date">
+        <strong>Apr 5</strong>
+        11 days ago
+      </div>
+      <div class="recent-body">
+        <div class="recent-quote">"When Priya pushed back on prioritizing structural safety over patient-facing features, I almost escalated. Instead I asked what concrete outcome would make the feature 'worth' a safety tradeoff. That reframed the whole conversation."</div>
+        <div class="recent-narrative">You de-escalated by translating the disagreement into a decision framework the team could share. That's not conflict-avoidance — it's naming the underlying values so the conversation becomes about tradeoffs rather than positions.</div>
+        <div class="recent-meta">
+          <span>Capstone Team Journal — Entry 12</span>
+          <span>·</span>
+          <span class="tag" style="background:#eaf4ea;color:var(--social)">Conflict Management</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================================================== -->
+  <!-- TAB 3: Then vs. Now                                -->
+  <!-- ================================================== -->
+  <div class="tab-panel" id="panel-thennow">
+
+    <div class="thennow-intro">
+      <strong>Envelope, not rate.</strong>
+      Durable skills don't come and go week-to-week. Once you reach a way of thinking, it stays available — even if this week's assignments don't exercise it. These pairs show the <em>same kind of challenge</em> handled earlier in your learning vs. more recently. The shift shows how far you've reached in that skill.
+    </div>
+
+    <!-- Pair 1: Perspective Shifting -->
+    <div class="thennow-pair-outcome">
+      <span class="dot" style="background:var(--cognitive)"></span>
+      Perspective Shifting — noticing assumptions you didn't know you had
+    </div>
+    <div class="thennow-pair">
+      <div class="thennow-card then">
+        <div class="thennow-header">
+          <span class="thennow-period">Then</span>
+          <span class="thennow-source">ENGR 101 — Fall 2023, 1st year</span>
+        </div>
+        <div class="thennow-situation">When a teammate saw a problem differently</div>
+        <div class="thennow-quote">"My lab partner kept saying the torque equation was wrong. I explained it to him again more slowly. Eventually he got it."</div>
+        <div class="thennow-narrative">You treated the disagreement as a translation problem — the other person needed clearer explanation. You didn't yet consider that their framing might be different from yours.</div>
+      </div>
+      <div class="thennow-arrow">→</div>
+      <div class="thennow-card now">
+        <div class="thennow-header">
+          <span class="thennow-period">Now</span>
+          <span class="thennow-source">ME 495 Capstone — Spring 2026, 4th year</span>
+        </div>
+        <div class="thennow-situation">When a teammate saw a problem differently</div>
+        <div class="thennow-quote">"When Priya explained how the patient actually holds the device, I realized the entire load analysis I'd done was based on the clinician's grip, not the patient's. I'd been designing for the wrong user without knowing it."</div>
+        <div class="thennow-narrative">You treated her framing as evidence that your own framing had a blind spot. That's a structural shift — from "I'm right and need to explain" to "my model might be missing something only she can see."</div>
+      </div>
+    </div>
+
+    <!-- Pair 2: Resilience -->
+    <div class="thennow-pair-outcome">
+      <span class="dot" style="background:var(--emotional)"></span>
+      Resilience &amp; Failure Adaptation — how you relate to a failed attempt
+    </div>
+    <div class="thennow-pair">
+      <div class="thennow-card then">
+        <div class="thennow-header">
+          <span class="thennow-period">Then</span>
+          <span class="thennow-source">MATH 221 — Fall 2024, 2nd year</span>
+        </div>
+        <div class="thennow-situation">After a rough midterm</div>
+        <div class="thennow-quote">"I studied the whole weekend and still got a 61. I must not be a math person. I'll focus on the courses where I actually do well."</div>
+        <div class="thennow-narrative">The failure became a statement about you. The response was to retreat from the territory, not re-approach it differently.</div>
+      </div>
+      <div class="thennow-arrow">→</div>
+      <div class="thennow-card now">
+        <div class="thennow-header">
+          <span class="thennow-period">Now</span>
+          <span class="thennow-source">ME 495 Capstone — Spring 2026, 4th year</span>
+        </div>
+        <div class="thennow-situation">After the first prototype failed testing</div>
+        <div class="thennow-quote">"The prototype didn't survive the drop test. Before I felt bad about it, I wrote down what the failure mode ruled out: it wasn't the joint design, and it wasn't the material choice. That's two hypotheses I didn't have yesterday."</div>
+        <div class="thennow-narrative">The failure became information. You moved directly from "what happened" to "what this rules in or out" — treating the event as evidence rather than a verdict.</div>
+      </div>
+    </div>
+
+    <!-- Pair 3: Feedback Processing -->
+    <div class="thennow-pair-outcome">
+      <span class="dot" style="background:var(--social)"></span>
+      Feedback Processing — what you do with a hard critique
+    </div>
+    <div class="thennow-pair">
+      <div class="thennow-card then">
+        <div class="thennow-header">
+          <span class="thennow-period">Then</span>
+          <span class="thennow-source">ENGL 201 — Spring 2024, 1st year</span>
+        </div>
+        <div class="thennow-situation">Received critical feedback on an essay</div>
+        <div class="thennow-quote">"The professor said my argument was 'structurally confused.' I went back through the essay to find the paragraphs that could still work and mostly rewrote around her comments."</div>
+        <div class="thennow-narrative">You treated feedback as a list of patches. The goal was to rescue the existing piece, not to absorb what the feedback might be suggesting about your underlying approach.</div>
+      </div>
+      <div class="thennow-arrow">→</div>
+      <div class="thennow-card now">
+        <div class="thennow-header">
+          <span class="thennow-period">Now</span>
+          <span class="thennow-source">ME 495 Capstone — Spring 2026, 4th year</span>
+        </div>
+        <div class="thennow-situation">Received critical feedback on the capstone design</div>
+        <div class="thennow-quote">"Reading Dr. Chen's feedback back, the real thing was that I hadn't actually engaged with the critique — I'd just restated my original point more carefully. I didn't rewrite anything yet. I sat with her comment until I could say it back in my own words."</div>
+        <div class="thennow-narrative">You slowed down between receiving feedback and acting on it. The gap you now take — between "what they said" and "what that implies for what I'm doing" — is the thing that turns critique into signal.</div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- ========= Outcome detail content (rendered by JS) ========= -->
+<script>
+  // Detail data keyed by outcome slug.
+  const OUTCOME_DETAILS = {
+    "perspective-shifting": {
+      name: "Perspective Shifting",
+      code: "TORI 1.1",
+      domainClass: "cog",
+      personalNarrative: "You've been noticing your own assumptions in team decisions — especially when your engineering intuition clashed with user research from your nursing teammates. Your most sophisticated move was reworking the load-balancing tradeoff after realizing the patient's grip was structurally different from the clinician's grip you'd been designing for.",
+      synthNote: "synthesized from 4 moments across 4 contexts",
+      institutional: "Critically examining one's own viewpoint and actively considering alternative ways of seeing a situation or problem.",
+      reach: "You've moved from treating disagreement as a translation problem to treating it as evidence that your own framing may be incomplete.",
+      breadth: "4 different contexts — ENGR 101, ME 300, Capstone journal, Capstone technical memo",
+      recency: "Most recent: 4 days ago, in your Capstone Team Journal",
+      peakMoment: {
+        source: "Capstone Team Journal — Entry 14, Apr 12 2026",
+        quote: "When Priya explained how the patient actually holds the device, I realized the entire load analysis I'd done was based on the clinician's grip, not the patient's. I'd been designing for the wrong user without knowing it.",
+        narrative: "You caught a structural assumption hiding inside your engineering work — the user in your head wasn't the user the product serves. Noticing assumptions you didn't know you had is the core move of perspective shifting.",
+        tags: ["Perspective Shifting", "Integrative Thinking"]
+      },
+      otherMoments: [
+        {
+          source: "ME 300 Paper — Dec 2025",
+          quote: "My teammate's approach to the heat-dissipation problem didn't match mine, and I kept arguing until I realized we were solving different problems. His was 'worst case'; mine was 'typical case.'",
+          narrative: "You noticed a framing difference rather than a calculation difference. That's the step before the shift."
+        },
+        {
+          source: "ENGR 101 Lab Partner Reflection — Oct 2023",
+          quote: "My lab partner kept saying the torque equation was wrong. I explained it to him again more slowly. Eventually he got it.",
+          narrative: "Earlier pattern: disagreement as translation. You explained harder rather than listened differently."
+        }
+      ]
+    },
+
+    "problem-solving": {
+      name: "Problem-Solving",
+      code: "TORI 1.6",
+      domainClass: "cog",
+      personalNarrative: "You approach problems iteratively — documenting what you tried, why it didn't work, and what the failure suggested about the next attempt. Your debugging of the sensor integration shows you're now separating 'the code is wrong' from 'my mental model is wrong,' which is a higher-order move.",
+      synthNote: "synthesized from 3 moments across 3 contexts",
+      institutional: "Examining the methods, strategies, and thought processes used to address challenges and arrive at solutions.",
+      reach: "You've moved from linear debugging (keep trying things) to hypothesis-ruling (each attempt is designed to eliminate a possibility).",
+      breadth: "3 contexts — ME 300 Design, Capstone sensor work, MATH 221",
+      recency: "Most recent: 11 days ago, Capstone sensor integration write-up",
+      peakMoment: {
+        source: "Capstone Sensor Integration Log — Apr 5 2026",
+        quote: "Attempt 3 failed. But the way it failed told me the problem isn't in the code — the timing is too consistent for a software bug. Something in my mental model of how the sensor reports is wrong. Time to re-read the datasheet.",
+        narrative: "You used the shape of the failure to locate the bug in your understanding rather than in the artifact. That's a meta-debugging move.",
+        tags: ["Problem-Solving", "Critical Thinking"]
+      },
+      otherMoments: [
+        {
+          source: "ME 300 Design Project — Nov 2025",
+          quote: "The simulation kept diverging. I wrote down every assumption I'd made in the model, then crossed off the ones that would still be true if I inverted them.",
+          narrative: "You externalized your assumptions so you could test them one at a time. Earlier attempts were more 'try something and see.'"
+        }
+      ]
+    },
+
+    "integrative-thinking": {
+      name: "Integrative Thinking",
+      code: "TORI 1.3",
+      domainClass: "cog",
+      personalNarrative: "Your design decisions weave together fluid dynamics, material science, and user research in ways that weren't obvious to you last semester. The assistive-device writeup is your first artifact where the different disciplines aren't competing for attention — they're cooperating.",
+      synthNote: "synthesized from 2 moments across 2 contexts",
+      institutional: "Examining how one combines diverse or even conflicting perspectives, ideas, or data into a cohesive understanding or solution.",
+      reach: "Your disciplines are starting to talk to each other without an interpreter.",
+      breadth: "2 contexts — Capstone technical memo, ME 300 final paper",
+      recency: "Most recent: 6 days ago",
+      peakMoment: {
+        source: "ME 495 Technical Memo #3 — Apr 10 2026",
+        quote: "The thermodynamics and fluid dynamics pieces used to feel like separate chapters I had to switch between. Writing this up I noticed I was using them in the same sentence without translating between them.",
+        narrative: "Your disciplines are beginning to talk to each other without an interpreter. This kind of integrative thinking is the thing the senior design course is supposed to trigger — and it's showing up in your writing.",
+        tags: ["Integrative Thinking"]
+      },
+      otherMoments: []
+    },
+
+    "critical-thinking": {
+      name: "Critical Thinking",
+      code: "TORI 1.5",
+      domainClass: "cog",
+      personalNarrative: "You've been evaluating conflicting technical sources without defaulting to the first one that confirms what you wanted to do. When the materials comparison gave you two contradictory answers, you tracked down the difference rather than picking.",
+      synthNote: "synthesized from 2 moments across 2 contexts",
+      institutional: "Examining how one evaluates information, forms judgments, and draws conclusions through logical reasoning and evidence-based analysis.",
+      reach: "You've moved from 'pick a source' to 'understand why sources disagree' as your first move.",
+      breadth: "2 contexts — ME 300 materials research, Capstone literature review",
+      recency: "Most recent: 5 weeks ago — you haven't exercised this recently",
+      peakMoment: {
+        source: "ME 300 Materials Research — Mar 2026",
+        quote: "Two papers gave contradictory yield-strength values for the same alloy. Before I picked one, I looked at how each team had tested — different strain rates, different sample sizes. The contradiction went away when I stopped treating them as two answers to the same question.",
+        narrative: "You used the disagreement between sources as information about the experimental conditions rather than a coin flip to resolve."
+      },
+      otherMoments: []
+    },
+
+    "emotional-differentiation": {
+      name: "Emotional Differentiation",
+      code: "TORI 2.1",
+      domainClass: "emo",
+      personalNarrative: "You've started distinguishing frustration from imposter-feeling — two feelings that used to collapse into 'I'm not good enough.' Naming them separately in your team-conflict journal helped you respond differently to each.",
+      synthNote: "synthesized from 2 moments across 2 contexts",
+      institutional: "Recognizing, labeling, and distinguishing between discrete emotions with precision (emotional granularity).",
+      reach: "You've moved from one-word labels ('stressed,' 'annoyed') to naming the specific sub-feelings inside them.",
+      breadth: "2 contexts — Weekly Journal, Capstone Team Journal",
+      recency: "Most recent: 9 days ago",
+      peakMoment: {
+        source: "Weekly Journal — Week 10, Apr 7 2026",
+        quote: "I called it 'being frustrated with the team' but when I wrote it out I noticed it was two different feelings. The frustration was about the pace. The harder thing — which I didn't want to name — was feeling like I was in over my head.",
+        narrative: "You're separating feelings that used to travel together as one lump. Naming frustration and imposter-feeling as distinct lets you respond to each differently — the first is about the team, the second is about your story about yourself.",
+        tags: ["Emotional Differentiation", "Self-Efficacy"]
+      },
+      otherMoments: []
+    },
+
+    "resilience": {
+      name: "Resilience & Failure Adaptation",
+      code: "TORI 2.2",
+      domainClass: "emo",
+      personalNarrative: "Failed prototypes used to feel personal. Your recent reflection on the second prototype attempt shows you're now treating failure as information — specifically asking 'what did this failure rule out that a success wouldn't have?'",
+      synthNote: "synthesized from 3 moments across 3 contexts",
+      institutional: "Recovering or bouncing back from setbacks or adversity, and learning from mistakes to transform them into growth opportunities.",
+      reach: "You've moved from failure-as-verdict to failure-as-evidence.",
+      breadth: "3 contexts — Capstone prototype log, MATH 221 midterm, first-year design project",
+      recency: "Most recent: 2 weeks ago",
+      peakMoment: {
+        source: "Capstone Prototype Log — Apr 1 2026",
+        quote: "The prototype didn't survive the drop test. Before I felt bad about it, I wrote down what the failure mode ruled out: it wasn't the joint design, and it wasn't the material choice. That's two hypotheses I didn't have yesterday.",
+        narrative: "The failure became information. You moved directly from 'what happened' to 'what this rules in or out' — treating the event as evidence rather than a verdict."
+      },
+      otherMoments: [
+        {
+          source: "MATH 221 Midterm Reflection — Nov 2024",
+          quote: "I studied the whole weekend and still got a 61. I must not be a math person.",
+          narrative: "Earlier pattern: failure as statement about self. Different from your current move."
+        }
+      ]
+    },
+
+    "feedback-processing": {
+      name: "Feedback Processing",
+      code: "TORI 3.3",
+      domainClass: "soc",
+      personalNarrative: "You've moved from defending your designs against critique to asking 'what is this feedback actually trying to tell me?' The thermodynamics professor's pushback became the seed for a better design, not a wound.",
+      synthNote: "synthesized from 3 moments across 3 contexts",
+      institutional: "Thoughtfully examining how one receives, interprets, and responds to feedback from others, transforming external feedback into actionable insights.",
+      reach: "You've started inserting a pause between receiving feedback and acting on it — the pause is where the meaning gets extracted.",
+      breadth: "3 contexts — ME 495 Capstone, ME 300 Design Project, ENGL 201",
+      recency: "Most recent: 2 days ago",
+      peakMoment: {
+        source: "ME 495 Capstone — Week 11 Reflection, Apr 14 2026",
+        quote: "I kept calling the disagreement 'a communication issue' but reading Dr. Chen's feedback back, the real thing was that I hadn't actually engaged with the critique — I'd just restated my original point more carefully.",
+        narrative: "You're starting to distinguish defending your design from understanding the feedback. That's the move that turns critique into signal instead of noise.",
+        tags: ["Feedback Processing", "Perspective Shifting"]
+      },
+      otherMoments: [
+        {
+          source: "ENGL 201 Essay Revision — Spring 2024",
+          quote: "The professor said my argument was 'structurally confused.' I went back through the essay to find the paragraphs that could still work and mostly rewrote around her comments.",
+          narrative: "Earlier pattern: feedback as a list of patches. You weren't yet absorbing what it suggested about your underlying approach."
+        }
+      ]
+    },
+
+    "conflict-management": {
+      name: "Conflict Management & Resolution",
+      code: "TORI 3.5",
+      domainClass: "soc",
+      personalNarrative: "When your teammate prioritized patient-facing features over structural safety, you didn't escalate or defer — you surfaced the underlying values difference and proposed a scoring framework the team could agree on. That's de-escalation through translation.",
+      synthNote: "synthesized from 2 moments across 2 contexts",
+      institutional: "Reflecting on interpersonal conflicts, analyzing causes, conflict styles, emotional responses, and resolution processes.",
+      reach: "You've moved from avoiding conflict (or winning it) to translating it into a question the team can decide together.",
+      breadth: "2 contexts — Capstone Team Journal entries",
+      recency: "Most recent: 8 days ago",
+      peakMoment: {
+        source: "Capstone Team Journal — Entry 12, Apr 5 2026",
+        quote: "When Priya pushed back on prioritizing structural safety over patient-facing features, I almost escalated. Instead I asked what concrete outcome would make the feature 'worth' a safety tradeoff. That reframed the whole conversation.",
+        narrative: "You de-escalated by translating the disagreement into a decision framework the team could share. That's not conflict-avoidance — it's naming the underlying values so the conversation becomes about tradeoffs rather than positions.",
+        tags: ["Conflict Management", "Perspective Shifting"]
+      },
+      otherMoments: []
+    },
+
+    "learning-from-others": {
+      name: "Learning from Others",
+      code: "TORI 3.1",
+      domainClass: "soc",
+      personalNarrative: "Your mentor conversations don't just give you answers — they change the question you were asking. Dr. Patel's suggestion that you 'design for the third use case, not the first' reframed your whole approach to the capstone.",
+      synthNote: "synthesized from 2 moments across 2 contexts",
+      institutional: "Examining how interactions with peers, mentors, or role models contribute to one's own knowledge and growth.",
+      reach: "You've moved from 'ask the expert for the answer' to 'ask the expert what question I should be asking.'",
+      breadth: "2 contexts — Mentor journal, teammate reflection",
+      recency: "Most recent: 3 weeks ago",
+      peakMoment: {
+        source: "Mentor Journal — Mar 2026",
+        quote: "Dr. Patel told me to design for the third use case, not the first. I didn't understand what she meant for three days. Then it clicked: the first use case is the one you imagine, the third is the one that tells you what's robust.",
+        narrative: "You held onto a piece of advice until it resolved, rather than applying it immediately. The delay wasn't avoidance — it was the thing that let the meaning develop."
+      },
+      otherMoments: []
+    },
+
+    "mindset": {
+      name: "Mindset Development",
+      code: "TORI 4.4",
+      domainClass: "per",
+      personalNarrative: "Your language has shifted from 'I should already know this' to 'I'm learning this.' The distinction isn't cosmetic — it's changing what you do when you don't understand something, which is now 'ask' rather than 'hide.'",
+      synthNote: "synthesized from 2 moments across 2 contexts",
+      institutional: "Examining and shifting core beliefs about the malleability of abilities, intelligence, or personal qualities (fixed vs. growth mindset).",
+      reach: "You've moved from a fixed framing ('I'm a math person or I'm not') toward a learning framing ('I haven't done this YET').",
+      breadth: "2 contexts — Capstone reflection, semester-end reflection",
+      recency: "Most recent: 1 week ago",
+      peakMoment: {
+        source: "Capstone Team Journal — Entry 13, Apr 9 2026",
+        quote: "I caught myself saying 'I should already know this' when I didn't understand the load calculation. Then I said 'okay, I don't know this yet' — and I asked Jordan to walk me through it. It took five minutes instead of two weeks of pretending.",
+        narrative: "You caught a fixed-mindset script and substituted a learning-oriented one in real time. That substitution is what changes what you do next."
+      },
+      otherMoments: []
+    },
+
+    "self-efficacy": {
+      name: "Self-Efficacy",
+      code: "TORI 4.11",
+      domainClass: "per",
+      personalNarrative: "You took on the team-lead role for the user testing sessions despite initially turning it down. Your reflection on why you initially declined ('I haven't done this before') vs. why you accepted ('I haven't done this YET') shows the shift.",
+      synthNote: "synthesized from 2 moments across 2 contexts",
+      institutional: "Concentrating on one's confidence in performing specific tasks or handling challenges, informed by past successes, role models, and emotional states.",
+      reach: "You're starting to act into new roles before feeling ready for them.",
+      breadth: "2 contexts — Capstone leadership role, first-year design project",
+      recency: "Most recent: 13 days ago",
+      peakMoment: {
+        source: "Capstone Role Reflection — Apr 3 2026",
+        quote: "I turned down leading the user testing session the first time they asked. Then Priya asked why, and I couldn't actually name a reason — it was just 'I haven't done this before.' Which is exactly why I should.",
+        narrative: "You surfaced the implicit rule 'I should only do things I've already done,' named it, and then broke it on purpose."
+      },
+      otherMoments: []
+    },
+
+    "goals-motivation": {
+      name: "Goals & Motivation",
+      code: "TORI 4.6",
+      domainClass: "per",
+      personalNarrative: "You reconnected with why you chose engineering when the coursework started to feel mechanical. Your reflection on the assistive-device project — that it felt like the first work where you were 'making something for a real person' — is a recommitment, not a restart.",
+      synthNote: "synthesized from 1 moment",
+      institutional: "Exploring how individuals set objectives, sustain drive, and evaluate whether their goals align with personal values (intrinsic vs. extrinsic).",
+      reach: "You've articulated an intrinsic motivation for the work, not just a career path.",
+      breadth: "1 context — semester-start reflection",
+      recency: "Most recent: 6 weeks ago — you haven't exercised this recently",
+      peakMoment: {
+        source: "Semester-Start Reflection — Feb 2026",
+        quote: "I'd gotten into a groove of doing the work because it was assigned. The assistive-device project is the first thing this year where I'm building something for a real person — Priya's aunt specifically, even if not literally — and I can feel the difference in how I approach it.",
+        narrative: "You named a motivational shift rather than just experiencing it. That articulation is what makes it accessible later, when the mechanical mode returns."
+      },
+      otherMoments: []
+    },
+
+    "ethics": {
+      name: "Ethics",
+      code: "TORI 5.2",
+      domainClass: "cul",
+      personalNarrative: "Your assistive-device project has surfaced questions you didn't initially see — who gets this device, who doesn't, who pays, who profits. You're treating ethics as a design input, not as a compliance layer added after the design is done.",
+      synthNote: "synthesized from 1 moment",
+      institutional: "Examining moral principles and reasoning behind right and wrong actions, evaluating how personal values and societal norms guide behavior.",
+      reach: "You've started asking ethical questions while the design is still plastic, when the answers can actually change the design.",
+      breadth: "1 context — Capstone reflection",
+      recency: "Most recent: 10 days ago",
+      peakMoment: {
+        source: "Capstone Reflection — Apr 6 2026",
+        quote: "We designed for 'the user' but I realized halfway through that 'the user' in our docs is the person who can afford it. The device as we've scoped it costs $1,200 to produce. The people who most need it are the ones least likely to have $1,200.",
+        narrative: "You caught a distributional question hiding in a technical spec. Asking it now, rather than after launch, is the move that keeps ethics operative in the design instead of performative about it."
+      },
+      otherMoments: []
+    }
+  };
+
+  // === Tab switching ===
+  document.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => {
+      const tab = t.dataset.tab;
+      document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      document.getElementById('panel-' + tab).classList.add('active');
+    });
+  });
+
+  // === Outcome pill expansion ===
+  // When you click a pill, render the detail card inside the detail container
+  // for its domain. Clicking the same pill collapses it.
+  let expandedOutcome = null;
+
+  document.querySelectorAll('.outcome-pill[data-outcome]').forEach(pill => {
+    pill.addEventListener('click', () => {
+      const slug = pill.dataset.outcome;
+      const domain = pill.dataset.domain;
+      const detailContainer = document.getElementById('detail-' + domain);
+
+      // If same pill clicked twice → collapse
+      if (expandedOutcome === slug) {
+        detailContainer.classList.remove('open');
+        detailContainer.innerHTML = '';
+        pill.classList.remove('expanded');
+        expandedOutcome = null;
+        return;
+      }
+
+      // Collapse all others
+      document.querySelectorAll('.outcome-pill').forEach(p => p.classList.remove('expanded'));
+      document.querySelectorAll('.outcome-detail').forEach(d => {
+        d.classList.remove('open');
+        d.innerHTML = '';
+      });
+
+      // Render new detail
+      const d = OUTCOME_DETAILS[slug];
+      if (!d) return;
+
+      detailContainer.className = 'outcome-detail ' + d.domainClass + ' open';
+
+      const otherMomentsHtml = d.otherMoments.map(m => `
+        <div class="moment">
+          <div class="moment-header">
+            <span class="moment-source">${m.source}</span>
+          </div>
+          <div class="moment-quote">"${m.quote}"</div>
+          <div class="moment-narrative">${m.narrative}</div>
+        </div>
+      `).join('');
+
+      detailContainer.innerHTML = `
+        <div class="detail-outcome-title">${d.name}</div>
+        <div class="detail-outcome-sub">${d.code}</div>
+
+        <div class="personalized-label">What this has looked like for you</div>
+        <div class="personalized-narrative">
+          ${d.personalNarrative}
+          <div class="personalized-synth">${d.synthNote}</div>
+        </div>
+
+        <div class="disclosure" onclick="this.nextElementSibling.classList.toggle('open'); this.textContent = this.nextElementSibling.classList.contains('open') ? '▾ See the institution\\'s definition' : '▸ See the institution\\'s definition';">▸ See the institution's definition</div>
+        <div class="disclosure-content">${d.institutional}</div>
+
+        <div class="dimensions-row">
+          <div class="dim-card">
+            <div class="dim-label">Reach</div>
+            <div class="dim-note">${d.reach}</div>
+          </div>
+          <div class="dim-card">
+            <div class="dim-label">Breadth</div>
+            <div class="dim-note">${d.breadth}</div>
+          </div>
+          <div class="dim-card">
+            <div class="dim-label">Recency</div>
+            <div class="dim-note">${d.recency}</div>
+          </div>
+        </div>
+
+        <div class="moments-heading">
+          <span class="moments-heading-title">Evidence moments</span>
+          <span class="moments-heading-hint">Your peak moment first, then others in order</span>
+        </div>
+
+        <div class="moment peak">
+          <div class="moment-header">
+            <span class="peak-badge">PEAK</span>
+            <span class="moment-source">${d.peakMoment.source}</span>
+          </div>
+          <div class="moment-quote">"${d.peakMoment.quote}"</div>
+          <div class="moment-narrative">${d.peakMoment.narrative}</div>
+          ${d.peakMoment.tags ? `<div class="moment-tags">${d.peakMoment.tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>` : ''}
+        </div>
+
+        ${otherMomentsHtml}
+      `;
+
+      pill.classList.add('expanded');
+      expandedOutcome = slug;
+
+      // Scroll the detail into view
+      setTimeout(() => detailContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+    });
+  });
+</script>
+
+</body>
+</html>
