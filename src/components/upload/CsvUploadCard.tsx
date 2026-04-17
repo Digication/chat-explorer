@@ -130,7 +130,7 @@ export default function CsvUploadCard() {
       setError(err instanceof Error ? err.message : "Upload failed");
       setStep("preview"); // let them retry
     }
-  }, [file, preview]);
+  }, [file, preview, replaceMode]);
 
   // Reset everything so the user can upload another file
   const handleReset = () => {
