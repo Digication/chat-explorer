@@ -504,17 +504,28 @@ export async function commitUpload(
           // Handle duplicate comments — skip or update depending on mode
           if (dedup.existingCommentIds.has(row.commentId)) {
             if (replaceMode) {
-              // Update the existing comment's text with the cleaner version
-              await manager.update(
-                Comment,
-                { externalId: row.commentId, threadId: thread.id },
-                {
-                  text: decodeEntities(row.commentFullText ?? ""),
-                  timestamp: parseDateOrNull(row.commentTimestamp),
-                  grade: row.grade || null,
-                }
-              );
-              updatedCommentsCount++;
+              // Find the existing comment by joining through the institution,
+              // rather than relying on thread.id from the resolution chain
+              // (which may point to a newly-created thread if the course/
+              // assignment/thread chain didn't resolve correctly).
+              const existing = await manager
+                .createQueryBuilder(Comment, "c")
+                .innerJoin("c.thread", "t")
+                .innerJoin("t.assignment", "a")
+                .innerJoin("a.course", "co")
+                .where("co.institutionId = :institutionId", { institutionId })
+                .andWhere("c.externalId = :externalId", {
+                  externalId: row.commentId,
+                })
+                .getOne();
+
+              if (existing) {
+                existing.text = decodeEntities(row.commentFullText ?? "");
+                existing.timestamp = parseDateOrNull(row.commentTimestamp) ?? existing.timestamp;
+                existing.grade = row.grade || existing.grade;
+                await manager.save(Comment, existing);
+                updatedCommentsCount++;
+              }
             }
             continue;
           }
