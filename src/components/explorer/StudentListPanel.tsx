@@ -14,6 +14,7 @@ import UserAvatar from "@/components/shared/UserAvatar";
 import ToriChip from "@/components/shared/ToriChip";
 import { useUserSettings } from "@/lib/UserSettingsContext";
 import { CATEGORY_CONFIG, CATEGORY_COLORS, CATEGORY_LABELS } from "@/lib/reflection-categories";
+import { HEADER_HEIGHT } from "@/components/layout/GlobalHeader";
 
 /** Width of the student list panel. */
 const PANEL_WIDTH = 360;
@@ -76,7 +77,13 @@ export default function StudentListPanel({
       anchor="left"
       open={open}
       onClose={onClose}
-      PaperProps={{ sx: { width: PANEL_WIDTH } }}
+      PaperProps={{
+        sx: {
+          width: PANEL_WIDTH,
+          top: `${HEADER_HEIGHT}px`,
+          height: `calc(100vh - ${HEADER_HEIGHT}px)`,
+        },
+      }}
     >
       <Box sx={{ p: 2 }}>
         <Typography variant="h6" fontWeight={600} sx={{ mb: 1.5 }}>
@@ -110,7 +117,7 @@ export default function StudentListPanel({
             onClick={() => onToggle(s.studentId)}
             sx={{ borderRadius: 1, mb: 0.5, py: 1 }}
           >
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, width: "100%" }}>
+            <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.5, width: "100%" }}>
               <UserAvatar
                 name={s.name}
                 size="medium"

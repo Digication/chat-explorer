@@ -1,18 +1,16 @@
 import { useState } from "react";
-import { Box, IconButton, Typography } from "@mui/material";
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import { Box, ButtonBase, IconButton, Typography } from "@mui/material";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import UserAvatar from "@/components/shared/UserAvatar";
 import { useUserSettings } from "@/lib/UserSettingsContext";
 
 /** How many students are visible at once in the carousel. */
 const VISIBLE_COUNT = 5;
-/** Width of each student slot in px. */
-const SLOT_WIDTH = 80;
-/** Avatar size for the selected student (px). */
-const SELECTED_SIZE = 44;
-/** Avatar size for unselected students (px). */
-const UNSELECTED_SIZE = 32;
+/** Avatar size for the selected student (px) — matches Campus Web. */
+const SELECTED_SIZE = 40;
+/** Avatar size for unselected students (px) — matches Campus Web. */
+const UNSELECTED_SIZE = 24;
 
 interface Student {
   studentId: string;
@@ -48,87 +46,51 @@ export default function StudentCarousel({
   const scrollLeft = () => setStartIndex((i) => Math.max(0, i - 1));
   const scrollRight = () => setStartIndex((i) => Math.min(maxStart, i + 1));
 
+  // Compute the visible window centered on the selection
+  const visibleStudents = students.slice(startIndex, startIndex + VISIBLE_COUNT);
+
   return (
-    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
+    <Box component="nav" sx={{ display: "flex", alignItems: "center" }}>
       {/* Left arrow */}
       <IconButton
         size="small"
         onClick={scrollLeft}
         disabled={startIndex === 0}
-        sx={{ color: "grey.400" }}
+        aria-label="Previous student"
       >
-        <ChevronLeftIcon />
+        <ArrowBackIcon />
       </IconButton>
 
-      {/* Visible window */}
-      <Box
-        sx={{
-          width: VISIBLE_COUNT * SLOT_WIDTH,
-          overflow: "hidden",
-        }}
-      >
-        <Box
-          sx={{
-            display: "flex",
-            transform: `translateX(-${startIndex * SLOT_WIDTH}px)`,
-            transition: "transform 0.2s ease",
-          }}
-        >
-          {students.map((s) => {
-            const isSelected = selectedIds.includes(s.studentId);
-            return (
-              <Box
-                key={s.studentId}
-                onClick={() => onSelect(s.studentId)}
-                sx={{
-                  width: SLOT_WIDTH,
-                  minWidth: SLOT_WIDTH,
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  py: 0.5,
-                }}
-              >
-                <UserAvatar
-                  name={getDisplayName(s.name)}
-                  size={isSelected ? SELECTED_SIZE : UNSELECTED_SIZE}
-                  selected={isSelected}
-                />
-                {/* Show name only when selected */}
-                {isSelected && (
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      color: "#fff",
-                      mt: 0.25,
-                      fontSize: "0.6rem",
-                      lineHeight: 1.2,
-                      maxWidth: SLOT_WIDTH - 8,
-                      textAlign: "center",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {getDisplayName(s.name)}
-                  </Typography>
-                )}
-              </Box>
-            );
-          })}
-        </Box>
-      </Box>
+      {/* Visible carousel items */}
+      {visibleStudents.map((s) => {
+        const isSelected = selectedIds.includes(s.studentId);
+        return (
+          <ButtonBase
+            key={s.studentId}
+            focusRipple
+            centerRipple
+            onClick={() => onSelect(s.studentId)}
+            sx={{ p: "2px", height: 60 }}
+          >
+            <Box position="relative">
+              <UserAvatar
+                name={getDisplayName(s.name)}
+                size={isSelected ? SELECTED_SIZE : UNSELECTED_SIZE}
+                selected={isSelected}
+              />
+            </Box>
+          </ButtonBase>
+        );
+      })}
 
       {/* Right arrow */}
       <IconButton
         size="small"
         onClick={scrollRight}
         disabled={startIndex >= maxStart}
-        sx={{ color: "grey.400" }}
+        aria-label="Next student"
       >
-        <ChevronRightIcon />
+        <ArrowForwardIcon />
       </IconButton>
     </Box>
   );

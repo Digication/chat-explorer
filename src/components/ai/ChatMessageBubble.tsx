@@ -1,4 +1,4 @@
-import { Box, Typography, Paper, keyframes } from "@mui/material";
+import { Box, Typography, keyframes } from "@mui/material";
 import ReactMarkdown from "react-markdown";
 
 /** Shape of a chat message used by this component. */
@@ -61,25 +61,19 @@ export default function ChatMessageBubble({ message, isTyping }: ChatMessageBubb
       sx={{
         display: "flex",
         justifyContent: isUser ? "flex-end" : "flex-start",
-        mb: 1.5,
-        px: 1,
+        mb: 2,
+        px: 2,
       }}
     >
-      <Box sx={{ maxWidth: "min(75%, 520px)" }}>
-        {/* The bubble */}
-        <Paper
-          elevation={0}
+      <Box sx={{ maxWidth: "min(85%, 520px)", minWidth: isUser ? "40%" : undefined }}>
+        {/* The bubble — user gets a gray rounded bubble, assistant is plain */}
+        <Box
           sx={{
-            px: 2,
-            py: 1,
-            borderRadius: "12px",
-            // User: white with blue left accent. Assistant: light gray, no border.
-            bgcolor: isUser ? "#fff" : "#f5f5f5",
+            p: 2,
+            borderRadius: isUser ? 6 : 2,
+            bgcolor: isUser ? "grey.200" : "transparent",
             color: "text.primary",
-            ...(isUser
-              ? { borderLeft: "3px solid", borderColor: "primary.main" }
-              : {}),
-            // Markdown content inside assistant bubbles
+            // Markdown content styling
             "& p": { m: 0 },
             "& p + p": { mt: 1 },
             "& code": {
@@ -123,7 +117,7 @@ export default function ChatMessageBubble({ message, isTyping }: ChatMessageBubb
               <ReactMarkdown>{message.content}</ReactMarkdown>
             </Typography>
           )}
-        </Paper>
+        </Box>
 
         {/* Timestamp below the bubble */}
         {!isTyping && (

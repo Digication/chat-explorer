@@ -1,6 +1,7 @@
-import { AppBar, Toolbar, Box, ButtonBase, Badge, Typography } from "@mui/material";
+import { Box, ButtonBase, Divider, Paper } from "@mui/material";
 import { ThemeProvider } from "@mui/material/styles";
-import PeopleIcon from "@mui/icons-material/People";
+import RecentActorsIcon from "@mui/icons-material/RecentActors";
+import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import StudentCarousel from "@/components/explorer/StudentCarousel";
 import { sidebarTheme } from "@/lib/theme";
 
@@ -43,91 +44,86 @@ export default function BottomBar({
 }: BottomBarProps) {
   return (
     <ThemeProvider theme={sidebarTheme}>
-    <AppBar
-      position="fixed"
-      sx={{
-        top: "auto",
-        bottom: 0,
-        backgroundColor: "grey.900",
-        // Spans the full width, offset by the 60px sidebar on the left
-        left: 60,
-        width: "calc(100% - 60px)",
-        height: 60,
-      }}
-    >
-      <Toolbar
+      <Paper
+        elevation={0}
+        square
         sx={{
-          minHeight: 60,
+          position: "fixed",
+          bottom: 0,
+          // Offset by the 60px sidebar on the left
+          left: 60,
+          width: "calc(100% - 60px)",
           height: 60,
+          bgcolor: "grey.900",
           display: "flex",
-          // Use relative positioning so children can be absolutely placed
-          position: "relative",
-          justifyContent: "center",
-          px: 2,
+          alignItems: "stretch",
         }}
       >
-        {/* Left zone: Students button pinned to left edge — entire area clickable */}
+        {/* Left zone: Students button — height fills the bar */}
         <ButtonBase
+          focusRipple
           onClick={onOpenStudentList}
           sx={{
-            position: "absolute",
-            left: 16,
-            display: "flex",
+            px: 3,
             alignItems: "center",
-            gap: 1,
-            borderRadius: 1,
-            px: 1.5,
-            py: 1,
-            minHeight: 44,
-            color: studentListOpen ? "primary.main" : "text.secondary",
-            "&:hover": { bgcolor: "action.hover" },
+            fontSize: 12,
+            fontWeight: 500,
+            textTransform: "uppercase",
+            color: studentListOpen ? "text.primary" : "text.secondary",
+            "&:hover": { bgcolor: "grey.800" },
+            ...(studentListOpen && {
+              background: "linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.15) 100%), #121212",
+            }),
           }}
         >
-          <Badge
-            badgeContent={students.length}
-            color="primary"
-            max={999}
-          >
-            <PeopleIcon />
-          </Badge>
-          <Typography variant="caption" sx={{ color: "inherit" }}>
-            Students
-          </Typography>
+          <Box mr={1} sx={{ display: "flex", alignItems: "center" }}>
+            <RecentActorsIcon />
+          </Box>
+          <Box component="span" sx={{ display: { xs: "none", md: "block" } }}>
+            Students ({students.length})
+          </Box>
         </ButtonBase>
 
-        {/* Center zone: Student carousel */}
-        <StudentCarousel
-          students={students}
-          selectedIds={selectedStudentIds}
-          onSelect={onSelectStudent}
-        />
+        <Divider orientation="vertical" flexItem />
 
-        {/* Right zone: Analyze button — entire area clickable */}
+        {/* Center zone: Student carousel — absolutely centered */}
+        <Box sx={{ flex: 1, position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <StudentCarousel
+            students={students}
+            selectedIds={selectedStudentIds}
+            onSelect={onSelectStudent}
+          />
+        </Box>
+
+        <Divider orientation="vertical" flexItem />
+
+        {/* Right zone: Analyze button — same style as Students button */}
         {onToggleAnalyze && (
           <ButtonBase
+            focusRipple
             onClick={onToggleAnalyze}
             sx={{
-              position: "absolute",
-              right: 16,
-              display: "flex",
+              px: 3,
               alignItems: "center",
-              borderRadius: 1,
-              px: 1.5,
-              py: 1,
-              minHeight: 44,
-              borderLeft: analyzeOpen ? "3px solid #1976d2" : "3px solid transparent",
-              bgcolor: analyzeOpen ? "rgba(255, 255, 255, 0.12)" : "transparent",
-              color: analyzeOpen ? "#fff" : "text.secondary",
-              "&:hover": { bgcolor: "rgba(255, 255, 255, 0.08)" },
+              fontSize: 12,
+              fontWeight: 500,
+              textTransform: "uppercase",
+              color: analyzeOpen ? "text.primary" : "text.secondary",
+              "&:hover": { bgcolor: "grey.800" },
+              ...(analyzeOpen && {
+                background: "linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.15) 100%), #121212",
+              }),
             }}
           >
-            <Typography variant="caption" sx={{ color: "inherit", fontWeight: analyzeOpen ? 500 : 400 }}>
+            <Box mr={1} sx={{ display: "flex", alignItems: "center" }}>
+              <AutoAwesomeIcon />
+            </Box>
+            <Box component="span" sx={{ display: { xs: "none", md: "block" } }}>
               Analyze
-            </Typography>
+            </Box>
           </ButtonBase>
         )}
-      </Toolbar>
-    </AppBar>
+      </Paper>
     </ThemeProvider>
   );
 }

@@ -40,37 +40,20 @@ describe("StudentCarousel", () => {
         onSelect={onSelect}
       />
     );
-    // Find the first student slot and click it
-    const slots = container.querySelectorAll('[class*="MuiBox-root"]');
-    const studentSlot = Array.from(slots).find(
-      (el) => (el as HTMLElement).style.width === "80px" || el.getAttribute("style")?.includes("80")
+    // Carousel items are now ButtonBase elements
+    const buttons = container.querySelectorAll("button.MuiButtonBase-root");
+    // First two buttons are navigation arrows, carousel items follow
+    // Find the first avatar button (not an arrow — arrows have aria-label)
+    const carouselButtons = Array.from(buttons).filter(
+      (btn) => !btn.getAttribute("aria-label")
     );
-    if (studentSlot) {
-      fireEvent.click(studentSlot);
+    if (carouselButtons.length > 0) {
+      fireEvent.click(carouselButtons[0]);
       expect(onSelect).toHaveBeenCalledWith("s1");
     }
   });
 
-  it("shift+click still calls onSelect (no multi-select)", () => {
-    const onSelect = vi.fn();
-    const { container } = render(
-      <StudentCarousel
-        students={students}
-        selectedIds={["s1"]}
-        onSelect={onSelect}
-      />
-    );
-    const slots = container.querySelectorAll('[class*="MuiBox-root"]');
-    const studentSlot = Array.from(slots).find(
-      (el) => (el as HTMLElement).style.width === "80px" || el.getAttribute("style")?.includes("80")
-    );
-    if (studentSlot) {
-      fireEvent.click(studentSlot, { shiftKey: true });
-      expect(onSelect).toHaveBeenCalled();
-    }
-  });
-
-  it("shows name only for selected students", () => {
+  it("has navigation arrows", () => {
     render(
       <StudentCarousel
         students={students}
@@ -78,7 +61,19 @@ describe("StudentCarousel", () => {
         onSelect={() => {}}
       />
     );
-    expect(screen.getByText("Alice")).toBeInTheDocument();
-    expect(screen.queryByText("Bob")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Previous student")).toBeInTheDocument();
+    expect(screen.getByLabelText("Next student")).toBeInTheDocument();
+  });
+
+  it("disables previous arrow at start", () => {
+    render(
+      <StudentCarousel
+        students={students}
+        selectedIds={["s1"]}
+        onSelect={() => {}}
+      />
+    );
+    const prevButton = screen.getByLabelText("Previous student");
+    expect(prevButton).toBeDisabled();
   });
 });

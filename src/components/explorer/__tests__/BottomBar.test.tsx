@@ -27,11 +27,11 @@ describe("BottomBar", () => {
     analyzeOpen: false,
   };
 
-  it("clicking 'Students' label triggers onOpenStudentList", () => {
+  it("clicking Students button triggers onOpenStudentList", () => {
     const onOpenStudentList = vi.fn();
     render(<BottomBar {...defaultProps} onOpenStudentList={onOpenStudentList} />);
-    // The entire Students area (icon + label) is one ButtonBase
-    const studentsButton = screen.getByText("Students").closest("button");
+    // The Students button shows count in parentheses
+    const studentsButton = screen.getByText("Students (2)").closest("button");
     expect(studentsButton).toBeTruthy();
     fireEvent.click(studentsButton!);
     expect(onOpenStudentList).toHaveBeenCalled();
@@ -46,8 +46,8 @@ describe("BottomBar", () => {
     expect(onToggleAnalyze).toHaveBeenCalled();
   });
 
-  it("shows student count in badge", () => {
+  it("shows student count in button label", () => {
     render(<BottomBar {...defaultProps} />);
-    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("Students (2)")).toBeInTheDocument();
   });
 });

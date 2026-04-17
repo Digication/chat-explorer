@@ -56,12 +56,11 @@ export default function GlobalHeader() {
           px: 2,
         }}
       >
-        {/* ── Left section: App name + Scope selector ────────────── */}
+        {/* ── Left section: Scope selector (with app name as first crumb) ── */}
         <Box
           sx={{
             display: "flex",
             alignItems: "center",
-            gap: 2,
             flex: 1,
             minWidth: 0,
             // Make breadcrumb text white so it's readable on dark bg
@@ -71,12 +70,6 @@ export default function GlobalHeader() {
             "& .MuiSvgIcon-root": { color: "#fff" },
           }}
         >
-          <Typography
-            variant="subtitle1"
-            sx={{ color: "#fff", fontWeight: 600, whiteSpace: "nowrap" }}
-          >
-            Chat Explorer
-          </Typography>
           <ScopeSelector compact />
         </Box>
 

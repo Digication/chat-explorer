@@ -16,7 +16,6 @@ import MenuItem from "@mui/material/MenuItem";
 import Skeleton from "@mui/material/Skeleton";
 import Typography from "@mui/material/Typography";
 import NavigateNextIcon from "@mui/icons-material/NavigateNext";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
   GET_ME,
   GET_MY_INSTITUTION,
@@ -213,7 +212,14 @@ export default function ScopeSelector({ compact = false }: ScopeSelectorProps) {
 
   return (
     <Box sx={{ mb: compact ? 0 : 3 }}>
-      <Breadcrumbs separator={<NavigateNextIcon fontSize="small" />}>
+      <Breadcrumbs
+        separator={<NavigateNextIcon fontSize="small" />}
+        sx={{
+          /* Normalize spacing: strip button padding so all items sit
+             at the same distance from the > separators. */
+          "& .MuiButton-root": { px: 0, minWidth: "auto" },
+        }}
+      >
         {/*
           IMPORTANT: each direct child of <Breadcrumbs> gets a separator before it.
           MUI uses React.Children.toArray() which flattens fragments, so a
@@ -222,14 +228,18 @@ export default function ScopeSelector({ compact = false }: ScopeSelectorProps) {
           Wrap each Button+Menu pair in a single <Box> so it counts as one child.
         */}
 
+        {/* App name — first breadcrumb, styled slightly bolder */}
+        <Typography fontWeight={600} sx={{ whiteSpace: "nowrap" }}>
+          Chat Explorer
+        </Typography>
+
         {/* Institution — clickable dropdown for digication_admin, static for others */}
         {isDigicationAdmin ? (
           <Box component="span">
             <Button
               size="small"
-              endIcon={<ExpandMoreIcon sx={{ opacity: 0, transition: "opacity 0.15s" }} />}
               onClick={(e) => setInstAnchor(e.currentTarget)}
-              sx={{ textTransform: "none", fontWeight: 500, "&:hover .MuiButton-endIcon": { opacity: 1 } }}
+              sx={{ textTransform: "none", fontWeight: 500 }}
             >
               {institutionName}
             </Button>
@@ -264,9 +274,8 @@ export default function ScopeSelector({ compact = false }: ScopeSelectorProps) {
           <Box component="span">
             <Button
               size="small"
-              endIcon={<ExpandMoreIcon sx={{ opacity: 0, transition: "opacity 0.15s" }} />}
               onClick={(e) => setCourseAnchor(e.currentTarget)}
-              sx={{ textTransform: "none", "&:hover .MuiButton-endIcon": { opacity: 1 } }}
+              sx={{ textTransform: "none" }}
             >
               {coursesLoading
                 ? "Loading..."
@@ -303,9 +312,8 @@ export default function ScopeSelector({ compact = false }: ScopeSelectorProps) {
             <Box component="span">
               <Button
                 size="small"
-                endIcon={<ExpandMoreIcon sx={{ opacity: 0, transition: "opacity 0.15s" }} />}
                 onClick={(e) => setAssignAnchor(e.currentTarget)}
-                sx={{ textTransform: "none", "&:hover .MuiButton-endIcon": { opacity: 1 } }}
+                sx={{ textTransform: "none" }}
               >
                 {assignLoading
                   ? "Loading..."
