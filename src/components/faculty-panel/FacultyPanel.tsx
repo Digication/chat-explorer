@@ -15,6 +15,7 @@ import ThreadPanel from "@/components/insights/ThreadPanel";
 import AiChatPanel from "@/components/ai/AiChatPanel";
 import { useInsightsScope } from "@/components/insights/ScopeSelector";
 import { useInsightsAnalytics } from "@/components/insights/InsightsAnalyticsContext";
+import { useUserSettings } from "@/lib/UserSettingsContext";
 
 const TAB_ORDER: PanelTab[] = ["student", "thread", "chat"];
 const TAB_LABELS: Record<PanelTab, string> = {
@@ -27,6 +28,7 @@ export default function FacultyPanel() {
   const panel = useFacultyPanel();
   const { scope } = useInsightsScope();
   const { getAnalyticsContext } = useInsightsAnalytics();
+  const { getDisplayName } = useUserSettings();
 
   // Auto-update Student tab when context changes — load the new student if available
   useEffect(() => {
@@ -92,8 +94,8 @@ export default function FacultyPanel() {
           noWrap
           sx={{ flex: 1, ml: 1 }}
         >
-          {panel.activeTab === "student" && panel.studentName}
-          {panel.activeTab === "thread" && panel.threadStudentName}
+          {panel.activeTab === "student" && panel.studentName && getDisplayName(panel.studentName)}
+          {panel.activeTab === "thread" && panel.threadStudentName && getDisplayName(panel.threadStudentName)}
           {panel.activeTab === "chat" && "AI Chat"}
         </Typography>
 
