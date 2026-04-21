@@ -33,6 +33,20 @@
 # Tech Stack Defaults
 When choosing libraries or setting up new apps, prefer this stack. When adding a dependency, prefer libraries compatible with these choices. Full details and guidelines: `skills/implement/references/TECH_STACK.md`
 
+# GraphQL Patterns
+
+## N+1 field resolvers — detect and fix
+**Symptom:** Slow first page load that feels fine on subsequent interactions (Apollo `cache-and-network` is masking the server-side cost).
+
+**Cause:** A GraphQL field resolver runs its own `repo.findOne(...)` or `repo.find(...)`, and that field is queried inside a list. One list of 100 items = 100+ extra queries per page load.
+
+**Fix pattern** (see `src/server/resolvers/course.ts` `Thread.comments` + `Comment.student` / `Comment.toriTags` as the reference implementation):
+1. **Eager-load at the list resolver** using TypeORM `relations: { <field>: true, <nestedField>: { ... } }`.
+2. **In each field resolver, check if data was pre-loaded** (`if (parent.<field> !== undefined) return parent.<field>;`) before falling back to its own fetch. The fallback keeps non-eager callers working.
+3. For join-table relations (like `CommentToriTag` bridging `Comment` → `ToriTag`), eager-load the join table with the nested target (`toriTags: { toriTag: true }`) and have the GraphQL resolver map `parent.<joinField>.map(j => j.<target>)`.
+
+**Where to apply:** Any resolver on `Thread`, `Assignment`, or `Course` that returns a list of children with their own relations. Audit new list-returning resolvers for this shape before shipping.
+
 # Memory Routing
 
 When saving learnings, route to the right destination. First match wins:
