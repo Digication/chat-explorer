@@ -149,10 +149,14 @@ export const courseResolvers = {
 
   Thread: {
     comments: async (parent: Thread) => {
+      // Eager-load student and toriTags (with their nested ToriTag) in one
+      // query so the Comment.student and Comment.toriTags field resolvers
+      // don't trigger an N+1 (per-comment) fetch.
       const repo = AppDataSource.getRepository(Comment);
       return repo.find({
         where: { threadId: parent.id },
         order: { orderIndex: "ASC" },
+        relations: { student: true, toriTags: { toriTag: true } },
       });
     },
     commentCount: async (parent: Thread) => {
@@ -170,11 +174,20 @@ export const courseResolvers = {
       return parent.text.trim().split(/\s+/).filter(Boolean).length;
     },
     student: async (parent: Comment) => {
+      // Fast path: eager-loaded by Thread.comments. Fall back to a lookup
+      // only when this Comment wasn't loaded with the student relation.
+      if (parent.student !== undefined) return parent.student;
       if (!parent.studentId) return null;
       const repo = AppDataSource.getRepository(Student);
       return repo.findOne({ where: { id: parent.studentId } });
     },
     toriTags: async (parent: Comment) => {
+      // Fast path: eager-loaded CommentToriTag[] with their nested ToriTag.
+      if (parent.toriTags !== undefined) {
+        return parent.toriTags
+          .map((ctt) => ctt.toriTag)
+          .filter((t): t is ToriTag => t != null);
+      }
       const cttRepo = AppDataSource.getRepository(CommentToriTag);
       const associations = await cttRepo.find({
         where: { commentId: parent.id },
