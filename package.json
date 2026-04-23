@@ -17,7 +17,9 @@
     "migration:generate": "typeorm migration:generate -d src/server/data-source.ts",
     "migration:run": "typeorm migration:run -d src/server/data-source.ts",
     "e2e": "npx playwright test",
-    "e2e:headed": "npx playwright test --headed"
+    "e2e:headed": "npx playwright test --headed",
+    "test:http": "vitest run src/server/upload.http.test.ts",
+    "test:all": "pnpm test && pnpm e2e"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.88.0",

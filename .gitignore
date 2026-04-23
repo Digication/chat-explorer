@@ -17,3 +17,6 @@ downloads/
 .claude/.claude-backup/
 .claude/user-context.md
 .claude/tests/TEST_RESULTS.md
+
+# Playwright E2E auth state
+playwright/.auth/

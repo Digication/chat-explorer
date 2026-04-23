@@ -197,6 +197,7 @@ export default function CsvUploadCard() {
           {/* Hidden file input */}
           <input
             ref={inputRef}
+            data-testid="upload-file-input"
             type="file"
             accept=".csv"
             hidden
@@ -291,6 +292,7 @@ export default function CsvUploadCard() {
               Cancel
             </Button>
             <Button
+              data-testid="upload-commit-btn"
               variant="contained"
               onClick={handleCommit}
               disabled={!preview.detectedInstitutionId}
@@ -316,7 +318,7 @@ export default function CsvUploadCard() {
 
       {/* Step 5: Done! */}
       {step === "done" && commitResult && (
-        <Box sx={{ textAlign: "center", py: 2 }}>
+        <Box data-testid="upload-complete" sx={{ textAlign: "center", py: 2 }}>
           <CheckCircleOutlineIcon
             sx={{ fontSize: 48, color: "success.main", mb: 1 }}
           />
