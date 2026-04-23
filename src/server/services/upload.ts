@@ -1,6 +1,6 @@
 import { type EntityManager } from "typeorm";
 import { randomUUID } from "node:crypto";
-import { writeFile, mkdir } from "node:fs/promises";
+import { mkdir, readFile, rename, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { AppDataSource } from "../data-source.js";
 import { parseCsvBuffer, decodeEntities, type RawCsvRow } from "./csv-parser.js";
@@ -22,7 +22,7 @@ import { UploadLog } from "../entities/UploadLog.js";
 const UPLOADS_DIR = join(process.cwd(), "data", "uploads");
 
 async function saveUploadedFile(
-  buffer: Buffer,
+  tempPath: string,
   originalFilename: string
 ): Promise<string> {
   const now = new Date();
@@ -30,11 +30,28 @@ async function saveUploadedFile(
   const dir = join(UPLOADS_DIR, monthDir);
   await mkdir(dir, { recursive: true });
 
-  // Use a UUID so filenames never collide, but keep the original name for reference
   const safeName = originalFilename.replace(/[^a-zA-Z0-9._-]/g, "_");
   const filename = `${randomUUID()}_${safeName}`;
-  const filePath = join(dir, filename);
-  await writeFile(filePath, buffer);
+  const destPath = join(dir, filename);
+
+  // rename() is atomic within the same filesystem and does not load the file
+  // into memory. If tempPath and destPath are on different filesystems we
+  // fall back to a copy+unlink (rare — only happens if /tmp is a separate
+  // mount), which still streams and doesn't hold the file in RAM.
+  try {
+    await rename(tempPath, destPath);
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "EXDEV") {
+      // Cross-device: fall back to streaming copy.
+      const { createReadStream, createWriteStream } = await import("node:fs");
+      const { pipeline } = await import("node:stream/promises");
+      await pipeline(createReadStream(tempPath), createWriteStream(destPath));
+      await unlink(tempPath);
+    } else {
+      throw err;
+    }
+  }
 
   // Return a relative path (from project root) for portability
   return `data/uploads/${monthDir}/${filename}`;
@@ -203,8 +220,11 @@ function parseBool(value: string | undefined): boolean {
  * — without writing anything to the database.
  */
 export async function previewUpload(
-  fileBuffer: Buffer
+  filePath: string
 ): Promise<UploadPreviewResult> {
+  // Phase 03 will replace this with a streaming parseCsvFile(filePath).
+  // For now we read the file into a buffer so parseCsvBuffer keeps working.
+  const fileBuffer = await readFile(filePath);
   const rows = parseCsvBuffer(fileBuffer);
   const institution = await detectInstitution(rows);
 
@@ -274,16 +294,19 @@ export async function previewUpload(
  * fails, nothing is written.
  */
 export async function commitUpload(
-  fileBuffer: Buffer,
+  filePath: string,
   uploadedById: string,
   institutionId: string,
   originalFilename: string,
   replaceMode = false
 ): Promise<UploadCommitResult> {
+  // Phase 03 will replace this with streaming parseCsvFile(filePath).
+  const fileBuffer = await readFile(filePath);
   const rows = parseCsvBuffer(fileBuffer);
 
-  // Save the original CSV to disk so we always have the raw source file
-  const savedFilePath = await saveUploadedFile(fileBuffer, originalFilename);
+  // Move the temp file to its permanent location. Keeps the original CSV on
+  // disk for debugging and re-processing, but without a second in-memory copy.
+  const savedFilePath = await saveUploadedFile(filePath, originalFilename);
 
   return AppDataSource.transaction(async (manager: EntityManager) => {
     // ── Deduplication ────────────────────────────────────────────

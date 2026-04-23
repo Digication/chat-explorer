@@ -6,6 +6,9 @@ import cookieParser from "cookie-parser";
 import multer from "multer";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto";
+import { promises as fs } from "node:fs";
+import { unlink } from "node:fs/promises";
 import { createSchema, createYoga } from "graphql-yoga";
 import { toNodeHandler } from "better-auth/node";
 import { fromNodeHeaders } from "better-auth/node";
@@ -28,14 +31,54 @@ const PORT = parseInt(process.env.PORT || "4000", 10);
 
 // Upload size cap — multer rejects anything larger with LIMIT_FILE_SIZE,
 // which the upload error handler maps to a 413 with a human-readable message.
-// Phase 02 changes this to 250 MB when disk storage is wired in.
-const UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
+const UPLOAD_MAX_BYTES = 250 * 1024 * 1024;
 
-// File upload middleware — stores files in memory (max 50 MB)
+// File upload middleware — streams uploads to disk so we never hold the
+// full file in RAM. Temp files land in data/uploads/tmp/ and are either
+// moved to their final location (on successful commit) or deleted (on
+// preview completion / commit failure / any other error).
+//
+// The 250 MB cap matches real-world CSVs we've seen (75 MB, ~250k rows
+// with large pasted-paper content in some cells). Multer will reject
+// anything larger with LIMIT_FILE_SIZE, which Phase 01's error handler
+// maps to a 413 with a human-readable message.
+const UPLOAD_TMP_DIR = path.join(process.cwd(), "data", "uploads", "tmp");
+
+// Ensure the tmp dir exists at boot. multer.diskStorage uses it as a
+// destination; if it's missing, multer throws ENOENT on the first upload.
+// Top-level await is supported in this project (Node 24 + ESM).
+await fs.mkdir(UPLOAD_TMP_DIR, { recursive: true });
+
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, UPLOAD_TMP_DIR),
+    filename: (_req, file, cb) => {
+      // Random name so concurrent uploads can't collide. The original filename
+      // is preserved on req.file.originalname and passed to commitUpload.
+      const id = randomUUID();
+      const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
+      cb(null, `${id}__${safeName}`);
+    },
+  }),
   limits: { fileSize: UPLOAD_MAX_BYTES },
 });
+
+// Best-effort temp file cleanup. We call this after preview responses and
+// on error paths so tmp files don't accumulate. Never throws — if the file
+// is already gone (e.g., already moved by saveUploadedFile), we log and move
+// on. Used by both upload routes and tests.
+async function cleanupTempUpload(filePath: string | undefined): Promise<void> {
+  if (!filePath) return;
+  try {
+    await unlink(filePath);
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException).code;
+    // ENOENT means the file was already moved or cleaned up — not an error.
+    if (code !== "ENOENT") {
+      console.warn("[upload] failed to clean up temp file:", filePath, err);
+    }
+  }
+}
 
 // Allow the dev URL, the production Railway URL, and any extra origins
 // supplied via the ALLOWED_ORIGINS env var (comma-separated).
@@ -97,6 +140,7 @@ app.post(
   requireAuth,
   upload.single("file"),
   async (req: AuthenticatedRequest, res, next) => {
+    const tempPath = req.file?.path;
     try {
       if (!req.file) {
         res.status(400).json({ error: "No file provided" });
@@ -107,11 +151,14 @@ app.post(
         return;
       }
 
-      const result = await previewUpload(req.file.buffer);
+      const result = await previewUpload(req.file.path);
       res.json(result);
     } catch (err) {
-      // Forward to the upload error handler so the real message reaches the client
       next(err);
+    } finally {
+      // Preview never keeps the file — clean up whether the preview
+      // succeeded or failed. The client will re-upload for commit.
+      await cleanupTempUpload(tempPath);
     }
   }
 );
@@ -122,6 +169,8 @@ app.post(
   requireAuth,
   upload.single("file"),
   async (req: AuthenticatedRequest, res, next) => {
+    const tempPath = req.file?.path;
+    let moved = false;
     try {
       if (!req.file) {
         res.status(400).json({ error: "No file provided" });
@@ -137,12 +186,16 @@ app.post(
       const replaceMode = req.body?.replaceMode === "true";
 
       const result = await commitUpload(
-        req.file.buffer,
+        req.file.path,
         req.user!.id,
         institutionId,
         req.file.originalname,
         replaceMode
       );
+
+      // commitUpload succeeded → saveUploadedFile renamed the temp file out
+      // of tmp/ into data/uploads/<month>/. No cleanup needed.
+      moved = true;
 
       // Fire-and-forget reflection classification (Plan 3 / Hatton & Smith).
       // Runs outside the upload transaction so a slow LLM call cannot hold
@@ -157,6 +210,13 @@ app.post(
       res.json(result);
     } catch (err) {
       next(err);
+    } finally {
+      // If commit failed before saveUploadedFile ran, the temp file is
+      // still in tmp/ — delete it. If commit succeeded, moved is true
+      // and we skip the cleanup.
+      if (!moved) {
+        await cleanupTempUpload(tempPath);
+      }
     }
   }
 );
