@@ -1015,10 +1015,25 @@ async function importToriTags(input: {
     }));
 
     for (const tagBatch of chunk(tagRows, TORI_TAG_INSERT_BATCH_SIZE)) {
-      await AppDataSource.transaction(async (manager: EntityManager) => {
-        await manager.insert(CommentToriTag, tagBatch);
-      });
-      total += tagBatch.length;
+      // ON CONFLICT DO NOTHING: if a prior run partially inserted tags
+      // (e.g. crashed mid-batch before this fix) or if two uploads race
+      // on the same (commentId, toriTagId) pair, skip rather than throw.
+      // The count returned below may slightly over-report because ignored
+      // rows still count as "batched"; this is acceptable for an idempotent
+      // safety net. For a new upload with the dedup fix in extractToriForThread,
+      // no conflicts should ever fire.
+      const result = await AppDataSource.transaction(
+        async (manager: EntityManager) => {
+          return manager
+            .createQueryBuilder()
+            .insert()
+            .into(CommentToriTag)
+            .values(tagBatch)
+            .orIgnore()
+            .execute();
+        }
+      );
+      total += result.identifiers.length;
     }
   }
 

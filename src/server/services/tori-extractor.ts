@@ -85,6 +85,11 @@ export async function extractToriForThread(
 ): Promise<ToriAssociation[]> {
   const sorted = [...comments].sort((a, b) => a.orderIndex - b.orderIndex);
   const associations: ToriAssociation[] = [];
+  // A thread can have several assistant replies after the same student
+  // message — if two of them mention the same TORI tag, we'd emit the
+  // same (studentCommentId, toriTagId) pair twice, and the unique index
+  // on comment_tori_tag would reject the second insert. Dedupe here.
+  const seen = new Set<string>();
 
   for (const comment of sorted) {
     if (comment.role !== "ASSISTANT") continue;
@@ -99,6 +104,9 @@ export async function extractToriForThread(
     const extracted = await extractToriTags(comment.text);
 
     for (const tag of extracted) {
+      const key = `${precedingStudent.id}\0${tag.toriTagId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
       associations.push({
         studentCommentId: precedingStudent.id,
         toriTagId: tag.toriTagId,

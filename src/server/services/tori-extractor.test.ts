@@ -149,4 +149,21 @@ describe("extractToriForThread", () => {
     const associations = await extractToriForThread(comments);
     expect(associations).toHaveLength(0);
   });
+
+  it("dedupes repeated (studentComment, tag) pairs when multiple assistant replies mention the same tag", async () => {
+    // Real-world case: a student asks something, then two assistant replies both
+    // mention the same TORI category. The unique index on comment_tori_tag would
+    // reject the second insert — extractToriForThread must dedupe up front.
+    const comments = [
+      { id: "u1", externalId: "ext-u1", role: "USER", text: "help me reflect", orderIndex: 0 },
+      { id: "a1", externalId: "ext-a1", role: "ASSISTANT", text: "(TORI: Perspective Shifting)", orderIndex: 1 },
+      { id: "a2", externalId: "ext-a2", role: "ASSISTANT", text: "(TORI: Perspective Shifting)", orderIndex: 2 },
+    ];
+
+    const associations = await extractToriForThread(comments);
+    // Only one (u1, t1) pair regardless of how many assistant replies mentioned it.
+    expect(associations).toHaveLength(1);
+    expect(associations[0].studentCommentId).toBe("u1");
+    expect(associations[0].toriTagId).toBe("t1");
+  });
 });
