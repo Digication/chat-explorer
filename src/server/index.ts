@@ -26,10 +26,15 @@ import type { GraphQLContext } from "./types/context.js";
 const app = express();
 const PORT = parseInt(process.env.PORT || "4000", 10);
 
+// Upload size cap — multer rejects anything larger with LIMIT_FILE_SIZE,
+// which the upload error handler maps to a 413 with a human-readable message.
+// Phase 02 changes this to 250 MB when disk storage is wired in.
+const UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
+
 // File upload middleware — stores files in memory (max 50 MB)
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 },
+  limits: { fileSize: UPLOAD_MAX_BYTES },
 });
 
 // Allow the dev URL, the production Railway URL, and any extra origins
@@ -91,7 +96,7 @@ app.post(
   "/api/upload/preview",
   requireAuth,
   upload.single("file"),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res, next) => {
     try {
       if (!req.file) {
         res.status(400).json({ error: "No file provided" });
@@ -105,8 +110,8 @@ app.post(
       const result = await previewUpload(req.file.buffer);
       res.json(result);
     } catch (err) {
-      console.error("Upload preview error:", err);
-      res.status(500).json({ error: "Failed to preview upload" });
+      // Forward to the upload error handler so the real message reaches the client
+      next(err);
     }
   }
 );
@@ -116,7 +121,7 @@ app.post(
   "/api/upload/commit",
   requireAuth,
   upload.single("file"),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res, next) => {
     try {
       if (!req.file) {
         res.status(400).json({ error: "No file provided" });
@@ -151,11 +156,62 @@ app.post(
 
       res.json(result);
     } catch (err) {
-      console.error("Upload commit error:", err);
-      res.status(500).json({ error: "Failed to commit upload" });
+      next(err);
     }
   }
 );
+
+// ── Upload error handler ─────────────────────────────────────────
+// Runs when a multer middleware rejects the request (e.g. file too large)
+// or when an upload route's async handler throws. Must be declared AFTER the
+// upload routes so Express routes errors from those routes to this handler.
+//
+// Returns the real error message in the response body so the client can show
+// it to the user. Falls back to a generic message only when the error has no
+// usable message string.
+app.use(
+  "/api/upload",
+  (
+    err: unknown,
+    req: express.Request,
+    res: express.Response,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    next: express.NextFunction
+  ) => {
+    // Always log the full error server-side. This is our only record if the
+    // user reports a failure, so include enough detail to diagnose.
+    console.error("[upload] error:", err);
+
+    // Multer-specific errors carry a .code we can map to a status.
+    if (err instanceof multer.MulterError) {
+      const status = err.code === "LIMIT_FILE_SIZE" ? 413 : 400;
+      const message =
+        err.code === "LIMIT_FILE_SIZE"
+          ? `File is too large. Maximum size is ${formatBytes(UPLOAD_MAX_BYTES)}.`
+          : err.message;
+      res.status(status).json({
+        error: message,
+        code: err.code,
+      });
+      return;
+    }
+
+    // Any other error — return a 500 with the real message and name so the
+    // user can see what went wrong (and we can copy it into a bug report).
+    const e = err as { message?: string; name?: string; code?: string };
+    res.status(500).json({
+      error: e.message || "Upload failed",
+      name: e.name,
+      code: e.code,
+    });
+  }
+);
+
+// Helper used by the upload error handler.
+function formatBytes(bytes: number): string {
+  const mb = bytes / (1024 * 1024);
+  return mb >= 1 ? `${Math.round(mb)} MB` : `${bytes} bytes`;
+}
 
 // ── GraphQL API ──────────────────────────────────────────────────
 // Mount BEFORE express.json() so the body stream is not consumed
