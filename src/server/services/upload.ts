@@ -1,9 +1,9 @@
 import { type EntityManager } from "typeorm";
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, unlink } from "node:fs/promises";
+import { mkdir, rename, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { AppDataSource } from "../data-source.js";
-import { parseCsvBuffer, decodeEntities, type RawCsvRow } from "./csv-parser.js";
+import { parseCsvFile, decodeEntities, type RawCsvRow } from "./csv-parser.js";
 import { checkDuplicates } from "./dedup.js";
 import { extractToriForThread } from "./tori-extractor.js";
 import { Institution } from "../entities/Institution.js";
@@ -222,10 +222,7 @@ function parseBool(value: string | undefined): boolean {
 export async function previewUpload(
   filePath: string
 ): Promise<UploadPreviewResult> {
-  // Phase 03 will replace this with a streaming parseCsvFile(filePath).
-  // For now we read the file into a buffer so parseCsvBuffer keeps working.
-  const fileBuffer = await readFile(filePath);
-  const rows = parseCsvBuffer(fileBuffer);
+  const rows = await parseCsvFile(filePath);
   const institution = await detectInstitution(rows);
 
   if (!institution) {
@@ -300,9 +297,7 @@ export async function commitUpload(
   originalFilename: string,
   replaceMode = false
 ): Promise<UploadCommitResult> {
-  // Phase 03 will replace this with streaming parseCsvFile(filePath).
-  const fileBuffer = await readFile(filePath);
-  const rows = parseCsvBuffer(fileBuffer);
+  const rows = await parseCsvFile(filePath);
 
   // Move the temp file to its permanent location. Keeps the original CSV on
   // disk for debugging and re-processing, but without a second in-memory copy.
