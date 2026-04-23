@@ -3,6 +3,12 @@ import { spawn } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
+
+// Unique-per-run domain so this E2E doesn't pollute or collide with the
+// `example.digication.com` institution used by other tests.
+const E2E_RUN_SUFFIX = `${Date.now()}-${randomUUID().slice(0, 8)}`;
+const E2E_DOMAIN = `e2e-upload-${E2E_RUN_SUFFIX}.digication.com`;
 
 // Load the auth session written by global-setup so this test starts logged in.
 // Other spec files that test unauthenticated flows don't load this state.
@@ -10,7 +16,7 @@ test.use({ storageState: join(process.cwd(), "playwright", ".auth", "user.json")
 
 async function generateSyntheticCsv(outPath: string, rows: number): Promise<void> {
   // Pass a time-based offset so repeated runs don't collide on comment IDs.
-  // The generator accepts: outPath rowCount bigTextChars shape commentOffset entityOffset
+  // The generator accepts: outPath rowCount bigTextChars shape commentOffset entityOffset domain
   const commentOffset = Date.now() % 10_000_000;
   const entityOffset = commentOffset;
   await new Promise<void>((resolve, reject) => {
@@ -24,6 +30,7 @@ async function generateSyntheticCsv(outPath: string, rows: number): Promise<void
         "many-assignments",
         String(commentOffset),
         String(entityOffset),
+        E2E_DOMAIN,
       ],
       { stdio: "inherit" }
     );

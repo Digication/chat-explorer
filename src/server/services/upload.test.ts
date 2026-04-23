@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { AppDataSource } from "../data-source.js";
 import { Institution } from "../entities/Institution.js";
-import { User } from "../entities/User.js";
+import { User, UserRole } from "../entities/User.js";
 import { Comment } from "../entities/Comment.js";
 import { Assignment } from "../entities/Assignment.js";
 import { UploadLog } from "../entities/UploadLog.js";
@@ -44,6 +44,10 @@ async function generateFixture(
         shape,
         String(commentOffset),
         String(entityOffset),
+        // Domain MUST match the per-run test institution so detectInstitution()
+        // picks the freshly-created one and not a stale "example" institution
+        // left behind by a prior test run.
+        TEST_INSTITUTION_DOMAIN,
       ],
       { stdio: "inherit" }
     );
@@ -84,7 +88,7 @@ beforeAll(async () => {
     id: TEST_USER_ID, // explicit — User.id is @PrimaryColumn (no auto-gen)
     name: "Upload Test User",
     email: TEST_USER_EMAIL,
-    role: "instructor",      // matches the user_role_enum lowercase values
+    role: UserRole.INSTRUCTOR,
     institutionId,
   });
 }, 60_000);

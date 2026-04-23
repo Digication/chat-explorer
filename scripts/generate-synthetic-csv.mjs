@@ -31,6 +31,11 @@ const shape = process.argv[5] || "many-assignments"; // or "single-assignment"
 // are imported into the same institution (which dedup checks institution-wide).
 const commentOffset = Number(process.argv[6] ?? 0);
 const entityOffset = Number(process.argv[7] ?? 0);
+// domain controls the hostname in the generated submissionUrl; detectInstitution()
+// uses this to pick/create an Institution. Callers that want per-run isolation
+// should pass a unique domain so they don't pick up a stale institution from a
+// previous run that polluted `example.digication.com`.
+const domain = process.argv[8] || "example.digication.com";
 
 const HEADERS = [
   "Thread ID", "Thread Name", "Thread total input tokens",
@@ -85,7 +90,7 @@ const bigText = "This is a student essay paragraph. ".repeat(
   Math.ceil(bigTextChars / 35)
 ).slice(0, bigTextChars);
 
-const submissionUrlBase = "https://example.digication.com/app/c/test-course/!/assessment/";
+const submissionUrlBase = `https://${domain}/app/c/test-course/!/assessment/`;
 
 const lines = [HEADERS.map(csvEscape).join(",")];
 let commentCounter = 0;
