@@ -21,6 +21,25 @@ import { UploadLog } from "../entities/UploadLog.js";
 // This keeps the original file around for debugging and re-processing.
 const UPLOADS_DIR = join(process.cwd(), "data", "uploads");
 
+// ── Chunking tunables ─────────────────────────────────────────────
+// Comment rows per database transaction. At this size, worst-case:
+// 5000 × ~60 fields × ~200 bytes = ~60 MB of SQL payload per txn. Postgres's
+// max_allocated_packet is 1 GB, so we have plenty of headroom. Each txn
+// commits in a few seconds locally, under 30s even against Railway.
+const ROW_CHUNK_SIZE = 5000;
+
+// Rows per SQL INSERT statement. 500 keeps each INSERT well under any
+// reasonable statement-length limit while amortizing round-trip cost.
+const COMMENT_INSERT_BATCH_SIZE = 500;
+
+// Parent entities per transaction. Parents are low volume but 8000 students
+// × manager.save() round-trips is still ~minutes. Chunking keeps each txn
+// short and avoids long-held locks on the students table.
+const PARENT_CHUNK_SIZE = 500;
+
+// TORI tags per INSERT. Typically small per-thread, so 500 is plenty.
+const TORI_TAG_INSERT_BATCH_SIZE = 500;
+
 async function saveUploadedFile(
   tempPath: string,
   originalFilename: string
@@ -213,6 +232,17 @@ function parseBool(value: string | undefined): boolean {
   return ["true", "1", "yes"].includes(value.trim().toLowerCase());
 }
 
+// ── Helper: slice an array into fixed-size chunks ─────────────────
+// Used by every pass of the upload pipeline to keep each transaction /
+// INSERT statement bounded regardless of total volume.
+function chunk<T>(items: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    out.push(items.slice(i, i + size));
+  }
+  return out;
+}
+
 // ── Preview (dry-run) ──────────────────────────────────────────────
 
 /**
@@ -287,8 +317,23 @@ export async function previewUpload(
  * Parses the CSV, deduplicates, creates all new entities, extracts
  * TORI tags, creates CourseAccess for the uploader, and logs the upload.
  *
- * Everything runs inside a single database transaction — if anything
- * fails, nothing is written.
+ * The write path is now a four-pass pipeline with row-chunked transactions:
+ *
+ *   Pass A (importParents) — upsert Courses, Assignments, Threads, Students
+ *     in chunked transactions (up to PARENT_CHUNK_SIZE per commit). Returns
+ *     lookup maps keyed by external/system ID so the comment pass can wire
+ *     up foreign keys without re-querying.
+ *   Pass B (importComments) — process rows in chunks of ROW_CHUNK_SIZE per
+ *     transaction. Inside each transaction, bulk-insert with manager.insert()
+ *     in batches of COMMENT_INSERT_BATCH_SIZE. Replace-mode UPDATEs happen
+ *     inside the same chunk's transaction.
+ *   Pass C (importToriTags) — after all comments are committed, run TORI
+ *     extraction per thread and batch-insert CommentToriTag rows.
+ *   Pass D (finalize) — one short transaction for CourseAccess + UploadLog.
+ *
+ * This structure means each individual transaction commits quickly and
+ * releases locks, so an 8,000-student single-assignment import no longer
+ * holds one giant write transaction open for the full duration.
  */
 export async function commitUpload(
   filePath: string,
@@ -297,305 +342,558 @@ export async function commitUpload(
   originalFilename: string,
   replaceMode = false
 ): Promise<UploadCommitResult> {
+  // ── Parse (streaming, outside any transaction) ────────────────────
   const rows = await parseCsvFile(filePath);
 
+  // ── Save the CSV file (no DB) ─────────────────────────────────────
   // Move the temp file to its permanent location. Keeps the original CSV on
   // disk for debugging and re-processing, but without a second in-memory copy.
   const savedFilePath = await saveUploadedFile(filePath, originalFilename);
 
-  return AppDataSource.transaction(async (manager: EntityManager) => {
-    // ── Deduplication ────────────────────────────────────────────
-    const threadIds = [
-      ...new Set(rows.map((r) => r.threadId).filter(Boolean)),
-    ];
-    const commentIds = [
-      ...new Set(rows.map((r) => r.commentId).filter(Boolean)),
-    ];
-    const studentIds = [
-      ...new Set(rows.map((r) => r.authorSystemId).filter(Boolean)),
-    ];
-    const assignmentIds = [
-      ...new Set(rows.map((r) => r.assignmentId).filter(Boolean)),
-    ];
+  // ── Dedup lookup (one short query, outside any txn) ───────────────
+  const allThreadIds = [...new Set(rows.map((r) => r.threadId).filter(Boolean))];
+  const allCommentIds = [
+    ...new Set(rows.map((r) => r.commentId).filter(Boolean)),
+  ];
+  const allStudentSystemIds = [
+    ...new Set(rows.map((r) => r.authorSystemId).filter(Boolean)),
+  ];
+  const allAssignmentIds = [
+    ...new Set(rows.map((r) => r.assignmentId).filter(Boolean)),
+  ];
 
-    const dedup = await checkDuplicates(
-      institutionId,
-      threadIds,
-      commentIds,
-      studentIds,
-      assignmentIds
-    );
+  const dedup = await checkDuplicates(
+    institutionId,
+    allThreadIds,
+    allCommentIds,
+    allStudentSystemIds,
+    allAssignmentIds
+  );
 
-    // ── Group rows by assignment ─────────────────────────────────
-    const rowsByAssignment = new Map<string, RawCsvRow[]>();
-    for (const row of rows) {
-      if (!row.assignmentId) continue;
-      const group = rowsByAssignment.get(row.assignmentId) ?? [];
-      group.push(row);
-      rowsByAssignment.set(row.assignmentId, group);
+  // ── Pass A: parent entities (chunked transactions) ────────────────
+  const parents = await importParents({
+    rows,
+    dedup,
+    institutionId,
+    replaceMode,
+  });
+
+  // ── Pass B: comments (row-chunked transactions) ───────────────────
+  const comments = await importComments({
+    rows,
+    dedup,
+    parents,
+    uploadedById,
+    institutionId,
+    replaceMode,
+  });
+
+  // ── Pass C: TORI tags (after comments are committed) ──────────────
+  const toriTagsExtracted = await importToriTags({
+    insertedByThread: comments.insertedByThread,
+  });
+
+  // ── Pass D: finalize (CourseAccess + UploadLog) ───────────────────
+  const uploadLog = await AppDataSource.transaction(
+    async (manager: EntityManager) => {
+      for (const courseId of parents.courseIdsForAccess) {
+        const existing = await manager.findOne(CourseAccess, {
+          where: { userId: uploadedById, courseId },
+        });
+        if (!existing) {
+          await manager.save(CourseAccess, {
+            userId: uploadedById,
+            courseId,
+            accessLevel: AccessLevel.OWNER,
+            grantedById: uploadedById,
+          });
+        }
+      }
+
+      return manager.save(UploadLog, {
+        uploadedById,
+        institutionId,
+        originalFilename,
+        filePath: savedFilePath,
+        totalRows: rows.length,
+        newComments: comments.newCommentsCount,
+        skippedDuplicates: allCommentIds.length - comments.newCommentsCount,
+        newThreads: parents.newThreadsCount,
+        newStudents: parents.newStudentsCount,
+        newCourses: parents.newCoursesCount,
+        newAssignments: parents.newAssignmentsCount,
+        toriTagsExtracted,
+      });
+    }
+  );
+
+  return {
+    totalRows: rows.length,
+    newComments: comments.newCommentsCount,
+    duplicateComments: allCommentIds.length - comments.newCommentsCount,
+    newThreads: parents.newThreadsCount,
+    newStudents: parents.newStudentsCount,
+    newAssignments: parents.newAssignmentsCount,
+    newCourses: parents.newCoursesCount,
+    detectedInstitutionId: institutionId,
+    detectedInstitutionName: null,
+    uploadLogId: uploadLog.id,
+    toriTagsExtracted,
+    courseAccessCreated: parents.courseIdsForAccess.size > 0,
+    newUserCommentIds: comments.newUserCommentIds,
+    updatedComments: comments.updatedCommentsCount,
+  };
+}
+
+// ── Pass A: importParents ─────────────────────────────────────────
+// Pre-creates Courses, Assignments, Threads, Students in chunked
+// transactions. Total parent volume is bounded by the CSV's distinct-
+// entity count (thousands at most in real data), not by row count.
+interface ParentImportInput {
+  rows: RawCsvRow[];
+  dedup: Awaited<ReturnType<typeof checkDuplicates>>;
+  institutionId: string;
+  replaceMode: boolean;
+}
+
+interface ParentLookups {
+  // Primary-key lookups used by the comment pass.
+  courseIdByCourseExtId: Map<string, string>; // CSV course id → DB id
+  assignmentIdByExtId: Map<string, string>; // CSV assignment id → DB id
+  threadIdByExtId: Map<string, string>; // CSV thread id → DB id
+  studentIdBySystemId: Map<string, string>; // author systemId → DB id
+
+  // Counters + side effects for the UploadLog.
+  courseIdsForAccess: Set<string>;
+  newCoursesCount: number;
+  newAssignmentsCount: number;
+  newThreadsCount: number;
+  newStudentsCount: number;
+}
+
+async function importParents(
+  input: ParentImportInput
+): Promise<ParentLookups> {
+  const { rows, dedup, institutionId, replaceMode } = input;
+
+  const courseIdByCourseExtId = new Map<string, string>();
+  const assignmentIdByExtId = new Map<string, string>();
+  const threadIdByExtId = new Map<string, string>();
+  const studentIdBySystemId = new Map<string, string>();
+  const courseIdsForAccess = new Set<string>();
+
+  let newCoursesCount = 0;
+  let newAssignmentsCount = 0;
+  let newThreadsCount = 0;
+  let newStudentsCount = 0;
+
+  // ── A. Collect distinct parents from the CSV ──────────────────────
+  // Preserve first-occurrence order so the "first row wins" behavior for
+  // metadata (thread name, assignment description, etc.) matches what
+  // the old implementation did.
+  const courseSpecs: Array<{ externalId: string | null; row: RawCsvRow }> = [];
+  const seenCourseKeys = new Set<string>();
+  const assignmentSpecs: Array<{ externalId: string; row: RawCsvRow }> = [];
+  const seenAssignmentIds = new Set<string>();
+  const threadSpecs: Array<{
+    externalId: string;
+    assignmentExternalId: string;
+    row: RawCsvRow;
+  }> = [];
+  const seenThreadIds = new Set<string>();
+  const studentSpecs: Array<{ systemId: string; row: RawCsvRow }> = [];
+  const seenStudentIds = new Set<string>();
+
+  for (const row of rows) {
+    if (!row.assignmentId) continue;
+
+    const csvCourseId = row.courseId?.trim() || null;
+    const courseKey = csvCourseId ?? `__assignment__${row.assignmentId}`;
+    if (!seenCourseKeys.has(courseKey)) {
+      seenCourseKeys.add(courseKey);
+      courseSpecs.push({ externalId: csvCourseId, row });
     }
 
-    // ── Counters ─────────────────────────────────────────────────
-    let newCommentsCount = 0;
-    let updatedCommentsCount = 0;
-    let newThreadsCount = 0;
-    let newStudentsCount = 0;
-    let newAssignmentsCount = 0;
-    let newCoursesCount = 0;
-    let toriTagsExtracted = 0;
-    const courseIdsForAccess = new Set<string>();
-    // Collected for the post-commit reflection-classification hook.
-    const newUserCommentIds: string[] = [];
+    if (!seenAssignmentIds.has(row.assignmentId)) {
+      seenAssignmentIds.add(row.assignmentId);
+      assignmentSpecs.push({ externalId: row.assignmentId, row });
+    }
 
-    // Caches to avoid repeated DB lookups within this transaction
-    const studentCache = new Map<string, Student>(); // systemId → Student
-    const courseCache = new Map<string, Course>(); // assignmentExternalId → Course
-    const assignmentCache = new Map<string, Assignment>(); // externalId → Assignment
-    const threadCache = new Map<string, Thread>(); // externalId → Thread
+    if (row.threadId && !seenThreadIds.has(row.threadId)) {
+      seenThreadIds.add(row.threadId);
+      threadSpecs.push({
+        externalId: row.threadId,
+        assignmentExternalId: row.assignmentId,
+        row,
+      });
+    }
 
-    // ── Process each assignment group ────────────────────────────
-    for (const [assignmentExternalId, assignmentRows] of rowsByAssignment) {
-      // ── 1. Ensure a Course exists ──────────────────────────────
-      const firstRow = assignmentRows[0];
-      const csvCourseId = firstRow.courseId?.trim() || null;
-
-      // Cache key: use the CSV course ID if available, otherwise fall back
-      // to assignment ID (legacy behavior for CSVs without course data)
-      const courseCacheKey = csvCourseId ?? `__assignment__${assignmentExternalId}`;
-      let course = courseCache.get(courseCacheKey);
-
-      if (!course) {
-        if (csvCourseId) {
-          // ── New CSV format: real course data available ──────────
-          // Try to find existing course by externalId within this institution
-          course =
-            (await manager.findOne(Course, {
-              where: { externalId: csvCourseId, institutionId },
-            })) ?? undefined;
-
-          if (!course) {
-            // Create course with full metadata from CSV
-            course = await manager.save(Course, {
-              institutionId,
-              externalId: csvCourseId,
-              name: firstRow.courseName || "Untitled Course",
-              url: firstRow.courseUrl || null,
-              startDate: parseDateOrNull(firstRow.courseStartDate),
-              endDate: parseDateOrNull(firstRow.courseEndDate),
-              courseNumber: firstRow.courseNumber || null,
-              syncId: firstRow.courseSyncId || null,
-              faculty: firstRow.courseFaculty || null,
-            });
-            newCoursesCount++;
-          }
-        } else {
-          // ── Legacy CSV format: no course data — one course per assignment
-          const courseName = `${firstRow.assignmentName ?? "Untitled"} — Course`;
-
-          if (!dedup.existingAssignmentIds.has(assignmentExternalId)) {
-            course = await manager.save(Course, {
-              institutionId,
-              name: courseName,
-            });
-            newCoursesCount++;
-          } else {
-            const existingAssignment = await manager.findOne(Assignment, {
-              where: { externalId: assignmentExternalId },
-              relations: { course: true },
-            });
-            course = existingAssignment?.course as Course | undefined;
-            if (!course) {
-              course = await manager.save(Course, {
-                institutionId,
-                name: courseName,
-              });
-              newCoursesCount++;
-            }
-          }
-        }
-        courseCache.set(courseCacheKey, course);
+    // Students only come from USER rows — we figure that out using
+    // resolveCommentRole. Comments that turn out to be ASSISTANT/SYSTEM
+    // don't create a student even if the author columns are populated.
+    if (row.authorSystemId?.trim() && !seenStudentIds.has(row.authorSystemId)) {
+      if (resolveCommentRole(row) === CommentRole.USER) {
+        seenStudentIds.add(row.authorSystemId);
+        studentSpecs.push({ systemId: row.authorSystemId, row });
       }
-      courseIdsForAccess.add(course.id);
+    }
+  }
 
-      // ── 2. Ensure the Assignment exists ────────────────────────
-      let assignment = assignmentCache.get(assignmentExternalId);
-      if (!assignment) {
-        if (dedup.existingAssignmentIds.has(assignmentExternalId)) {
-          // Already in DB — fetch it
-          assignment =
-            (await manager.findOne(Assignment, {
-              where: { externalId: assignmentExternalId, courseId: course.id },
-            })) ?? undefined;
-        }
-        if (!assignment) {
-          const row = assignmentRows[0];
-          assignment = await manager.save(Assignment, {
-            courseId: course.id,
-            externalId: assignmentExternalId,
-            name: row.assignmentName ?? "Untitled Assignment",
-            description: row.assignmentDescription || null,
-            url: row.assignmentUrl || null,
-            createdDate: parseDateOrNull(row.assignmentCreatedDate),
-            dueDate: parseDateOrNull(row.assignmentDueDate),
-            gradeMaxPoints: parseFloatOrNull(row.gradeMaxPoints),
-            intendedOutcomes: row.assignmentIntendedOutcomes || null,
-            aiAssistantId: row.aiAssistantId || null,
-            aiAssistantName: row.aiAssistantName || null,
-            aiAssistantDescription: row.aiAssistantDescription || null,
-            aiAssistantInstruction: row.aiAssistantInstruction || null,
-            aiAssistantRestriction: row.aiAssistantRestriction || null,
-            aiAssistantRole: row.aiAssistantRole || null,
-            aiAssistantTags: row.aiAssistantTags || null,
-            aiAssistantGradeLevel: row.aiAssistantGradeLevel || null,
-            aiAssistantResponseLength: row.aiAssistantResponseLength || null,
-            aiAssistantVisibility: row.aiAssistantVisibility || null,
-            aiAssistantReflections: parseBool(row.aiAssistantReflections),
-            aiAssistantGenerateAnswers: parseBool(
-              row.aiAssistantGenerateAnswers
-            ),
-            aiAssistantIntendedAudience:
-              row.aiAssistantIntendedAudience || null,
-          });
-          newAssignmentsCount++;
-        }
-        assignmentCache.set(assignmentExternalId, assignment);
+  // ── B. Courses (chunked transactions) ─────────────────────────────
+  for (const batch of chunk(courseSpecs, PARENT_CHUNK_SIZE)) {
+    await AppDataSource.transaction(async (manager: EntityManager) => {
+      for (const spec of batch) {
+        const course = await ensureCourse(
+          manager,
+          spec,
+          institutionId,
+          dedup
+        );
+        if (course.wasCreated) newCoursesCount++;
+        courseIdByCourseExtId.set(courseKeyFor(spec), course.id);
+        courseIdsForAccess.add(course.id);
       }
+    });
+  }
 
-      // ── 3. Group this assignment's rows by thread ──────────────
-      const rowsByThread = new Map<string, RawCsvRow[]>();
-      for (const row of assignmentRows) {
-        if (!row.threadId) continue;
-        const group = rowsByThread.get(row.threadId) ?? [];
-        group.push(row);
-        rowsByThread.set(row.threadId, group);
-      }
-
-      // ── 4. Process each thread ─────────────────────────────────
-      for (const [threadExternalId, threadRows] of rowsByThread) {
-        // Ensure the Thread exists
-        let thread = threadCache.get(threadExternalId);
-        if (!thread) {
-          if (dedup.existingThreadIds.has(threadExternalId)) {
-            thread =
-              (await manager.findOne(Thread, {
-                where: {
-                  externalId: threadExternalId,
-                  assignmentId: assignment.id,
-                },
-              })) ?? undefined;
-          }
-          if (!thread) {
-            const firstRow = threadRows[0];
-            thread = await manager.save(Thread, {
-              assignmentId: assignment.id,
-              externalId: threadExternalId,
-              name: firstRow.threadName ?? "Untitled Thread",
-              totalInputTokens: parseIntOrNull(
-                firstRow.threadTotalInputTokens
-              ),
-              totalOutputTokens: parseIntOrNull(
-                firstRow.threadTotalOutputTokens
-              ),
-              totalCost: parseFloatOrNull(firstRow.threadTotalCost),
-              submissionUrl: firstRow.submissionUrl || null,
-            });
-            newThreadsCount++;
-          }
-          threadCache.set(threadExternalId, thread);
+  // ── C. Assignments (chunked transactions) ────────────────────────
+  for (const batch of chunk(assignmentSpecs, PARENT_CHUNK_SIZE)) {
+    await AppDataSource.transaction(async (manager: EntityManager) => {
+      for (const spec of batch) {
+        const courseExt = spec.row.courseId?.trim() || null;
+        const courseKey = courseExt ?? `__assignment__${spec.externalId}`;
+        const courseId = courseIdByCourseExtId.get(courseKey);
+        if (!courseId) {
+          throw new Error(
+            `Internal: course id missing for assignment ${spec.externalId} (courseKey=${courseKey})`
+          );
         }
+        const a = await ensureAssignment(manager, spec, courseId, dedup);
+        if (a.wasCreated) newAssignmentsCount++;
+        assignmentIdByExtId.set(spec.externalId, a.id);
+      }
+    });
+  }
 
-        // ── 5. Create comments within this thread ────────────────
-        // Track new comments for TORI extraction at end of thread
-        const newCommentsForTori: Array<{
-          id: string;
+  // ── D. Threads (chunked transactions) ────────────────────────────
+  for (const batch of chunk(threadSpecs, PARENT_CHUNK_SIZE)) {
+    await AppDataSource.transaction(async (manager: EntityManager) => {
+      for (const spec of batch) {
+        const assignmentId = assignmentIdByExtId.get(spec.assignmentExternalId);
+        if (!assignmentId) {
+          throw new Error(
+            `Internal: assignment id missing for thread ${spec.externalId}`
+          );
+        }
+        const t = await ensureThread(manager, spec, assignmentId, dedup);
+        if (t.wasCreated) newThreadsCount++;
+        threadIdByExtId.set(spec.externalId, t.id);
+      }
+    });
+  }
+
+  // ── E. Students (chunked transactions) ───────────────────────────
+  for (const batch of chunk(studentSpecs, PARENT_CHUNK_SIZE)) {
+    await AppDataSource.transaction(async (manager: EntityManager) => {
+      for (const spec of batch) {
+        const s = await ensureStudent(
+          manager,
+          spec,
+          institutionId,
+          dedup,
+          replaceMode
+        );
+        if (s.wasCreated) newStudentsCount++;
+        studentIdBySystemId.set(spec.systemId, s.id);
+      }
+    });
+  }
+
+  return {
+    courseIdByCourseExtId,
+    assignmentIdByExtId,
+    threadIdByExtId,
+    studentIdBySystemId,
+    courseIdsForAccess,
+    newCoursesCount,
+    newAssignmentsCount,
+    newThreadsCount,
+    newStudentsCount,
+  };
+}
+
+function courseKeyFor(spec: {
+  externalId: string | null;
+  row: RawCsvRow;
+}): string {
+  return spec.externalId ?? `__assignment__${spec.row.assignmentId}`;
+}
+
+// ── ensureCourse / ensureAssignment / ensureThread / ensureStudent ─
+// Per-entity helpers called by the parent pass. Each returns
+// { id, wasCreated }. They still use manager.save() (not manager.insert())
+// because they preserve the original logic for dedup, legacy-CSV fallback,
+// and replace-mode updates — and parent volume is small enough that the
+// extra round-trip cost doesn't matter.
+
+async function ensureCourse(
+  manager: EntityManager,
+  spec: { externalId: string | null; row: RawCsvRow },
+  institutionId: string,
+  dedup: Awaited<ReturnType<typeof checkDuplicates>>
+): Promise<{ id: string; wasCreated: boolean }> {
+  const { externalId, row } = spec;
+
+  if (externalId) {
+    // New CSV format: look up by externalId within institution.
+    const existing = await manager.findOne(Course, {
+      where: { externalId, institutionId },
+    });
+    if (existing) return { id: existing.id, wasCreated: false };
+
+    const created = await manager.save(Course, {
+      institutionId,
+      externalId,
+      name: row.courseName || "Untitled Course",
+      url: row.courseUrl || null,
+      startDate: parseDateOrNull(row.courseStartDate),
+      endDate: parseDateOrNull(row.courseEndDate),
+      courseNumber: row.courseNumber || null,
+      syncId: row.courseSyncId || null,
+      faculty: row.courseFaculty || null,
+    });
+    return { id: created.id, wasCreated: true };
+  }
+
+  // Legacy CSV: no course column → one course per assignment.
+  const courseName = `${row.assignmentName ?? "Untitled"} — Course`;
+  const assignmentIsKnown = dedup.existingAssignmentIds.has(row.assignmentId);
+  if (assignmentIsKnown) {
+    const existingAssignment = await manager.findOne(Assignment, {
+      where: { externalId: row.assignmentId },
+      relations: { course: true },
+    });
+    if (existingAssignment?.course) {
+      return { id: existingAssignment.course.id, wasCreated: false };
+    }
+  }
+  const created = await manager.save(Course, {
+    institutionId,
+    name: courseName,
+  });
+  return { id: created.id, wasCreated: true };
+}
+
+async function ensureAssignment(
+  manager: EntityManager,
+  spec: { externalId: string; row: RawCsvRow },
+  courseId: string,
+  dedup: Awaited<ReturnType<typeof checkDuplicates>>
+): Promise<{ id: string; wasCreated: boolean }> {
+  const { externalId, row } = spec;
+  if (dedup.existingAssignmentIds.has(externalId)) {
+    const existing = await manager.findOne(Assignment, {
+      where: { externalId, courseId },
+    });
+    if (existing) return { id: existing.id, wasCreated: false };
+  }
+  const created = await manager.save(
+    Assignment,
+    buildAssignmentEntity(row, courseId, externalId)
+  );
+  return { id: created.id, wasCreated: true };
+}
+
+async function ensureThread(
+  manager: EntityManager,
+  spec: { externalId: string; assignmentExternalId: string; row: RawCsvRow },
+  assignmentId: string,
+  dedup: Awaited<ReturnType<typeof checkDuplicates>>
+): Promise<{ id: string; wasCreated: boolean }> {
+  const { externalId, row } = spec;
+  // Short-circuit: only findOne if we know the thread already exists.
+  // Matters a lot for 8k-student imports where most threads are new.
+  if (dedup.existingThreadIds.has(externalId)) {
+    const existing = await manager.findOne(Thread, {
+      where: { externalId, assignmentId },
+    });
+    if (existing) return { id: existing.id, wasCreated: false };
+  }
+  const created = await manager.save(Thread, {
+    assignmentId,
+    externalId,
+    name: row.threadName ?? "Untitled Thread",
+    totalInputTokens: parseIntOrNull(row.threadTotalInputTokens),
+    totalOutputTokens: parseIntOrNull(row.threadTotalOutputTokens),
+    totalCost: parseFloatOrNull(row.threadTotalCost),
+    submissionUrl: row.submissionUrl || null,
+  });
+  return { id: created.id, wasCreated: true };
+}
+
+async function ensureStudent(
+  manager: EntityManager,
+  spec: { systemId: string; row: RawCsvRow },
+  institutionId: string,
+  dedup: Awaited<ReturnType<typeof checkDuplicates>>,
+  replaceMode: boolean
+): Promise<{ id: string; wasCreated: boolean }> {
+  const { systemId, row } = spec;
+  // Short-circuit: only findOne when we know the student might exist.
+  // On an 8k-student fresh import this skips 8k pointless SELECTs.
+  if (dedup.existingStudentSystemIds.has(systemId)) {
+    const existing = await manager.findOne(Student, {
+      where: { systemId, institutionId },
+    });
+    if (existing) {
+      if (replaceMode) {
+        existing.firstName = row.authorFirstName || existing.firstName;
+        existing.lastName = row.authorLastName || existing.lastName;
+        existing.email = row.authorEmail || existing.email;
+        await manager.save(Student, existing);
+      }
+      return { id: existing.id, wasCreated: false };
+    }
+  }
+  const created = await manager.save(Student, {
+    institutionId,
+    systemId,
+    syncId: row.authorSyncId || null,
+    firstName: row.authorFirstName || null,
+    lastName: row.authorLastName || null,
+    email: row.authorEmail || null,
+    systemRole: row.authorSystemRole || null,
+    courseRole: row.authorCourseRole || null,
+  });
+  return { id: created.id, wasCreated: true };
+}
+
+function buildAssignmentEntity(
+  row: RawCsvRow,
+  courseId: string,
+  externalId: string
+): Partial<Assignment> {
+  return {
+    courseId,
+    externalId,
+    name: row.assignmentName ?? "Untitled Assignment",
+    description: row.assignmentDescription || null,
+    url: row.assignmentUrl || null,
+    createdDate: parseDateOrNull(row.assignmentCreatedDate),
+    dueDate: parseDateOrNull(row.assignmentDueDate),
+    gradeMaxPoints: parseFloatOrNull(row.gradeMaxPoints),
+    intendedOutcomes: row.assignmentIntendedOutcomes || null,
+    aiAssistantId: row.aiAssistantId || null,
+    aiAssistantName: row.aiAssistantName || null,
+    aiAssistantDescription: row.aiAssistantDescription || null,
+    aiAssistantInstruction: row.aiAssistantInstruction || null,
+    aiAssistantRestriction: row.aiAssistantRestriction || null,
+    aiAssistantRole: row.aiAssistantRole || null,
+    aiAssistantTags: row.aiAssistantTags || null,
+    aiAssistantGradeLevel: row.aiAssistantGradeLevel || null,
+    aiAssistantResponseLength: row.aiAssistantResponseLength || null,
+    aiAssistantVisibility: row.aiAssistantVisibility || null,
+    aiAssistantReflections: parseBool(row.aiAssistantReflections),
+    aiAssistantGenerateAnswers: parseBool(row.aiAssistantGenerateAnswers),
+    aiAssistantIntendedAudience: row.aiAssistantIntendedAudience || null,
+  };
+}
+
+// ── Pass B: importComments ────────────────────────────────────────
+// Main scale lever. Rows processed in chunks of ROW_CHUNK_SIZE per
+// transaction. Inside each transaction, new comments are bulk-inserted
+// with manager.insert(Comment, batchOf500). Replace-mode updates still
+// use manager.save() one-at-a-time (uncommon code path).
+interface CommentImportInput {
+  rows: RawCsvRow[];
+  dedup: Awaited<ReturnType<typeof checkDuplicates>>;
+  parents: ParentLookups;
+  uploadedById: string;
+  institutionId: string;
+  replaceMode: boolean;
+}
+
+interface InsertedCommentMeta {
+  id: string;
+  externalId: string;
+  role: CommentRole;
+  text: string;
+  orderIndex: number;
+}
+
+interface CommentImportResult {
+  newCommentsCount: number;
+  updatedCommentsCount: number;
+  newUserCommentIds: string[];
+  // Inserted comments grouped by their threadId (DB id, not external id).
+  // The TORI pass reads this to extract tags per-thread without re-querying.
+  insertedByThread: Map<string, InsertedCommentMeta[]>;
+}
+
+async function importComments(
+  input: CommentImportInput
+): Promise<CommentImportResult> {
+  const { rows, dedup, parents, uploadedById, institutionId, replaceMode } =
+    input;
+
+  const newUserCommentIds: string[] = [];
+  const insertedByThread = new Map<string, InsertedCommentMeta[]>();
+  let newCommentsCount = 0;
+  let updatedCommentsCount = 0;
+
+  // De-dup within the CSV itself (same commentId appearing twice in one
+  // file) — tracked globally across chunks because a dup might span chunks.
+  const insertedExternalIds = new Set<string>();
+
+  for (const rowChunk of chunk(rows, ROW_CHUNK_SIZE)) {
+    const { chunkNewCount, chunkUpdatedCount } = await AppDataSource.transaction(
+      async (manager: EntityManager) => {
+        let chunkNewCount = 0;
+        let chunkUpdatedCount = 0;
+
+        // ── Build insert drafts for this chunk ──────────────────────
+        interface NewCommentDraft {
+          threadId: string;
+          studentId: string | null;
           externalId: string;
-          role: string;
+          role: CommentRole;
           text: string;
+          timestamp: Date | null;
           orderIndex: number;
-        }> = [];
+          totalComments: number | null;
+          grade: string | null;
+        }
+        const drafts: NewCommentDraft[] = [];
+        // Rows that are dupes and need replace-mode UPDATE handled below.
+        const replaceRows: RawCsvRow[] = [];
 
-        // Track comment IDs we've already inserted in this upload
-        // to handle duplicates within the same CSV file
-        const insertedCommentIds = new Set<string>();
+        for (const row of rowChunk) {
+          if (!row.assignmentId || !row.threadId) continue;
+          if (!row.commentId) continue;
 
-        for (const row of threadRows) {
-          // Handle duplicate comments — skip or update depending on mode
           if (dedup.existingCommentIds.has(row.commentId)) {
-            if (replaceMode) {
-              // Find the existing comment by joining through the institution,
-              // rather than relying on thread.id from the resolution chain
-              // (which may point to a newly-created thread if the course/
-              // assignment/thread chain didn't resolve correctly).
-              const existing = await manager
-                .createQueryBuilder(Comment, "c")
-                .innerJoin("c.thread", "t")
-                .innerJoin("t.assignment", "a")
-                .innerJoin("a.course", "co")
-                .where("co.institutionId = :institutionId", { institutionId })
-                .andWhere("c.externalId = :externalId", {
-                  externalId: row.commentId,
-                })
-                .getOne();
-
-              if (existing) {
-                existing.text = decodeEntities(row.commentFullText ?? "");
-                existing.timestamp = parseDateOrNull(row.commentTimestamp) ?? existing.timestamp;
-                existing.grade = row.grade || existing.grade;
-                await manager.save(Comment, existing);
-                updatedCommentsCount++;
-              }
-            }
+            if (replaceMode) replaceRows.push(row);
             continue;
           }
-          if (insertedCommentIds.has(row.commentId)) continue;
-          insertedCommentIds.add(row.commentId);
+          if (insertedExternalIds.has(row.commentId)) continue;
+          insertedExternalIds.add(row.commentId);
 
-          // Determine comment role
-          const role = resolveCommentRole(row);
-
-          // Ensure student exists (only for USER comments)
-          let studentId: string | null = null;
-          if (role === CommentRole.USER && row.authorSystemId?.trim()) {
-            let student = studentCache.get(row.authorSystemId);
-            if (!student) {
-              if (dedup.existingStudentSystemIds.has(row.authorSystemId)) {
-                student =
-                  (await manager.findOne(Student, {
-                    where: {
-                      systemId: row.authorSystemId,
-                      institutionId,
-                    },
-                  })) ?? undefined;
-
-                // In replace mode, update student info with the cleaner data
-                if (student && replaceMode) {
-                  student.firstName = row.authorFirstName || student.firstName;
-                  student.lastName = row.authorLastName || student.lastName;
-                  student.email = row.authorEmail || student.email;
-                  await manager.save(Student, student);
-                }
-              }
-              if (!student) {
-                student = await manager.save(Student, {
-                  institutionId,
-                  systemId: row.authorSystemId,
-                  syncId: row.authorSyncId || null,
-                  firstName: row.authorFirstName || null,
-                  lastName: row.authorLastName || null,
-                  email: row.authorEmail || null,
-                  systemRole: row.authorSystemRole || null,
-                  courseRole: row.authorCourseRole || null,
-                });
-                newStudentsCount++;
-              }
-              studentCache.set(row.authorSystemId, student);
-            }
-            studentId = student.id;
+          const threadId = parents.threadIdByExtId.get(row.threadId);
+          if (!threadId) {
+            throw new Error(
+              `Internal: threadId missing for row with externalId ${row.commentId} (thread ${row.threadId})`
+            );
           }
 
-          // Create the comment
-          const comment = await manager.save(Comment, {
-            threadId: thread.id,
+          const role = resolveCommentRole(row);
+          let studentId: string | null = null;
+          if (role === CommentRole.USER && row.authorSystemId?.trim()) {
+            studentId =
+              parents.studentIdBySystemId.get(row.authorSystemId) ?? null;
+          }
+
+          drafts.push({
+            threadId,
             studentId,
             externalId: row.commentId,
             role,
@@ -604,86 +902,125 @@ export async function commitUpload(
             orderIndex: parseIntOrNull(row.commentOrder) ?? 0,
             totalComments: parseIntOrNull(row.totalComments),
             grade: row.grade || null,
+          });
+        }
+
+        // ── Insert in batches of COMMENT_INSERT_BATCH_SIZE ─────────
+        for (const batch of chunk(drafts, COMMENT_INSERT_BATCH_SIZE)) {
+          const toInsert = batch.map((d) => ({
+            threadId: d.threadId,
+            studentId: d.studentId,
+            externalId: d.externalId,
+            role: d.role,
+            text: d.text,
+            timestamp: d.timestamp,
+            orderIndex: d.orderIndex,
+            totalComments: d.totalComments,
+            grade: d.grade,
             uploadedById,
-          });
+          }));
+          const result = await manager.insert(Comment, toInsert);
 
-          newCommentsCount++;
-          if (comment.role === CommentRole.USER) {
-            newUserCommentIds.push(comment.id);
+          // Sanity check: TypeORM's RETURNING-based insert is supposed to
+          // give us the same number of identifiers as input rows, in the
+          // same order. If this ever fails the rest of the function would
+          // silently associate the wrong ID with the wrong externalId for
+          // TORI tagging — better to fail loudly here.
+          if (result.identifiers.length !== batch.length) {
+            throw new Error(
+              `Internal: insert returned ${result.identifiers.length} identifiers for ${batch.length} rows`
+            );
           }
 
-          newCommentsForTori.push({
-            id: comment.id,
-            externalId: comment.externalId,
-            role: comment.role,
-            text: comment.text,
-            orderIndex: comment.orderIndex,
-          });
-        }
-
-        // ── 6. Extract TORI tags for this thread ─────────────────
-        if (newCommentsForTori.length > 0) {
-          const associations = await extractToriForThread(newCommentsForTori);
-
-          for (const assoc of associations) {
-            await manager.save(CommentToriTag, {
-              commentId: assoc.studentCommentId,
-              toriTagId: assoc.toriTagId,
-              sourceCommentId: assoc.sourceCommentId,
-              extractionMethod: "extracted",
+          // result.identifiers is same-length, same-order as the input.
+          for (let i = 0; i < batch.length; i++) {
+            const id = (result.identifiers[i] as { id: string }).id;
+            const d = batch[i];
+            chunkNewCount++;
+            if (d.role === CommentRole.USER) {
+              newUserCommentIds.push(id);
+            }
+            const list = insertedByThread.get(d.threadId) ?? [];
+            list.push({
+              id,
+              externalId: d.externalId,
+              role: d.role,
+              text: d.text,
+              orderIndex: d.orderIndex,
             });
-            toriTagsExtracted++;
+            insertedByThread.set(d.threadId, list);
           }
         }
-      } // end thread loop
-    } // end assignment loop
 
-    // ── Create CourseAccess for uploader ──────────────────────────
-    for (const courseId of courseIdsForAccess) {
-      const existing = await manager.findOne(CourseAccess, {
-        where: { userId: uploadedById, courseId },
-      });
-      if (!existing) {
-        await manager.save(CourseAccess, {
-          userId: uploadedById,
-          courseId,
-          accessLevel: AccessLevel.OWNER,
-          grantedById: uploadedById,
-        });
+        // ── Replace-mode updates (one at a time; only runs when the
+        //    user has enabled replaceMode, which is the uncommon path) ─
+        if (replaceMode && replaceRows.length > 0) {
+          for (const row of replaceRows) {
+            const existing = await manager
+              .createQueryBuilder(Comment, "c")
+              .innerJoin("c.thread", "t")
+              .innerJoin("t.assignment", "a")
+              .innerJoin("a.course", "co")
+              .where("co.institutionId = :institutionId", { institutionId })
+              .andWhere("c.externalId = :externalId", {
+                externalId: row.commentId,
+              })
+              .getOne();
+            if (existing) {
+              existing.text = decodeEntities(row.commentFullText ?? "");
+              existing.timestamp =
+                parseDateOrNull(row.commentTimestamp) ?? existing.timestamp;
+              existing.grade = row.grade || existing.grade;
+              await manager.save(Comment, existing);
+              chunkUpdatedCount++;
+            }
+          }
+        }
+
+        return { chunkNewCount, chunkUpdatedCount };
       }
+    );
+
+    newCommentsCount += chunkNewCount;
+    updatedCommentsCount += chunkUpdatedCount;
+  }
+
+  return {
+    newCommentsCount,
+    updatedCommentsCount,
+    newUserCommentIds,
+    insertedByThread,
+  };
+}
+
+// ── Pass C: importToriTags ────────────────────────────────────────
+// After all comments are committed, run TORI extraction per thread
+// and batch-insert the resulting CommentToriTag rows.
+async function importToriTags(input: {
+  insertedByThread: Map<string, InsertedCommentMeta[]>;
+}): Promise<number> {
+  const { insertedByThread } = input;
+  let total = 0;
+
+  for (const [, threadComments] of insertedByThread) {
+    if (threadComments.length === 0) continue;
+    const associations = await extractToriForThread(threadComments);
+    if (associations.length === 0) continue;
+
+    const tagRows = associations.map((assoc) => ({
+      commentId: assoc.studentCommentId,
+      toriTagId: assoc.toriTagId,
+      sourceCommentId: assoc.sourceCommentId,
+      extractionMethod: "extracted" as const,
+    }));
+
+    for (const tagBatch of chunk(tagRows, TORI_TAG_INSERT_BATCH_SIZE)) {
+      await AppDataSource.transaction(async (manager: EntityManager) => {
+        await manager.insert(CommentToriTag, tagBatch);
+      });
+      total += tagBatch.length;
     }
+  }
 
-    // ── Create UploadLog ─────────────────────────────────────────
-    const uploadLog = await manager.save(UploadLog, {
-      uploadedById,
-      institutionId,
-      originalFilename,
-      filePath: savedFilePath,
-      totalRows: rows.length,
-      newComments: newCommentsCount,
-      skippedDuplicates: commentIds.length - newCommentsCount,
-      newThreads: newThreadsCount,
-      newStudents: newStudentsCount,
-      newCourses: newCoursesCount,
-      newAssignments: newAssignmentsCount,
-      toriTagsExtracted,
-    });
-
-    return {
-      totalRows: rows.length,
-      newComments: newCommentsCount,
-      duplicateComments: commentIds.length - newCommentsCount,
-      newThreads: newThreadsCount,
-      newStudents: newStudentsCount,
-      newAssignments: newAssignmentsCount,
-      newCourses: newCoursesCount,
-      detectedInstitutionId: institutionId,
-      detectedInstitutionName: null,
-      uploadLogId: uploadLog.id,
-      toriTagsExtracted,
-      courseAccessCreated: courseIdsForAccess.size > 0,
-      newUserCommentIds,
-      updatedComments: updatedCommentsCount,
-    };
-  });
+  return total;
 }
