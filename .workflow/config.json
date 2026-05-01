@@ -1,0 +1,6 @@
+{
+  "workflow": "solo",
+  "retrospective": {
+    "enabled": false
+  }
+}

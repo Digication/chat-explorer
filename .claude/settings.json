@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      ".claude/parity"
+    ],
+    "allow": [
+      "mcp__plugin_parity_parity-codex__codex_task",
+      "mcp__plugin_parity_parity-codex__codex_review",
+      "mcp__plugin_parity_parity-codex__codex_followup",
+      "mcp__plugin_parity_parity-gemini__gemini_task",
+      "mcp__plugin_parity_parity-gemini__gemini_review",
+      "mcp__plugin_parity_parity-gemini__gemini_followup",
+      "mcp__plugin_parity_parity-vibe__vibe_task",
+      "mcp__plugin_parity_parity-vibe__vibe_review",
+      "mcp__plugin_parity_parity-vibe__vibe_followup",
+      "mcp__plugin_parity_parity-claude__claude_task",
+      "mcp__plugin_parity_parity-claude__claude_review",
+      "mcp__plugin_parity_parity-claude__claude_followup"
+    ]
+  }
+}

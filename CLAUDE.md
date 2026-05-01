@@ -1,3 +1,8 @@
+<!-- parity:bootstrap:start -->
+@.claude/parity/agents/bootstrap.md
+@.claude/parity/agents/claude.md
+<!-- parity:bootstrap:end -->
+
 # Environment
 - Package manager: pnpm
 - Language: TypeScript

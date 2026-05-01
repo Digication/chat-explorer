@@ -20,3 +20,8 @@ downloads/
 
 # Playwright E2E auth state
 playwright/.auth/
+
+# Parity plugin (per-developer)
+.claude/settings.local.json
+.claude/parity
+.parity/metrics/tool-events-*.jsonl
