@@ -17,6 +17,10 @@ import { getRecommendations } from "../services/analytics/recommendations.js";
 import { getGrowth } from "../services/analytics/growth.js";
 import { getStudentProfile } from "../services/analytics/student-profile.js";
 import { getCrossCourseComparison } from "../services/analytics/cross-course.js";
+import {
+  getEvidenceSummary,
+  getStudentEvidenceMoments,
+} from "../services/analytics/evidence-outcomes.js";
 
 interface ScopeInput {
   institutionId: string;
@@ -202,6 +206,29 @@ export const analyticsResolvers = {
     ) => {
       const validated = await validateScope(ctx, scope);
       return getStudentProfile(validated, studentId);
+    },
+
+    evidenceSummary: async (
+      _: unknown,
+      { scope }: { scope: ScopeInput },
+      ctx: GraphQLContext
+    ) => {
+      const validated = await validateScope(ctx, scope);
+      return getEvidenceSummary(validated);
+    },
+
+    studentEvidenceMoments: async (
+      _: unknown,
+      {
+        scope,
+        studentId,
+        limit,
+        offset,
+      }: { scope: ScopeInput; studentId: string; limit?: number; offset?: number },
+      ctx: GraphQLContext
+    ) => {
+      const validated = await validateScope(ctx, scope);
+      return getStudentEvidenceMoments(validated, studentId, limit, offset);
     },
 
     crossCourseComparison: async (

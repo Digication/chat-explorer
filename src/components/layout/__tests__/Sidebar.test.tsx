@@ -85,4 +85,62 @@ describe("Sidebar", () => {
       screen.queryByTestId("AdminPanelSettingsOutlinedIcon")
     ).not.toBeInTheDocument();
   });
+
+  it("shows student nav items when user role is student", () => {
+    mockUseAuth.mockReturnValue({
+      user: {
+        id: "u4",
+        name: "Student",
+        email: "student@example.com",
+        role: "student",
+        institutionId: "inst-1",
+      },
+      isLoading: false,
+      isAuthenticated: true,
+    });
+
+    renderSidebar();
+    // Student nav icons should be present
+    expect(
+      screen.getByTestId("DashboardOutlinedIcon")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("AccountTreeOutlinedIcon")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("TrendingUpOutlinedIcon")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("EmojiEventsOutlinedIcon")
+    ).toBeInTheDocument();
+  });
+
+  it("hides faculty nav items for students", () => {
+    mockUseAuth.mockReturnValue({
+      user: {
+        id: "u5",
+        name: "Student",
+        email: "student@example.com",
+        role: "student",
+        institutionId: "inst-1",
+      },
+      isLoading: false,
+      isAuthenticated: true,
+    });
+
+    renderSidebar();
+    // Faculty nav icons should NOT be present
+    expect(
+      screen.queryByTestId("InsightsOutlinedIcon")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("ChatOutlinedIcon")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("CloudUploadOutlinedIcon")
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("AdminPanelSettingsOutlinedIcon")
+    ).not.toBeInTheDocument();
+  });
 });

@@ -461,6 +461,71 @@ export const GET_CROSS_COURSE_COMPARISON = gql`
   }
 `;
 
+/** Evidence summary — outcome alignment aggregations. */
+export const GET_EVIDENCE_SUMMARY = gql`
+  query EvidenceSummary($scope: AnalyticsScopeInput!) {
+    evidenceSummary(scope: $scope) {
+      data {
+        frameworkId
+        frameworkName
+        totalMoments
+        outcomes {
+          outcomeId
+          outcomeCode
+          outcomeName
+          totalAlignments
+          strengthDistribution {
+            EMERGING
+            DEVELOPING
+            DEMONSTRATING
+            EXEMPLARY
+          }
+          studentCount
+        }
+      }
+      meta {
+        consentedStudentCount
+        excludedStudentCount
+        computedAt
+        cached
+      }
+    }
+  }
+`;
+
+/** Evidence moments for a specific student. */
+export const GET_STUDENT_EVIDENCE_MOMENTS = gql`
+  query StudentEvidenceMoments(
+    $scope: AnalyticsScopeInput!
+    $studentId: ID!
+    $limit: Int
+    $offset: Int
+  ) {
+    studentEvidenceMoments(
+      scope: $scope
+      studentId: $studentId
+      limit: $limit
+      offset: $offset
+    ) {
+      moments {
+        momentId
+        commentId
+        narrative
+        sourceText
+        type
+        processedAt
+        outcomeAlignments {
+          outcomeCode
+          outcomeName
+          strengthLevel
+          rationale
+        }
+      }
+      totalCount
+    }
+  }
+`;
+
 /** All institutions (digication_admin only). */
 export const GET_INSTITUTIONS = gql`
   query Institutions {

@@ -5,6 +5,7 @@ import UsersTab from "@/components/admin/UsersTab";
 import InstitutionsTab from "@/components/admin/InstitutionsTab";
 import CourseAccessTab from "@/components/admin/CourseAccessTab";
 import AnalyticsTab from "@/components/admin/AnalyticsTab";
+import StudentInvitesTab from "@/components/admin/StudentInvitesTab";
 
 export default function AdminPage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -28,6 +29,7 @@ export default function AdminPage() {
           <Tab label="Institutions" value="institutions" />
         )}
         <Tab label="Course Access" value="course-access" />
+        <Tab label="Student Invites" value="student-invites" />
         <Tab label="Analytics" value="analytics" />
       </Tabs>
 
@@ -36,6 +38,7 @@ export default function AdminPage() {
         <InstitutionsTab />
       )}
       {currentTab === "course-access" && <CourseAccessTab />}
+      {currentTab === "student-invites" && <StudentInvitesTab />}
       {currentTab === "analytics" && <AnalyticsTab />}
     </Box>
   );

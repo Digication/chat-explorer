@@ -9,6 +9,7 @@ export const typeDefs = /* GraphQL */ `
     instructor
     institution_admin
     digication_admin
+    student
   }
 
   enum CommentRole {
@@ -120,6 +121,20 @@ export const typeDefs = /* GraphQL */ `
     lastName: String
     email: String
     displayName: String!
+    userId: ID
+    institutionId: ID!
+  }
+
+  type InviteResult {
+    userId: ID!
+    email: String!
+  }
+
+  type BulkInviteResult {
+    studentId: ID!
+    userId: ID
+    email: String
+    error: String
   }
 
   type Comment {
@@ -551,6 +566,147 @@ export const typeDefs = /* GraphQL */ `
     meta: AnalyticsMeta!
   }
 
+  # ── Evidence & Outcomes Types ─────────────────────────────────
+
+  enum StrengthLevel {
+    EMERGING
+    DEVELOPING
+    DEMONSTRATING
+    EXEMPLARY
+  }
+
+  type StrengthDistribution {
+    EMERGING: Int!
+    DEVELOPING: Int!
+    DEMONSTRATING: Int!
+    EXEMPLARY: Int!
+  }
+
+  type OutcomeSummaryItem {
+    outcomeId: ID!
+    outcomeCode: String!
+    outcomeName: String!
+    totalAlignments: Int!
+    strengthDistribution: StrengthDistribution!
+    studentCount: Int!
+  }
+
+  type EvidenceSummary {
+    frameworkId: ID
+    frameworkName: String
+    totalMoments: Int!
+    outcomes: [OutcomeSummaryItem!]!
+  }
+
+  type EvidenceSummaryResult {
+    data: EvidenceSummary!
+    meta: AnalyticsMeta!
+  }
+
+  type OutcomeAlignmentItem {
+    outcomeCode: String!
+    outcomeName: String!
+    strengthLevel: StrengthLevel!
+    rationale: String
+  }
+
+  type StudentEvidenceMomentItem {
+    momentId: ID!
+    commentId: ID
+    narrative: String!
+    sourceText: String!
+    type: String!
+    processedAt: String!
+    outcomeAlignments: [OutcomeAlignmentItem!]!
+  }
+
+  type StudentEvidenceResult {
+    moments: [StudentEvidenceMomentItem!]!
+    totalCount: Int!
+  }
+
+  # ── Artifact Types ─────────────────────────────────────────────
+
+  enum ArtifactType {
+    PAPER
+    PRESENTATION
+    CODE
+    PORTFOLIO
+    CONVERSATION
+  }
+
+  enum ArtifactStatus {
+    UPLOADED
+    PROCESSING
+    ANALYZED
+    FAILED
+    DELETED
+  }
+
+  enum SectionType {
+    PARAGRAPH
+    SECTION
+    SLIDE
+    CODE_BLOCK
+    HEADING
+    COMMENT
+  }
+
+  type Artifact {
+    id: ID!
+    studentId: ID!
+    courseId: ID!
+    assignmentId: ID
+    threadId: ID
+    title: String!
+    type: ArtifactType!
+    status: ArtifactStatus!
+    mimeType: String
+    fileSizeBytes: Int
+    hasStoredFile: Boolean!
+    errorMessage: String
+    uploadedAt: String!
+    updatedAt: String!
+    # Derived / joined fields
+    student: Student
+    course: Course
+    assignment: Assignment
+    sectionCount: Int!
+    sections: [ArtifactSection!]!
+  }
+
+  type ArtifactSection {
+    id: ID!
+    artifactId: ID!
+    commentId: ID
+    sequenceOrder: Int!
+    title: String
+    content: String!
+    type: SectionType!
+    wordCount: Int!
+    # Narrative evidence linked to this section (if any). Joined at
+    # read time — may include commentId-keyed moments for CONVERSATION
+    # artifacts whose sections wrap a Comment.
+    evidenceMoments: [ArtifactEvidenceMoment!]!
+  }
+
+  type ArtifactEvidenceMoment {
+    id: ID!
+    narrative: String!
+    sourceText: String!
+    processedAt: String!
+    outcomeAlignments: [OutcomeAlignmentItem!]!
+  }
+
+  input ArtifactsFilter {
+    institutionId: ID
+    courseId: ID
+    assignmentId: ID
+    studentId: ID
+    status: ArtifactStatus
+    type: ArtifactType
+  }
+
   # ── Chat Types ────────────────────────────────────────────────
 
   type ChatSession {
@@ -752,6 +908,14 @@ export const typeDefs = /* GraphQL */ `
     studentProfile(scope: AnalyticsScopeInput!, studentId: ID!): StudentProfileResult!
     crossCourseComparison(input: CrossCourseInput!): CrossCourseResult!
 
+    # Evidence & Outcomes
+    evidenceSummary(scope: AnalyticsScopeInput!): EvidenceSummaryResult!
+    studentEvidenceMoments(scope: AnalyticsScopeInput!, studentId: ID!, limit: Int, offset: Int): StudentEvidenceResult!
+
+    # Artifacts
+    artifacts(filter: ArtifactsFilter): [Artifact!]!
+    artifact(id: ID!): Artifact
+
     # Thread
     thread(id: ID!): Thread
 
@@ -776,6 +940,10 @@ export const typeDefs = /* GraphQL */ `
 
     # Current user
     me: User
+
+    # Student auth
+    myStudentProfile: Student
+    students(institutionId: ID!, search: String): [Student!]!
 
     # Telemetry (admin only)
     telemetrySummary(institutionId: ID, userId: ID, startDate: String!, endDate: String!): TelemetrySummary!
@@ -812,8 +980,16 @@ export const typeDefs = /* GraphQL */ `
     createInstitution(name: String!, domain: String, slug: String): Institution!
     updateInstitution(id: ID!, name: String, domain: String, slug: String): Institution!
 
+    # Student invites
+    inviteStudent(studentId: ID!): InviteResult!
+    bulkInviteStudents(studentIds: [ID!]!): [BulkInviteResult!]!
+
     # Telemetry
     trackEvents(events: [TelemetryEventInput!]!): Boolean!
     purgeOldTelemetry(olderThanDays: Int!): Int!
+
+    # Artifacts
+    deleteArtifact(id: ID!): Boolean!
+    wrapThreadAsArtifact(threadId: ID!): Artifact!
   }
 `;

@@ -15,6 +15,7 @@ import { fromNodeHeaders } from "better-auth/node";
 import { AppDataSource } from "./data-source.js";
 import { auth } from "./auth.js";
 import { seedToriTags } from "./seeds/tori-tags.js";
+import { seedToriFrameworks } from "./services/evidence/seed-tori-framework.js";
 import {
   requireAuth,
   type AuthenticatedRequest,
@@ -22,6 +23,18 @@ import {
 import { User } from "./entities/User.js";
 import { previewUpload, commitUpload } from "./services/upload.js";
 import { classifyUserCommentsInBackground } from "./services/reflection/ingest-hook.js";
+import { generateEvidenceInBackground } from "./services/evidence/evidence-pipeline.js";
+import {
+  createArtifactFromUpload,
+  canReadArtifact,
+  MAX_UPLOAD_BYTES,
+  UploadAuthError,
+  UploadValidationError,
+} from "./services/artifact/artifact-service.js";
+import { resolveArtifactPath } from "./services/artifact/artifact-storage.js";
+import { analyzeArtifactInBackground } from "./services/artifact/artifact-analyzer.js";
+import { Artifact, ArtifactType } from "./entities/Artifact.js";
+import { Student } from "./entities/Student.js";
 import { typeDefs } from "./types/schema.js";
 import { resolvers } from "./resolvers/index.js";
 import type { GraphQLContext } from "./types/context.js";
@@ -29,11 +42,11 @@ import type { GraphQLContext } from "./types/context.js";
 const app = express();
 const PORT = parseInt(process.env.PORT || "4000", 10);
 
-// Upload size cap — multer rejects anything larger with LIMIT_FILE_SIZE,
+// CSV upload size cap — multer rejects anything larger with LIMIT_FILE_SIZE,
 // which the upload error handler maps to a 413 with a human-readable message.
 const UPLOAD_MAX_BYTES = 250 * 1024 * 1024;
 
-// File upload middleware — streams uploads to disk so we never hold the
+// CSV upload middleware — streams uploads to disk so we never hold the
 // full file in RAM. Temp files land in data/uploads/tmp/ and are either
 // moved to their final location (on successful commit) or deleted (on
 // preview completion / commit failure / any other error).
@@ -79,6 +92,14 @@ async function cleanupTempUpload(filePath: string | undefined): Promise<void> {
     }
   }
 }
+
+// Separate upload middleware for artifact files (PDF/DOCX), capped at
+// 20 MB per the Phase 3 spec. Kept distinct from the CSV uploader so
+// the limits are visible at the mount point.
+const artifactUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_UPLOAD_BYTES },
+});
 
 // Allow the dev URL, the production Railway URL, and any extra origins
 // supplied via the ALLOWED_ORIGINS env var (comma-separated).
@@ -207,6 +228,16 @@ app.post(
         }
       );
 
+      // Fire-and-forget narrative evidence generation (Phase 2).
+      // Runs after reflection classification kicks off — both are independent
+      // background tasks that don't block the upload response.
+      void generateEvidenceInBackground(
+        result.newUserCommentIds,
+        institutionId
+      ).catch((err) => {
+        console.error("[evidence] background generation failed:", err);
+      });
+
       res.json(result);
     } catch (err) {
       next(err);
@@ -271,6 +302,161 @@ app.use(
 function formatBytes(bytes: number): string {
   const mb = bytes / (1024 * 1024);
   return mb >= 1 ? `${Math.round(mb)} MB` : `${bytes} bytes`;
+}
+
+// ── Artifact endpoints ───────────────────────────────────────────
+
+// Upload a PDF or DOCX artifact. Faculty supply `studentId` explicitly
+// in the form; students may only upload for themselves (the route looks
+// up their Student record by user id).
+app.post(
+  "/api/artifacts/upload",
+  requireAuth,
+  artifactUpload.single("file"),
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.file) {
+        res.status(400).json({ error: "No file provided" });
+        return;
+      }
+      if (!req.user?.id) {
+        res.status(401).json({ error: "Not authenticated" });
+        return;
+      }
+
+      // Student uploads: auto-resolve the Student record from the signed-in user.
+      let studentId: string | undefined = req.body?.studentId?.trim() || undefined;
+      if (req.user.role === "student") {
+        const studentRepo = AppDataSource.getRepository(Student);
+        const student = await studentRepo.findOne({
+          where: { userId: req.user.id },
+        });
+        if (!student) {
+          res
+            .status(400)
+            .json({ error: "No student record linked to your account" });
+          return;
+        }
+        // A student cannot upload on behalf of anyone else.
+        studentId = student.id;
+      }
+
+      const courseId: string | undefined = req.body?.courseId?.trim() || undefined;
+      const assignmentId: string | null =
+        req.body?.assignmentId?.trim() || null;
+      const title: string | null = req.body?.title?.trim() || null;
+      const rawType = (req.body?.type as string | undefined)?.toUpperCase();
+      const type =
+        rawType && rawType in ArtifactType
+          ? (ArtifactType[rawType as keyof typeof ArtifactType] as ArtifactType)
+          : ArtifactType.PAPER;
+
+      if (!studentId || !courseId) {
+        res.status(400).json({ error: "studentId and courseId are required" });
+        return;
+      }
+
+      const result = await createArtifactFromUpload({
+        userId: req.user.id,
+        buffer: req.file.buffer,
+        filename: req.file.originalname,
+        mimeType: req.file.mimetype,
+        studentId,
+        courseId,
+        assignmentId,
+        type,
+        title,
+      });
+
+      // Fire-and-forget analysis (same pattern as CSV upload's
+      // reflection/evidence hooks). The artifact is already in PROCESSING;
+      // the analyzer flips it to ANALYZED or FAILED when done.
+      void analyzeArtifactInBackground(result.id).catch((err) => {
+        console.error(
+          `[artifact] background analysis crashed for ${result.id}:`,
+          err
+        );
+      });
+
+      res.json(result);
+    } catch (err) {
+      if (err instanceof UploadValidationError) {
+        res.status(400).json({ error: err.message });
+        return;
+      }
+      if (err instanceof UploadAuthError) {
+        res.status(403).json({ error: err.message });
+        return;
+      }
+      console.error("Artifact upload error:", err);
+      res.status(500).json({ error: "Failed to upload artifact" });
+    }
+  }
+);
+
+// Download the original file for an artifact. Auth gate mirrors the
+// upload rules: students only see their own artifacts, instructors
+// need a CourseAccess row, admins can see anything in their institution.
+app.get(
+  "/api/artifacts/:id/download",
+  requireAuth,
+  async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.user?.id) {
+        res.status(401).json({ error: "Not authenticated" });
+        return;
+      }
+
+      const artifactId = String(req.params.id);
+      const artifactRepo = AppDataSource.getRepository(Artifact);
+      const artifact = await artifactRepo.findOne({
+        where: { id: artifactId },
+      });
+      if (!artifact) {
+        res.status(404).json({ error: "Artifact not found" });
+        return;
+      }
+      if (!artifact.storagePath) {
+        res.status(404).json({ error: "Artifact has no stored file" });
+        return;
+      }
+
+      const allowed = await canReadArtifact(
+        { id: req.user.id, role: req.user.role, institutionId: req.user.institutionId },
+        artifact
+      );
+      if (!allowed) {
+        res.status(403).json({ error: "Not authorized" });
+        return;
+      }
+
+      const absolutePath = resolveArtifactPath(artifact.storagePath);
+      const downloadName = artifact.title
+        ? `${artifact.title}${getExtension(artifact.mimeType)}`
+        : `artifact-${artifact.id}${getExtension(artifact.mimeType)}`;
+      res.download(absolutePath, downloadName, (err) => {
+        if (err) {
+          console.error("Artifact download error:", err);
+          if (!res.headersSent) {
+            res.status(500).json({ error: "Failed to read artifact file" });
+          }
+        }
+      });
+    } catch (err) {
+      console.error("Artifact download error:", err);
+      res.status(500).json({ error: "Failed to download artifact" });
+    }
+  }
+);
+
+function getExtension(mimeType: string | null): string {
+  if (mimeType === "application/pdf") return ".pdf";
+  if (
+    mimeType ===
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  )
+    return ".docx";
+  return "";
 }
 
 // ── GraphQL API ──────────────────────────────────────────────────
@@ -376,6 +562,7 @@ async function main() {
     }
 
     await seedToriTags();
+    await seedToriFrameworks();
 
     // Bootstrap: promote a user to digication_admin if BOOTSTRAP_ADMIN_EMAIL
     // is set. This solves the chicken-and-egg problem where no admin exists

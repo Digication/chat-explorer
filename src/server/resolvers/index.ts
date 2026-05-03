@@ -11,6 +11,8 @@ import { consentResolvers } from "./consent.js";
 import { exportResolvers } from "./export.js";
 import { adminResolvers } from "./admin.js";
 import { telemetryResolvers } from "./telemetry.js";
+import { studentAuthResolvers } from "./student-auth.js";
+import { artifactResolvers } from "./artifact.js";
 
 /**
  * Merges all resolver groups into a single resolver map.
@@ -26,6 +28,8 @@ export const resolvers = {
     ...exportResolvers.Query,
     ...adminResolvers.Query,
     ...telemetryResolvers.Query,
+    ...studentAuthResolvers.Query,
+    ...artifactResolvers.Query,
 
     // Reference data
     toriTags: async () => {
@@ -50,6 +54,8 @@ export const resolvers = {
     ...adminResolvers.Mutation,
     ...institutionResolvers.Mutation,
     ...telemetryResolvers.Mutation,
+    ...studentAuthResolvers.Mutation,
+    ...artifactResolvers.Mutation,
   },
 
   // Field resolvers
@@ -62,4 +68,6 @@ export const resolvers = {
   Student: courseResolvers.Student,
   ChatSession: chatResolvers.ChatSession,
   ChatMessage: chatResolvers.ChatMessage,
+  Artifact: artifactResolvers.Artifact,
+  ArtifactSection: artifactResolvers.ArtifactSection,
 };

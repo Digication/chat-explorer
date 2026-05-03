@@ -1,13 +1,18 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
-import { useQuery } from "@apollo/client/react";
+import { useQuery, useMutation } from "@apollo/client/react";
+import { useNavigate } from "react-router";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
 import Skeleton from "@mui/material/Skeleton";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
+import CircularProgress from "@mui/material/CircularProgress";
 import CloseIcon from "@mui/icons-material/Close";
+import BookmarkAddOutlinedIcon from "@mui/icons-material/BookmarkAddOutlined";
 import { GET_THREAD_BY_ID } from "@/lib/queries/explorer";
+import { WRAP_THREAD_AS_ARTIFACT } from "@/lib/queries/artifact";
 import CommentCard from "@/components/explorer/CommentCard";
 import ToriFilters from "@/components/explorer/ToriFilters";
 import { useUserSettings } from "@/lib/UserSettingsContext";
@@ -27,13 +32,34 @@ interface ThreadPanelProps {
 }
 
 export default function ThreadPanel({ threadId, studentName, onClose, embedded, onStudentClick, studentId, initialToriTag }: ThreadPanelProps) {
+  const navigate = useNavigate();
   const { getDisplayName } = useUserSettings();
   const [activeFilters, setActiveFilters] = useState<string[]>(
     initialToriTag ? [initialToriTag] : []
   );
+  const [wrapError, setWrapError] = useState<string | null>(null);
   const { data, loading, error, refetch } = useQuery<any>(GET_THREAD_BY_ID, {
     variables: { id: threadId },
   });
+
+  // Wrap the thread as a CONVERSATION artifact — idempotent, so safe
+  // to call even if one already exists.
+  const [wrapThread, { loading: wrapping }] = useMutation(
+    WRAP_THREAD_AS_ARTIFACT,
+    {
+      onCompleted: (result: unknown) => {
+        const id = (result as { wrapThreadAsArtifact?: { id?: string } })
+          .wrapThreadAsArtifact?.id;
+        if (id) navigate(`/artifacts/${id}`);
+      },
+      onError: (err) => setWrapError(err.message),
+    }
+  );
+
+  const handleWrap = () => {
+    setWrapError(null);
+    void wrapThread({ variables: { threadId } });
+  };
 
   const thread = data?.thread;
 
@@ -130,10 +156,37 @@ export default function ThreadPanel({ threadId, studentName, onClose, embedded, 
             </Typography>
           )}
         </Box>
+        <Tooltip title="Save this conversation as an artifact">
+          <span>
+            <IconButton
+              size="small"
+              onClick={handleWrap}
+              disabled={wrapping || !thread}
+              aria-label="Save conversation as artifact"
+            >
+              {wrapping ? (
+                <CircularProgress size={16} />
+              ) : (
+                <BookmarkAddOutlinedIcon fontSize="small" />
+              )}
+            </IconButton>
+          </span>
+        </Tooltip>
         <IconButton size="small" onClick={onClose} aria-label="Close thread panel">
           <CloseIcon fontSize="small" />
         </IconButton>
       </Box>
+
+      {/* Wrap-as-artifact error banner */}
+      {wrapError && (
+        <Alert
+          severity="error"
+          onClose={() => setWrapError(null)}
+          sx={{ mx: 2, mt: 1 }}
+        >
+          Could not save as artifact: {wrapError}
+        </Alert>
+      )}
 
       {/* TORI tag filter bar */}
       {availableTags.length > 0 && (
