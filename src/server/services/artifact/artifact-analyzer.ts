@@ -1,19 +1,18 @@
 /**
  * Artifact analyzer — the background task that feeds each artifact's
- * sections through the Phase 2 narrative generator and writes
- * EvidenceMoment + EvidenceOutcomeLink rows keyed to sectionId (not
- * commentId).
+ * sections through the narrative generator and writes EvidenceMoment +
+ * EvidenceOutcomeLink rows keyed to artifactSectionId.
  *
  * Called fire-and-forget from the upload route, same pattern as
  * `generateEvidenceInBackground`. On success we flip
  * `artifact.status` to ANALYZED; on failure we flip to FAILED and
  * populate `errorMessage` so the UI can surface the problem.
  *
- * Implementation trick: the existing `generateNarrativeBatch` keys its
- * input and output on `commentId`. Rather than fork the prompt code,
- * we pass section ids in the `commentId` field and translate the
- * response back to sectionId at save time. The LLM simply echoes the
- * id we gave it, so this is a safe opaque-handle trick.
+ * The narrative generator's input/output schema uses an opaque
+ * `sourceId` (Phase 2 passes Comment ids; this module passes
+ * ArtifactSection ids). The generator does not interpret it — see
+ * `narrative-generator.ts` types. EvidenceMoment rows produced here
+ * populate `artifactSectionId` and leave `commentId` null.
  */
 
 import { AppDataSource } from "../../data-source.js";
@@ -182,10 +181,10 @@ async function runAnalysis(artifact: Artifact): Promise<void> {
   }));
 
   // ── 4. Build narrative inputs from sections ───────────────────────
-  // We slot section ids into the commentId field — the LLM echoes them
-  // back unchanged and we translate on save.
+  // The generator's `sourceId` field is opaque — we pass section ids
+  // here. The LLM echoes them back as `sourceId` in the output.
   const sectionInputs: NarrativeInputComment[] = todo.map((s) => ({
-    commentId: s.id,
+    sourceId: s.id,
     studentId: artifact.studentId,
     text: s.content,
     threadName: combineTitle(artifact.title, s.title),
@@ -243,8 +242,9 @@ async function runAnalysis(artifact: Artifact): Promise<void> {
 
 /**
  * Persist narrative results as EvidenceMoment + EvidenceOutcomeLink
- * rows. The results reference section ids (via the opaque-handle trick)
- * which we translate back to `artifactSectionId` on write.
+ * rows. Each result's `sourceId` is the ArtifactSection id (set in the
+ * input), which we write to `artifactSectionId`. `commentId` is left
+ * null for artifact-derived moments.
  */
 async function saveArtifactEvidence(
   results: Awaited<ReturnType<typeof generateNarrativeBatch>>,
@@ -253,7 +253,7 @@ async function saveArtifactEvidence(
 ): Promise<void> {
   await AppDataSource.transaction(async (manager) => {
     for (const result of results) {
-      const section = sectionById.get(result.commentId);
+      const section = sectionById.get(result.sourceId);
       if (!section) continue; // LLM echoed an unknown id — skip
 
       const moment = await manager.save(

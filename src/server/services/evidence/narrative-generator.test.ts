@@ -37,7 +37,7 @@ function makeInput(
   return {
     comments: [
       {
-        commentId: "c1",
+        sourceId: "c1",
         studentId: "s1",
         text: "I learned to debug by stepping through the code line by line.",
         threadName: "Week 3 Reflection",
@@ -65,7 +65,7 @@ function makeInput(
 }
 
 function makeLlmResponse(items: Array<{
-  commentId: string;
+  sourceId: string;
   narrative: string;
   outcomeAlignments?: Array<{
     outcomeCode: string;
@@ -84,7 +84,7 @@ describe("generateNarrativeBatch — happy paths", () => {
     mockSendChat.mockResolvedValueOnce(
       makeLlmResponse([
         {
-          commentId: "c1",
+          sourceId: "c1",
           narrative: "The student demonstrates a methodical approach to debugging.",
           outcomeAlignments: [
             {
@@ -99,7 +99,7 @@ describe("generateNarrativeBatch — happy paths", () => {
 
     const results = await generateNarrativeBatch(input);
     expect(results).toHaveLength(1);
-    expect(results[0].commentId).toBe("c1");
+    expect(results[0].sourceId).toBe("c1");
     expect(results[0].narrative).toContain("methodical approach");
     expect(results[0].outcomeAlignments).toHaveLength(1);
     expect(results[0].outcomeAlignments[0].outcomeDefinitionId).toBe("out-1");
@@ -113,7 +113,7 @@ describe("generateNarrativeBatch — happy paths", () => {
     const input = makeInput({
       comments: [
         {
-          commentId: "c1",
+          sourceId: "c1",
           studentId: "s1",
           text: "Comment one",
           threadName: "T1",
@@ -122,7 +122,7 @@ describe("generateNarrativeBatch — happy paths", () => {
           reflectionCategory: null,
         },
         {
-          commentId: "c2",
+          sourceId: "c2",
           studentId: "s2",
           text: "Comment two",
           threadName: "T2",
@@ -135,12 +135,12 @@ describe("generateNarrativeBatch — happy paths", () => {
     mockSendChat.mockResolvedValueOnce(
       makeLlmResponse([
         {
-          commentId: "c1",
+          sourceId: "c1",
           narrative: "First narrative.",
           outcomeAlignments: [],
         },
         {
-          commentId: "c2",
+          sourceId: "c2",
           narrative: "Second narrative.",
           outcomeAlignments: [
             {
@@ -155,9 +155,9 @@ describe("generateNarrativeBatch — happy paths", () => {
 
     const results = await generateNarrativeBatch(input);
     expect(results).toHaveLength(2);
-    expect(results[0].commentId).toBe("c1");
+    expect(results[0].sourceId).toBe("c1");
     expect(results[0].outcomeAlignments).toHaveLength(0);
-    expect(results[1].commentId).toBe("c2");
+    expect(results[1].sourceId).toBe("c2");
     expect(results[1].outcomeAlignments[0].outcomeDefinitionId).toBe("out-2");
   });
 
@@ -175,7 +175,7 @@ describe("generateNarrativeBatch — happy paths", () => {
       mockSendChat.mockResolvedValueOnce(
         makeLlmResponse([
           {
-            commentId: "c1",
+            sourceId: "c1",
             narrative: `Narrative for ${level}.`,
             outcomeAlignments: [
               {
@@ -200,7 +200,7 @@ describe("generateNarrativeBatch — JSON extraction", () => {
   it("strips ```json fences", async () => {
     const input = makeInput();
     mockSendChat.mockResolvedValueOnce(
-      '```json\n[{"commentId":"c1","narrative":"Fenced narrative.","outcomeAlignments":[]}]\n```'
+      '```json\n[{"sourceId":"c1","narrative":"Fenced narrative.","outcomeAlignments":[]}]\n```'
     );
     const results = await generateNarrativeBatch(input);
     expect(results).toHaveLength(1);
@@ -210,7 +210,7 @@ describe("generateNarrativeBatch — JSON extraction", () => {
   it("tolerates prose around JSON array", async () => {
     const input = makeInput();
     mockSendChat.mockResolvedValueOnce(
-      'Here is the analysis:\n[{"commentId":"c1","narrative":"Surrounded by prose.","outcomeAlignments":[]}]\nHope that helps!'
+      'Here is the analysis:\n[{"sourceId":"c1","narrative":"Surrounded by prose.","outcomeAlignments":[]}]\nHope that helps!'
     );
     const results = await generateNarrativeBatch(input);
     expect(results).toHaveLength(1);
@@ -220,7 +220,7 @@ describe("generateNarrativeBatch — JSON extraction", () => {
   it("strips bare ``` fences (no json tag)", async () => {
     const input = makeInput();
     mockSendChat.mockResolvedValueOnce(
-      '```\n[{"commentId":"c1","narrative":"Bare fence.","outcomeAlignments":[]}]\n```'
+      '```\n[{"sourceId":"c1","narrative":"Bare fence.","outcomeAlignments":[]}]\n```'
     );
     const results = await generateNarrativeBatch(input);
     expect(results).toHaveLength(1);
@@ -235,12 +235,12 @@ describe("generateNarrativeBatch — validation", () => {
     mockSendChat.mockResolvedValueOnce(
       makeLlmResponse([
         {
-          commentId: "c1",
+          sourceId: "c1",
           narrative: "Valid entry.",
           outcomeAlignments: [],
         },
         {
-          commentId: "HALLUCINATED",
+          sourceId: "HALLUCINATED",
           narrative: "Should be dropped.",
           outcomeAlignments: [],
         },
@@ -248,14 +248,14 @@ describe("generateNarrativeBatch — validation", () => {
     );
     const results = await generateNarrativeBatch(input);
     expect(results).toHaveLength(1);
-    expect(results[0].commentId).toBe("c1");
+    expect(results[0].sourceId).toBe("c1");
   });
 
   it("drops entries with empty narrative", async () => {
     const input = makeInput();
     mockSendChat.mockResolvedValueOnce(
       makeLlmResponse([
-        { commentId: "c1", narrative: "", outcomeAlignments: [] },
+        { sourceId: "c1", narrative: "", outcomeAlignments: [] },
       ])
     );
     const results = await generateNarrativeBatch(input);
@@ -268,7 +268,7 @@ describe("generateNarrativeBatch — validation", () => {
     mockSendChat.mockResolvedValueOnce(
       makeLlmResponse([
         {
-          commentId: "c1",
+          sourceId: "c1",
           narrative: longNarrative,
           outcomeAlignments: [],
         },
@@ -283,7 +283,7 @@ describe("generateNarrativeBatch — validation", () => {
     mockSendChat.mockResolvedValueOnce(
       makeLlmResponse([
         {
-          commentId: "c1",
+          sourceId: "c1",
           narrative: "Valid narrative.",
           outcomeAlignments: [
             {
@@ -310,7 +310,7 @@ describe("generateNarrativeBatch — validation", () => {
     mockSendChat.mockResolvedValueOnce(
       makeLlmResponse([
         {
-          commentId: "c1",
+          sourceId: "c1",
           narrative: "Valid narrative.",
           outcomeAlignments: [
             {
@@ -331,7 +331,7 @@ describe("generateNarrativeBatch — validation", () => {
     mockSendChat.mockResolvedValueOnce(
       makeLlmResponse([
         {
-          commentId: "c1",
+          sourceId: "c1",
           narrative: "Narrative without alignments is still useful.",
           outcomeAlignments: [
             {
@@ -355,7 +355,7 @@ describe("generateNarrativeBatch — validation", () => {
     mockSendChat.mockResolvedValueOnce(
       makeLlmResponse([
         {
-          commentId: "c1",
+          sourceId: "c1",
           narrative: "Valid.",
           outcomeAlignments: [
             {
@@ -377,7 +377,7 @@ describe("generateNarrativeBatch — validation", () => {
 describe("generateNarrativeBatch — error handling", () => {
   it("throws NarrativeError if batch exceeds MAX_BATCH_SIZE", async () => {
     const comments = Array.from({ length: MAX_BATCH_SIZE + 1 }, (_, i) => ({
-      commentId: `c${i}`,
+      sourceId: `c${i}`,
       studentId: "s1",
       text: "Text",
       threadName: "T",
@@ -398,7 +398,7 @@ describe("generateNarrativeBatch — error handling", () => {
       generateNarrativeBatch({
         comments: [
           {
-            commentId: "c1",
+            sourceId: "c1",
             studentId: "s1",
             text: "Text",
             threadName: "T",
@@ -427,7 +427,7 @@ describe("generateNarrativeBatch — error handling", () => {
     mockSendChat.mockResolvedValueOnce(
       makeLlmResponse([
         {
-          commentId: "c1",
+          sourceId: "c1",
           narrative: "Retry succeeded.",
           outcomeAlignments: [],
         },
@@ -456,7 +456,7 @@ describe("generateNarrativeBatch — error handling", () => {
     mockSendChat.mockResolvedValueOnce(
       makeLlmResponse([
         {
-          commentId: "c1",
+          sourceId: "c1",
           narrative: "Retry worked.",
           outcomeAlignments: [],
         },

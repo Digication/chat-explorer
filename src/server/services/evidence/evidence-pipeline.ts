@@ -146,15 +146,33 @@ export async function generateEvidenceInBackground(
   }));
 
   // ── 5. Build input comments ───────────────────────────────────────
-  const inputComments: NarrativeInputComment[] = todo.map((c) => ({
-    commentId: c.id,
-    studentId: (c as any).thread?.studentId ?? "",
-    text: c.text,
-    threadName: (c as any).thread?.name ?? "",
-    assignmentDescription: (c as any).thread?.assignment?.description ?? null,
-    toriTags: tagsByComment.get(c.id) ?? [],
-    reflectionCategory: reflectionByComment.get(c.id) ?? null,
-  }));
+  // sourceId is the Comment's id for Phase 2 — the analyzer side
+  // (artifact-analyzer.ts) passes ArtifactSection ids into the same
+  // shape. The narrative generator does not interpret either.
+  //
+  // studentId lives on Comment, NOT on Thread (Thread has no studentId
+  // column — see src/server/entities/Thread.ts). Comments without a
+  // studentId are skipped: those are typically system messages or
+  // historical rows that pre-date the studentId backfill, and we have
+  // no evidence anchor for them.
+  const inputComments: NarrativeInputComment[] = todo
+    .filter((c) => Boolean(c.studentId))
+    .map((c) => ({
+      sourceId: c.id,
+      studentId: c.studentId as string,
+      text: c.text,
+      threadName: (c as any).thread?.name ?? "",
+      assignmentDescription:
+        (c as any).thread?.assignment?.description ?? null,
+      toriTags: tagsByComment.get(c.id) ?? [],
+      reflectionCategory: reflectionByComment.get(c.id) ?? null,
+    }));
+  if (inputComments.length === 0) {
+    console.log(
+      `[evidence] no comments with studentId to process (${todo.length} skipped)`
+    );
+    return;
+  }
 
   // ── 6. Batch and process ──────────────────────────────────────────
   console.log(
@@ -203,26 +221,28 @@ async function saveEvidenceResults(
   inputComments: NarrativeInputComment[],
   institutionId: string
 ): Promise<void> {
-  // Build a lookup for studentId from the input
-  const studentIdByComment = new Map<string, string>();
+  // Build a lookup for studentId from the input. sourceId here is the
+  // Comment id (set by the caller above) — Phase 2 owns the comment
+  // mapping; the generator does not.
+  const studentIdBySource = new Map<string, string>();
   for (const c of inputComments) {
-    studentIdByComment.set(c.commentId, c.studentId);
+    studentIdBySource.set(c.sourceId, c.studentId);
   }
 
   await AppDataSource.transaction(async (manager) => {
     for (const result of results) {
-      const studentId = studentIdByComment.get(result.commentId);
+      const studentId = studentIdBySource.get(result.sourceId);
       if (!studentId) continue;
 
       // Find the source text from the input
       const inputComment = inputComments.find(
-        (c) => c.commentId === result.commentId
+        (c) => c.sourceId === result.sourceId
       );
 
       const moment = await manager.save(
         manager.getRepository(EvidenceMoment).create({
           studentId,
-          commentId: result.commentId,
+          commentId: result.sourceId, // Phase 2: sourceId IS the comment id
           narrative: result.narrative,
           sourceText: inputComment?.text ?? "",
           type: EvidenceType.TORI,

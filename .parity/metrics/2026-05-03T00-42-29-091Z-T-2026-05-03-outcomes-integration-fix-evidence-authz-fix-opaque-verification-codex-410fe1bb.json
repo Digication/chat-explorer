@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-05-03T00:42:29.091Z",
+  "run_id": "2026-05-03T00-42-29-088Z-410fe1bb",
+  "task_id": "T-2026-05-03-outcomes-integration-fix-evidence-authz-fix-opaque",
+  "phase": "verification",
+  "reviewer": "codex",
+  "sha": "STAGED",
+  "findings_raised": 1,
+  "exit_status": 0,
+  "findings_resolutions": {
+    "finding-1": {
+      "verdict": "upheld",
+      "annotated_at": "2026-05-03T00:57:03.681Z",
+      "reason": "Addressed in round 2 via the shared computeSourceNarrowing/buildSourceFilter helper. getStudentEvidenceMoments now applies the narrowing clause (em.commentId IN allowed-comments OR em.artifactSectionId IN allowed-sections) when scope.courseId or scope.assignmentId is set. The same helper was applied to getEvidenceSummary in round 3 (after Codex flagged the parallel leak in that function). Verified by 9 unit tests + 3 integration tests; full suite 448/448 green. Codex round-3 followup confirmed zero findings on the staged diff.",
+      "resolved_by": "@Claude",
+      "resolver_role": "Driver"
+    }
+  }
+}

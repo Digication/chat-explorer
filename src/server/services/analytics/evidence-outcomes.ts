@@ -53,6 +53,106 @@ export interface StudentEvidenceResult {
   totalCount: number;
 }
 
+// ── Source-narrowing helper ─────────────────────────────────────────
+//
+// At narrow scope (courseId or assignmentId set), evidence moments must
+// be additionally constrained to sources whose Comment or
+// ArtifactSection actually sits in the scope — otherwise a course-
+// scoped query would include the same student's moments from any other
+// course they're enrolled in.
+//
+// Returns:
+//  - `narrowed=false` (institution-only scope) → no additional filter;
+//    consent is the only gate.
+//  - `narrowed=true, allowedCommentIds + allowedSectionIds` → caller
+//    should add `(em.commentId IN (...) OR em.artifactSectionId IN (...))`
+//    to its query. If both arrays are empty, the caller MUST short-
+//    circuit to an empty result without issuing the moments query.
+
+interface SourceNarrowing {
+  narrowed: boolean;
+  allowedCommentIds: string[];
+  allowedSectionIds: string[];
+}
+
+async function computeSourceNarrowing(
+  scope: AnalyticsScope,
+  resolved: { comments: Array<{ id: string; studentId: string | null }> },
+  options: { studentIdFilter?: string } = {}
+): Promise<SourceNarrowing> {
+  const narrowed = Boolean(scope.courseId || scope.assignmentId);
+  if (!narrowed) {
+    return { narrowed: false, allowedCommentIds: [], allowedSectionIds: [] };
+  }
+
+  // Comment ids that are in-scope. resolveScope already enforces
+  // course/assignment for Comments. Optionally narrow to one student
+  // (used by getStudentEvidenceMoments).
+  const allowedCommentIds = resolved.comments
+    .filter(
+      (c) =>
+        !options.studentIdFilter ||
+        c.studentId === options.studentIdFilter
+    )
+    .map((c) => c.id);
+
+  // ArtifactSection ids that are in-scope: sections of artifacts whose
+  // courseId/assignmentId match the scope. Optionally narrow to one
+  // student.
+  const sectionQb = AppDataSource.getRepository("ArtifactSection")
+    .createQueryBuilder("asec")
+    .innerJoin("artifact", "art", 'art.id = asec."artifactId"')
+    .select(["asec.id"]);
+  if (options.studentIdFilter) {
+    sectionQb.andWhere('art."studentId" = :studentId', {
+      studentId: options.studentIdFilter,
+    });
+  }
+  if (scope.courseId) {
+    sectionQb.andWhere('art."courseId" = :courseId', {
+      courseId: scope.courseId,
+    });
+  }
+  if (scope.assignmentId) {
+    sectionQb.andWhere('art."assignmentId" = :assignmentId', {
+      assignmentId: scope.assignmentId,
+    });
+  }
+  const rows = await sectionQb.getRawMany();
+  const allowedSectionIds = rows.map((r) => r.asec_id ?? r.id);
+
+  return { narrowed: true, allowedCommentIds, allowedSectionIds };
+}
+
+/**
+ * Build the andWhere expression + params for a SourceNarrowing.
+ * Returns null when the narrowing is not applicable (institution scope)
+ * or both allowed lists are empty (caller should short-circuit).
+ */
+function buildSourceFilter(
+  s: SourceNarrowing
+): { clause: string; params: Record<string, unknown> } | null {
+  if (!s.narrowed) return null;
+  const parts: string[] = [];
+  const params: Record<string, unknown> = {};
+  if (s.allowedCommentIds.length > 0) {
+    parts.push('em."commentId" IN (:...allowedCommentIds)');
+    params.allowedCommentIds = s.allowedCommentIds;
+  }
+  if (s.allowedSectionIds.length > 0) {
+    parts.push('em."artifactSectionId" IN (:...allowedSectionIds)');
+    params.allowedSectionIds = s.allowedSectionIds;
+  }
+  if (parts.length === 0) {
+    // Narrow scope but no allowed sources — return a clause that
+    // matches nothing so the caller can keep its query shape simple
+    // without a separate short-circuit branch (still useful to short-
+    // circuit when possible, since this clause forces a 0-row scan).
+    return { clause: "1=0", params };
+  }
+  return { clause: `(${parts.join(" OR ")})`, params };
+}
+
 // ── Evidence Summary ────────────────────────────────────────────────
 
 /**
@@ -65,6 +165,14 @@ export async function getEvidenceSummary(
   const cacheKey = `evidence-summary:${JSON.stringify(scope)}`;
   const resolved = await resolveScope(scope);
   const consentedIds = resolved.consentedStudentIds;
+
+  // Source narrowing for course/assignment-scoped summaries — without
+  // this, a course-scoped roll-up would count any consented student's
+  // moments across all of their courses (cross-course leak). At
+  // institution scope the narrowing is not applied; consent is the
+  // only gate.
+  const narrowing = await computeSourceNarrowing(scope, resolved);
+  const sourceFilter = buildSourceFilter(narrowing);
 
   const { data, cached } = await withCache(cacheKey, scope, async () => {
     // Load the TORI framework for this institution
@@ -95,11 +203,22 @@ export async function getEvidenceSummary(
       order: { sortOrder: "ASC" },
     });
 
+    // Helper to apply the source filter to an EvidenceMoment-derived
+    // query that already has `em.studentId IN (...)` and isLatest set.
+    const applySourceFilter = <T extends { andWhere: Function }>(qb: T): T => {
+      if (sourceFilter) {
+        qb.andWhere(sourceFilter.clause, sourceFilter.params);
+      }
+      return qb;
+    };
+
     // Count evidence moments for consented students in scope
-    const momentQb = AppDataSource.getRepository(EvidenceMoment)
-      .createQueryBuilder("em")
-      .where("em.studentId IN (:...studentIds)", { studentIds: consentedIds })
-      .andWhere("em.isLatest = true");
+    const momentQb = applySourceFilter(
+      AppDataSource.getRepository(EvidenceMoment)
+        .createQueryBuilder("em")
+        .where("em.studentId IN (:...studentIds)", { studentIds: consentedIds })
+        .andWhere("em.isLatest = true")
+    );
 
     const totalMoments = await momentQb.getCount();
 
@@ -125,11 +244,16 @@ export async function getEvidenceSummary(
     }
 
     // Get alignment counts grouped by outcome + strength level
-    const alignmentRows = await AppDataSource.getRepository(EvidenceOutcomeLink)
-      .createQueryBuilder("eol")
-      .innerJoin("eol.evidenceMoment", "em")
-      .where("em.studentId IN (:...studentIds)", { studentIds: consentedIds })
-      .andWhere("em.isLatest = true")
+    const alignmentQb = applySourceFilter(
+      AppDataSource.getRepository(EvidenceOutcomeLink)
+        .createQueryBuilder("eol")
+        .innerJoin("eol.evidenceMoment", "em")
+        .where("em.studentId IN (:...studentIds)", {
+          studentIds: consentedIds,
+        })
+        .andWhere("em.isLatest = true")
+    );
+    const alignmentRows = await alignmentQb
       .select([
         'eol."outcomeDefinitionId" AS "outcomeDefinitionId"',
         'eol."strengthLevel" AS "strengthLevel"',
@@ -140,13 +264,16 @@ export async function getEvidenceSummary(
       .getRawMany();
 
     // Get distinct student counts per outcome
-    const studentCountRows = await AppDataSource.getRepository(
-      EvidenceOutcomeLink
-    )
-      .createQueryBuilder("eol")
-      .innerJoin("eol.evidenceMoment", "em")
-      .where("em.studentId IN (:...studentIds)", { studentIds: consentedIds })
-      .andWhere("em.isLatest = true")
+    const studentCountQb = applySourceFilter(
+      AppDataSource.getRepository(EvidenceOutcomeLink)
+        .createQueryBuilder("eol")
+        .innerJoin("eol.evidenceMoment", "em")
+        .where("em.studentId IN (:...studentIds)", {
+          studentIds: consentedIds,
+        })
+        .andWhere("em.isLatest = true")
+    );
+    const studentCountRows = await studentCountQb
       .select([
         'eol."outcomeDefinitionId" AS "outcomeDefinitionId"',
         'COUNT(DISTINCT em."studentId") AS "studentCount"',
@@ -220,6 +347,26 @@ export async function getEvidenceSummary(
 /**
  * Returns the evidence moments for a specific student, with their
  * outcome alignments. Used for the student detail drill-down.
+ *
+ * Authorization (two layers):
+ *
+ *   1. Student-level — the caller must have already validated the
+ *      outer `scope` (via validateScope at the resolver). This function
+ *      additionally enforces that `studentId` falls inside
+ *      `scope.consentedStudentIds` — i.e., the student is in the
+ *      validated scope AND has not opted out via StudentConsent.
+ *
+ *   2. Source-level (course/assignment narrowing) — when scope narrows
+ *      below institution (courseId or assignmentId set), evidence
+ *      moments must additionally come from a Comment or ArtifactSection
+ *      that ALSO sits in that course/assignment. Without this, a course-
+ *      scoped caller would receive the same student's moments from any
+ *      other course they're enrolled in. We compute the in-scope
+ *      Comment ids from `resolved.comments` and the in-scope
+ *      ArtifactSection ids by joining ArtifactSection→Artifact and
+ *      filtering on the same scope predicates.
+ *
+ * Either guard returning empty short-circuits before the moments query.
  */
 export async function getStudentEvidenceMoments(
   scope: AnalyticsScope,
@@ -230,21 +377,43 @@ export async function getStudentEvidenceMoments(
   const safeLimit = Math.min(Math.max(limit, 1), 200);
   const safeOffset = Math.max(offset, 0);
 
+  // Layer 1: scope/consent guard.
+  const resolved = await resolveScope(scope);
+  if (!resolved.consentedStudentIds.includes(studentId)) {
+    return { moments: [], totalCount: 0 };
+  }
+
+  // Layer 2: source narrowing for course/assignment-scoped calls.
+  const narrowing = await computeSourceNarrowing(scope, resolved, {
+    studentIdFilter: studentId,
+  });
+  if (
+    narrowing.narrowed &&
+    narrowing.allowedCommentIds.length === 0 &&
+    narrowing.allowedSectionIds.length === 0
+  ) {
+    return { moments: [], totalCount: 0 };
+  }
+  const sourceFilter = buildSourceFilter(narrowing);
+
   // Count total
-  const totalCount = await AppDataSource.getRepository(EvidenceMoment)
+  const countQb = AppDataSource.getRepository(EvidenceMoment)
     .createQueryBuilder("em")
     .where("em.studentId = :studentId", { studentId })
-    .andWhere("em.isLatest = true")
-    .getCount();
+    .andWhere("em.isLatest = true");
+  if (sourceFilter) countQb.andWhere(sourceFilter.clause, sourceFilter.params);
+  const totalCount = await countQb.getCount();
 
   // Load moments with outcome links
-  const moments = await AppDataSource.getRepository(EvidenceMoment)
+  const momentsQb = AppDataSource.getRepository(EvidenceMoment)
     .createQueryBuilder("em")
     .leftJoinAndSelect("em.outcomeLinks", "eol")
     .leftJoin("eol.outcomeDefinition", "od")
     .addSelect(["od.code", "od.name"])
     .where("em.studentId = :studentId", { studentId })
-    .andWhere("em.isLatest = true")
+    .andWhere("em.isLatest = true");
+  if (sourceFilter) momentsQb.andWhere(sourceFilter.clause, sourceFilter.params);
+  const moments = await momentsQb
     .orderBy("em.processedAt", "DESC")
     .skip(safeOffset)
     .take(safeLimit)

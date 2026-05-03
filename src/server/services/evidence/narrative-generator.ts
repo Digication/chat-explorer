@@ -1,6 +1,12 @@
 /**
- * Narrative evidence generator — takes a batch of student comments and
- * produces interpretive narratives with outcome alignments using Gemini.
+ * Narrative evidence generator — takes a batch of text snippets (each
+ * tagged with a caller-supplied `sourceId`) and produces interpretive
+ * narratives with outcome alignments using Gemini.
+ *
+ * The `sourceId` is opaque to the generator — Phase 2 callers pass
+ * Comment ids; Phase 3 callers pass ArtifactSection ids. The generator
+ * just echoes the id back so the caller can correlate output to input
+ * without the generator having to understand source kinds.
  *
  * Follows the same patterns as the reflection classifier
  * (`src/server/services/reflection/classifier.ts`): Google LLM provider,
@@ -23,7 +29,13 @@ export const MAX_BATCH_SIZE = 5;
 // ────────────────────────────────────────────────────────────────────────────
 
 export interface NarrativeInputComment {
-  commentId: string;
+  /**
+   * Caller-supplied opaque identifier for this input. The generator
+   * does not interpret it — Phase 2 passes Comment ids, Phase 3 passes
+   * ArtifactSection ids. The LLM echoes it back as `sourceId` in the
+   * output so the caller can correlate.
+   */
+  sourceId: string;
   studentId: string;
   text: string;
   threadName: string;
@@ -51,7 +63,8 @@ export interface OutcomeAlignment {
 }
 
 export interface NarrativeOutput {
-  commentId: string;
+  /** Echoed back from the input — Phase 2 = comment id, Phase 3 = section id. */
+  sourceId: string;
   narrative: string;
   outcomeAlignments: OutcomeAlignment[];
 }
@@ -71,28 +84,29 @@ export class NarrativeError extends Error {
 // Prompt
 // ────────────────────────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `You are an expert educational assessment analyst. You generate concise narrative evidence summaries from student comments in higher education courses.
+const SYSTEM_PROMPT = `You are an expert educational assessment analyst. You generate concise narrative evidence summaries from student writing in higher education courses (chat reflections, paper sections, presentation slides, and similar).
 
-For each student comment, you will:
-1. Write a 2–3 sentence interpretive narrative (max 500 characters) that captures what the comment reveals about the student's learning, growth, or competency development. Do NOT just restate the comment — interpret its significance as evidence of learning.
+For each input, you will:
+1. Write a 2–3 sentence interpretive narrative (max 500 characters) that captures what the text reveals about the student's learning, growth, or competency development. Do NOT just restate the text — interpret its significance as evidence of learning.
 2. Assess alignment to the provided learning outcomes. For each relevant outcome, assign a strength level and a 1-sentence rationale.
 
 STRENGTH LEVELS (pick the highest one the evidence supports):
-- EMERGING — The comment hints at awareness of the outcome but shows no concrete demonstration.
-- DEVELOPING — The comment shows partial understanding or early application of the outcome.
-- DEMONSTRATING — The comment clearly shows competence in the outcome area.
-- EXEMPLARY — The comment shows sophisticated, transferable, or metacognitive mastery.
+- EMERGING — The text hints at awareness of the outcome but shows no concrete demonstration.
+- DEVELOPING — The text shows partial understanding or early application of the outcome.
+- DEMONSTRATING — The text clearly shows competence in the outcome area.
+- EXEMPLARY — The text shows sophisticated, transferable, or metacognitive mastery.
 
 RULES:
-- Only align to outcomes where the comment provides genuine evidence. Do NOT force alignments.
-- A comment may align to 0–3 outcomes. Most will align to 1–2.
+- Only align to outcomes where the text provides genuine evidence. Do NOT force alignments.
+- An input may align to 0–3 outcomes. Most will align to 1–2.
 - The "outcomeCode" in your response must exactly match one of the provided outcome codes.
+- The "sourceId" in your response must echo back the SOURCE ID we gave you for that input.
 - Return STRICT JSON only — no prose, no markdown fences, no explanation outside the JSON.
 
 OUTPUT FORMAT — return a JSON array:
 [
   {
-    "commentId": "<id>",
+    "sourceId": "<echoed back from input SOURCE ID>",
     "narrative": "<2-3 sentence narrative, max 500 chars>",
     "outcomeAlignments": [
       {
@@ -111,8 +125,8 @@ function buildUserPrompt(input: NarrativeInput): string {
 
   const commentsBlock = input.comments
     .map((c) => {
-      const parts = [`COMMENT ID: ${c.commentId}`];
-      parts.push(`THREAD: ${c.threadName}`);
+      const parts = [`SOURCE ID: ${c.sourceId}`];
+      parts.push(`CONTEXT: ${c.threadName}`);
       if (c.assignmentDescription) {
         parts.push(`ASSIGNMENT: ${c.assignmentDescription}`);
       }
@@ -130,10 +144,10 @@ function buildUserPrompt(input: NarrativeInput): string {
   return `AVAILABLE OUTCOMES:
 ${outcomesBlock}
 
-COMMENTS TO ANALYZE (${input.comments.length}):
+INPUTS TO ANALYZE (${input.comments.length}):
 ${commentsBlock}
 
-Return a JSON array with one entry per comment. JSON only, no prose.`;
+Return a JSON array with one entry per input. JSON only, no prose.`;
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -189,18 +203,21 @@ function parseAndValidateNarratives(
     codeToId.set(o.code, o.id);
   }
 
-  const commentIds = new Set(input.comments.map((c) => c.commentId));
+  const sourceIds = new Set(input.comments.map((c) => c.sourceId));
   const results: NarrativeOutput[] = [];
 
   for (const item of parsed) {
     const obj = item as Record<string, unknown>;
 
-    // Validate commentId
-    const commentId = obj.commentId;
-    if (typeof commentId !== "string" || !commentIds.has(commentId)) {
-      // Skip entries with unknown comment IDs — LLM hallucinated an ID
+    // Validate sourceId — accept legacy `commentId` from older prompt
+    // versions in case the LLM responds with the prior schema. New
+    // prompts ask for `sourceId`.
+    const rawId = (obj.sourceId ?? obj.commentId) as unknown;
+    if (typeof rawId !== "string" || !sourceIds.has(rawId)) {
+      // Skip entries with unknown ids — LLM hallucinated an ID
       continue;
     }
+    const sourceId = rawId;
 
     // Validate narrative
     let narrative = typeof obj.narrative === "string" ? obj.narrative.trim() : "";
@@ -238,11 +255,11 @@ function parseAndValidateNarratives(
       });
     }
 
-    results.push({ commentId, narrative, outcomeAlignments });
+    results.push({ sourceId, narrative, outcomeAlignments });
   }
 
-  // Every input comment should have a result. If some are missing, that's
-  // a partial success — we return what we got and let the caller decide.
+  // Every input should have a result. If some are missing, that's a
+  // partial success — we return what we got and let the caller decide.
   return results;
 }
 

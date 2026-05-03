@@ -106,7 +106,12 @@ beforeEach(() => {
 // ── Helpers ──────────────────────────────────────────────────────────
 
 function setupDefaultMocks(options?: {
-  comments?: Array<{ id: string; text: string; role?: string }>;
+  comments?: Array<{
+    id: string;
+    text: string;
+    role?: string;
+    studentId?: string | null;
+  }>;
   existingMomentIds?: string[];
   toriTags?: Array<{ commentId: string; tagName: string }>;
   reflections?: Array<{ commentId: string; category: string }>;
@@ -128,13 +133,16 @@ function setupDefaultMocks(options?: {
     ],
   } = options ?? {};
 
-  // Comment repo — returns comments with thread/assignment metadata
+  // Comment repo — returns comments with thread/assignment metadata.
+  // studentId lives on Comment (Thread has no studentId column). The
+  // Thread sub-object only carries name + assignment for prompt context.
   const commentQb = makeQb(
     comments.map((c) => ({
       id: c.id,
       text: c.text,
       role: c.role ?? "user",
-      thread: { name: "Week 3", studentId: "s1", assignment: { description: "Reflect" } },
+      studentId: c.studentId === undefined ? "s1" : c.studentId,
+      thread: { name: "Week 3", assignment: { description: "Reflect" } },
     }))
   );
   mockRepo("Comment", { createQueryBuilder: vi.fn().mockReturnValue(commentQb) });
@@ -208,10 +216,11 @@ function setupDefaultMocks(options?: {
     await cb(manager);
   });
 
-  // Default narrative generator response
+  // Default narrative generator response. The generator's output uses
+  // `sourceId` — for Phase 2 callers, sourceId IS the comment id.
   mockGenerateNarrativeBatch.mockResolvedValue([
     {
-      commentId: "c1",
+      sourceId: "c1",
       narrative: "Evidence of systematic debugging skill.",
       outcomeAlignments: [
         {
@@ -222,7 +231,7 @@ function setupDefaultMocks(options?: {
       ],
     },
     {
-      commentId: "c2",
+      sourceId: "c2",
       narrative: "Evidence of teamwork understanding.",
       outcomeAlignments: [],
     },
@@ -262,6 +271,22 @@ describe("generateEvidenceInBackground", () => {
     expect(mockGenerateNarrativeBatch).not.toHaveBeenCalled();
   });
 
+  it("skips comments with no studentId (regression: studentId is on Comment, not Thread)", async () => {
+    // Both comments lack a studentId — pipeline must NOT call the LLM
+    // and must NOT write moments. This protects against the prior bug
+    // where evidence-pipeline read `thread.studentId` (a field that
+    // doesn't exist on Thread), which silently produced empty studentIds
+    // and caused saveEvidenceResults to skip every result.
+    setupDefaultMocks({
+      comments: [
+        { id: "c1", text: "Some reflection text.", studentId: null },
+        { id: "c2", text: "Another reflection.", studentId: null },
+      ],
+    });
+    await generateEvidenceInBackground(["c1", "c2"], "inst-1");
+    expect(mockGenerateNarrativeBatch).not.toHaveBeenCalled();
+  });
+
   it("calls generateNarrativeBatch and saves results", async () => {
     setupDefaultMocks();
     await generateEvidenceInBackground(["c1", "c2"], "inst-1");
@@ -282,7 +307,7 @@ describe("generateEvidenceInBackground", () => {
 
     const callArgs = mockGenerateNarrativeBatch.mock.calls[0][0];
     const c1Input = callArgs.comments.find(
-      (c: { commentId: string }) => c.commentId === "c1"
+      (c: { sourceId: string }) => c.sourceId === "c1"
     );
     expect(c1Input.toriTags).toContain("Problem-Solving");
     expect(c1Input.reflectionCategory).toBe("DIALOGIC_REFLECTION");
@@ -311,7 +336,7 @@ describe("generateEvidenceInBackground", () => {
       .mockRejectedValueOnce(new Error("LLM timeout"))
       .mockResolvedValueOnce([
         {
-          commentId: "c5",
+          sourceId: "c5",
           narrative: "Second batch narrative.",
           outcomeAlignments: [],
         },

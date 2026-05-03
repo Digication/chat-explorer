@@ -30,12 +30,12 @@ proposal: Land Phases 1-3 onto main with auth fix for studentEvidenceMoments sco
 
 | # | Check | Status | Evidence | Notes |
 |---|---|---|---|---|
-| 1 | Tier justification | _pending_ | | |
-| 2 | Build passes | _pending_ | | |
-| 3 | Tests pass | _pending_ | | |
-| 4 | Flow Hazard Analysis | _pending_ | | |
-| 5 | Gate 4 runtime smoke | _pending_ | | |
-| 6 | Verifier spot-check | _pending_ | | |
-| 7 | Observability | _pending_ | | |
-| 8 | Floor-signal scan | _pending_ | | |
-| 9 | Retrospective decision | _pending_ | | |
+| 1 | Tier justification | passed | R2 — touches authentication + cross-tenant boundaries (StudentConsent integration), evidence-pipeline write path, opaque-handle refactor across 2 callers | |
+| 2 | Build passes | passed | `pnpm typecheck` clean (run twice, before + after each fix iteration) | |
+| 3 | Tests pass | passed | `pnpm test` 448/448 green; new: 7 evidence-outcomes unit + 3 integration + 1 pipeline regression | |
+| 4 | Flow Hazard Analysis | passed | Cross-tenant evidence leak (cross-institution, cross-course, consent-excluded) closed in `getStudentEvidenceMoments` AND `getEvidenceSummary` via shared `computeSourceNarrowing` helper. Phase 2 pipeline studentId-leak (read from non-existent `thread.studentId`) closed in `evidence-pipeline.ts`. Opaque-handle abstraction leak in narrative-generator interface cleaned (commentId → sourceId). | |
+| 5 | Gate 4 runtime smoke | passed | Dev server restarts cleanly post-merge: `/api/health` returns 200, TORI framework auto-seeds for the institution (69 outcomes), no console errors | |
+| 6 | Verifier spot-check | passed | Codex 3 rounds — round 1: 1 high finding (cross-tenant leak in studentEvidenceMoments). Round 2: 2 high findings (parallel leak in getEvidenceSummary + phase-2 studentId bug in evidence-pipeline). Round 3: zero findings, approved. Metric file: `.parity/metrics/2026-05-03T00-42-29-091Z-...-verification-codex-410fe1bb.json`. | |
+| 7 | Observability | passed | All three writes (auth-guard short-circuit, pipeline studentId-skip, narrative-generator legacy-id parse) emit info/log lines for traceability | |
+| 8 | Floor-signal scan | passed | No floor signals tripped: no untested invariants, no destructive migrations, no shared-system mutations | |
+| 9 | Retrospective decision | N/A | retrospective.enabled=false in .workflow/config.json — auto-skip per Parity policy | |
