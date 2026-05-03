@@ -12,7 +12,6 @@ on:
       - 'src/**'
       - 'vitest.config.ts'
       - 'tsconfig*.json'
-      - '.github/workflows/ci-full.yml'
 
 concurrency:
   group: ci-full-${{ github.ref }}
