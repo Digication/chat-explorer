@@ -1,0 +1,62 @@
+name: Full Test Suite
+
+# Runs the integration suite (Postgres-backed) on PRs that change application
+# code or test config. Pure-dependency PRs and docs-only PRs are covered by
+# the typecheck + client unit tests in ci.yml. To force a run on an excluded
+# PR, push a no-op change under src/ or trigger via re-run UI.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'vitest.config.ts'
+      - 'tsconfig*.json'
+
+concurrency:
+  group: ci-full-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  full-test:
+    name: Full Test Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: dev
+          POSTGRES_PASSWORD: dev
+          POSTGRES_DB: chat-explorer
+        options: >-
+          --health-cmd "pg_isready -U dev"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: All tests (unit + integration)
+        run: pnpm test
+        env:
+          DATABASE_URL: postgresql://dev:dev@localhost:5432/chat-explorer
+
+      - name: Build
+        run: pnpm build
